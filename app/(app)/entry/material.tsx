@@ -12,6 +12,8 @@ import { getLocalDateString } from '../../../lib/dateUtils';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
+import mockJobs from '../../../mock_jobs.json';
+
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -146,7 +148,7 @@ export default function MaterialTransferEntryScreen() {
       ]);
 
       if (jobsRes.data) {
-        setJobs(jobsRes.data.map(j => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id })));
+        setJobs(mockJobs.map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id })));
       }
       
       if (user) {

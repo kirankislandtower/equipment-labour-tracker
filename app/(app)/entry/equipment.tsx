@@ -13,6 +13,8 @@ import WebCamera from '../../../components/WebCamera';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
+import mockJobs from '../../../mock_jobs.json';
+import mockSuppliersEquipment from '../../../mock_suppliers_equipment.json';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -136,7 +138,8 @@ export default function EquipmentEntryScreen() {
     remarks: '',
     fuel_provided: false,
     fuel_quantity: '',
-    fuel_unit: 'Gallons'
+    fuel_unit: 'Gallons',
+    location: ''
   });
 
   const rentalTypes = [
@@ -182,46 +185,27 @@ export default function EquipmentEntryScreen() {
   }, [formData.start_time, formData.end_time, formData.start_am_pm, formData.end_am_pm, formData.break_hours]);
 
   useEffect(() => {
-    const fetchAllocations = async () => {
-      if (!formData.job_id) {
-        setEquipmentList([]);
-        setSuppliers([]);
-        return;
-      }
-      try {
-        const [equipData, suppData] = await Promise.all([
-           supabase.from('job_equipment').select('equipment_master_id').eq('job_id', formData.job_id),
-           supabase.from('job_suppliers').select('supplier_id').eq('job_id', formData.job_id)
-        ]);
-        
-        if (equipData.data) {
-          const allocatedIds = new Set(equipData.data.map(d => d.equipment_master_id));
-          const filtered = allEquipmentList.filter(e => allocatedIds.has(e.id));
-          setEquipmentList(filtered.map(e => ({ label: `${e.equipment_category}: ${e.equipment_name}`, value: e.id })));
-          
-          if (formData.equipment_id && !allocatedIds.has(formData.equipment_id)) {
-             setFormData(prev => ({ ...prev, equipment_id: '' }));
-          }
-        }
-
-        if (suppData.data) {
-          const allocatedIds = new Set(suppData.data.map(d => d.supplier_id));
-          const filtered = allSuppliersList.filter(s => allocatedIds.has(s.id));
-          setSuppliers(filtered.map(s => ({ label: s.supplier_name, value: s.id })));
-          
-          if (formData.supplier_id && !allocatedIds.has(formData.supplier_id)) {
-             setFormData(prev => ({ ...prev, supplier_id: '' }));
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
+    // Populate all unique suppliers
+    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)));
+    setSuppliers(uniqueSuppliers.map(s => ({ label: s, value: s })));
     
-    if (allEquipmentList.length > 0 && allSuppliersList.length > 0) {
-      fetchAllocations();
+    // Filter equipment based on selected supplier
+    if (formData.supplier_id) {
+      const equipForSupplier = mockSuppliersEquipment
+        .filter(item => item.supplier === formData.supplier_id)
+        .map(item => ({ label: item.equipment, value: item.equipment }));
+      
+      // Make unique list of equipment for this supplier
+      const uniqueEquip = Array.from(new Map(equipForSupplier.map(item => [item.value, item])).values());
+      setEquipmentList(uniqueEquip);
+      
+      if (formData.equipment_id && !uniqueEquip.find(e => e.value === formData.equipment_id)) {
+        setFormData(prev => ({ ...prev, equipment_id: '' }));
+      }
+    } else {
+      setEquipmentList([]);
     }
-  }, [formData.job_id, allEquipmentList, allSuppliersList]);
+  }, [formData.supplier_id]);
 
   const fetchData = async () => {
     try {
@@ -233,7 +217,10 @@ export default function EquipmentEntryScreen() {
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
 
-      if (jobsRes.data) setJobs(jobsRes.data.map(j => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id })));
+      if (jobsRes.data) {
+        // Use mock data for testing as requested
+        setJobs(mockJobs.map((j: any) => ({ label: j.job_number, value: j.id })));
+      }
       if (suppliersRes.data) {
         setAllSuppliersList(suppliersRes.data);
       }
@@ -315,7 +302,8 @@ export default function EquipmentEntryScreen() {
           remarks: '',
           fuel_provided: false,
           fuel_quantity: '',
-          fuel_unit: 'Gallons'
+          fuel_unit: 'Gallons',
+          location: ''
         }));
         setPhotoUri(null);
       }
@@ -328,8 +316,20 @@ export default function EquipmentEntryScreen() {
     }
   };
 
-  const updateForm = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+  const updateForm = (key: string, value: any) => {
+    setFormData(prev => {
+      const newState = { ...prev, [key]: value };
+      // Clear dependent fields
+      if (key === 'job_id') {
+        newState.location = '';
+        newState.supplier_id = '';
+        newState.equipment_id = '';
+      }
+      if (key === 'supplier_id') {
+        newState.equipment_id = '';
+      }
+      return newState;
+    });
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
 
@@ -554,7 +554,8 @@ export default function EquipmentEntryScreen() {
                     remarks: '',
                     fuel_provided: false,
                     fuel_quantity: '',
-                    fuel_unit: 'Gallons'
+                    fuel_unit: 'Gallons',
+                    location: ''
                   });
                   setPhotoUri(null);
                   router.setParams({ id: '' });
@@ -609,10 +610,47 @@ export default function EquipmentEntryScreen() {
           required={true}
           value={formData.job_id}
           options={jobs}
-          onSelect={(v) => updateForm('job_id', v)}
+          onSelect={(v: string) => updateForm('job_id', v)}
           placeholder="Select Job"
           error={errors.job_id}
         />
+
+        {(() => {
+          const selectedJobObj = mockJobs.find((j: any) => j.id === formData.job_id);
+          if (!selectedJobObj) return null;
+          
+          const locationsArray = selectedJobObj.location && selectedJobObj.location !== 'N/A' 
+            ? selectedJobObj.location.split(',').map((l: string) => l.trim()).filter((l: string) => l) 
+            : [];
+            
+          const locationOptions = locationsArray.map((l: string) => ({ label: l, value: l }));
+
+          return (
+            <>
+              <View className="mb-4">
+                <Text className="text-sm font-medium text-slate-700 mb-1">Project Name</Text>
+                <TextInput
+                  value={selectedJobObj.job_name}
+                  editable={false}
+                  multiline
+                  className="bg-slate-100 border border-slate-200 text-slate-900 rounded-lg px-4 py-3.5"
+                />
+              </View>
+
+              {locationOptions.length > 0 && (
+                <CustomPicker 
+                  label="Location"
+                  required={true}
+                  value={formData.location}
+                  options={locationOptions}
+                  onSelect={(v: string) => updateForm('location', v)}
+                  placeholder="Select Location"
+                  error={errors.location}
+                />
+              )}
+            </>
+          );
+        })()}
 
         <View className={!formData.job_id ? 'opacity-50' : ''}>
           <CustomPicker 
@@ -626,13 +664,13 @@ export default function EquipmentEntryScreen() {
           />
         </View>
 
-        <View className={!formData.job_id ? 'opacity-50' : ''}>
+        <View className={!formData.supplier_id ? 'opacity-50' : ''}>
           <CustomPicker 
             label="Equipment Name" 
             value={formData.equipment_id} 
             options={equipmentList} 
             onSelect={(val: string) => updateForm('equipment_id', val)} 
-            placeholder={formData.job_id ? "Select Equipment" : "Please select a Job Number first"} 
+            placeholder={formData.supplier_id ? "Select Equipment" : "Please select a Supplier first"} 
             required
             error={errors.equipment_id}
           />

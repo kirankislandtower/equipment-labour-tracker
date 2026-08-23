@@ -10,8 +10,10 @@ import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cl
 import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
+import mockJobs from '../../../mock_jobs.json';
+import mockSuppliersEquipment from '../../../mock_suppliers_equipment.json';
 
-type Job = { id: string; job_number: string; job_name: string };
+type Job = { id: string; job_number: string; job_name: string; location?: string };
 type Supplier = { id: string; supplier_name: string };
 type Designation = { id: string; designation_name: string };
 
@@ -30,6 +32,7 @@ export default function LabourEntryScreen() {
 
   const [entryDate, setEntryDate] = useState(getLocalDateString());
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [employeeName, setEmployeeName] = useState('');
   const [selectedDesignation, setSelectedDesignation] = useState<Designation | null>(null);
@@ -41,6 +44,7 @@ export default function LabourEntryScreen() {
   const [remarks, setRemarks] = useState('');
 
   const [jobModalVisible, setJobModalVisible] = useState(false);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [supplierModalVisible, setSupplierModalVisible] = useState(false);
   const [designationModalVisible, setDesignationModalVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
@@ -85,34 +89,17 @@ export default function LabourEntryScreen() {
   );
 
   useEffect(() => {
-    const fetchAllocations = async () => {
-      if (!selectedJob) {
-        setSuppliers([]);
-        return;
-      }
-      try {
-        const { data } = await supabase.from('job_suppliers').select('supplier_id').eq('job_id', selectedJob.id);
-        if (data) {
-          const allocatedIds = new Set(data.map(d => d.supplier_id));
-          const filtered = allSuppliers.filter(s => allocatedIds.has(s.id));
-          setSuppliers(filtered);
-          
-          if (selectedSupplier && !allocatedIds.has(selectedSupplier.id)) {
-             setSelectedSupplier(null);
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    
-    if (allSuppliers.length > 0) {
-      fetchAllocations();
-    }
-  }, [selectedJob, allSuppliers]);
+    // Populate all unique suppliers
+    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)));
+    setAllSuppliers(uniqueSuppliers.map(s => ({ id: s, supplier_name: s })));
+    setSuppliers(uniqueSuppliers.map(s => ({ id: s, supplier_name: s })));
+  }, []);
 
   useEffect(() => {
     if (selectedJob && errors.job) setErrors(prev => ({ ...prev, job: '' }));
+    // Reset dependent fields when job changes
+    setSelectedLocation(null);
+    setSelectedSupplier(null);
   }, [selectedJob]);
   
   useEffect(() => {
@@ -133,10 +120,13 @@ export default function LabourEntryScreen() {
         supabase.auth.getUser()
       ]);
 
-      if (jobsRes.data) setJobs(jobsRes.data);
-      if (suppliersRes.data) {
-        setAllSuppliers(suppliersRes.data);
-      }
+      setJobs(mockJobs.map((j: any) => ({
+        id: j.id,
+        job_number: j.job_number,
+        job_name: j.job_name,
+        location: j.location
+      })));
+      
       if (designationsRes.data) setDesignations(designationsRes.data);
 
       if (user) {
@@ -309,7 +299,7 @@ export default function LabourEntryScreen() {
                 }}
               >
                 <Text className="text-slate-700 text-lg font-medium">
-                  {item.supplier_name || item.designation_name || (item.job_number ? `${item.job_number} - ${item.job_name}` : '')}
+                  {item.supplier_name || item.designation_name || item.location_name || item.job_number || ''}
                 </Text>
               </TouchableOpacity>
             )}
@@ -445,12 +435,51 @@ export default function LabourEntryScreen() {
               <Briefcase size={20} color={errors.job ? "#ef4444" : "#94a3b8"} />
             </View>
             <Text className={`flex-1 text-base ${selectedJob ? 'text-slate-900' : 'text-slate-400'}`}>
-              {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Select Job'}
+              {selectedJob ? selectedJob.job_number : 'Select Job'}
             </Text>
             <ChevronDown size={20} color={errors.job ? "#ef4444" : "#94a3b8"} />
           </TouchableOpacity>
           {errors.job ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.job}</Text> : null}
         </View>
+
+        {(() => {
+          if (!selectedJob) return null;
+          
+          const locationsArray = selectedJob.location && selectedJob.location !== 'N/A' 
+            ? selectedJob.location.split(',').map(l => l.trim()).filter(l => l) 
+            : [];
+            
+          return (
+            <>
+              <View className="mb-4">
+                <Text className="text-sm font-medium text-slate-700 mb-1">Project Name</Text>
+                <TextInput
+                  value={selectedJob.job_name}
+                  editable={false}
+                  multiline
+                  className="bg-slate-100 border border-slate-200 text-slate-900 rounded-lg px-4 py-3.5"
+                />
+              </View>
+
+              {locationsArray.length > 0 && (
+                <View className="mb-4">
+                  <Text className="text-sm font-medium text-slate-700 mb-1">
+                    Location <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={() => setLocationModalVisible(true)}
+                    className="flex-row items-center bg-white border border-slate-300 rounded-lg px-4 py-3 h-14 active:opacity-70"
+                  >
+                    <Text className={`flex-1 text-base ${selectedLocation ? 'text-slate-900' : 'text-slate-400'}`}>
+                      {selectedLocation || 'Select Location'}
+                    </Text>
+                    <ChevronDown size={20} color="#94a3b8" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          );
+        })()}
 
         <View className={`mb-4 ${!selectedJob ? 'opacity-50' : ''}`}>
           <Text className="text-sm font-medium text-slate-700 mb-1">
@@ -669,6 +698,16 @@ export default function LabourEntryScreen() {
       </ScrollView>
 
       {renderModal(jobModalVisible, setJobModalVisible, jobs, (item) => item.id, setSelectedJob, 'Select Job')}
+      
+      {selectedJob && renderModal(
+        locationModalVisible, 
+        setLocationModalVisible, 
+        (selectedJob.location && selectedJob.location !== 'N/A' ? selectedJob.location.split(',').map(l => ({ id: l.trim(), location_name: l.trim() })).filter(l => l.id) : []), 
+        (item) => item.id, 
+        (item) => setSelectedLocation(item.location_name), 
+        'Select Location'
+      )}
+
       {renderModal(supplierModalVisible, setSupplierModalVisible, suppliers, (item) => item.id, setSelectedSupplier, 'Select Supplier')}
       {renderModal(designationModalVisible, setDesignationModalVisible, designations, (item) => item.id, setSelectedDesignation, 'Select Designation')}
     </SafeAreaView>
