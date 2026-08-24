@@ -1,89 +1,410 @@
 [
-  { "supplier": "Al Shola Transport Co LLC", "equipment": "650 KV GEN SET" },
-  { "supplier": "ANWAR AL MADEENA GEN.TRANSPORTS", "equipment": "SALT WATER 2500 GLN" },
-  { "supplier": "BBC Trader and Transport Services LLC", "equipment": "20 CBM TRUCK" },
-  { "supplier": "BBC Trader and Transport Services LLC", "equipment": "50 TON CRANE" },
-  { "supplier": "BBC Trader and Transport Services LLC", "equipment": "70 TON CRANE" },
-  { "supplier": "BBC Trader and Transport Services LLC", "equipment": "TRAILER" },
-  { "supplier": "BBC Trader and Transport Services LLC", "equipment": "10 TON ROLLER" },
-  { "supplier": "BBC Trader and Transport Services LLC", "equipment": "3 TON ROLLER COMPACTOR" },
-  { "supplier": "BBC Trader and Transport Services LLC", "equipment": "10 TON ROLLER COMPACTOR" },
-  { "supplier": "BOMBAY GENERAL LAND TRANSPORT LLC", "equipment": "20 CBM TRUCK" },
-  { "supplier": "BOMBAY GENERAL LAND TRANSPORT LLC", "equipment": "SIX WHEEL TIPPER" },
-  { "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC", "equipment": "50 TON CRANE" },
-  { "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC", "equipment": "CHAIN EXCAVATOR" },
-  { "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC", "equipment": "TYRE EXCAVATOR" },
-  { "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC", "equipment": "BOB CAT" },
-  { "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC", "equipment": "SHOVEL" },
-  { "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC", "equipment": "20 TON CHAIN EXCAVATOR" },
-  { "supplier": "Ghulam Mustafa Construction Equipment&Machinary Rental LLC", "equipment": "ROLLER COMPACTOR" },
-  { "supplier": "K I M HEAVY MACHINERY CO.L.L.C", "equipment": "CONCRETE MIXER" },
-  { "supplier": "Long Reach Heavy & Light Trucks Transport LLC", "equipment": "7 TON HAIB" },
-  { "supplier": "Long Reach Heavy & Light Trucks Transport LLC", "equipment": "12 MTR TRAILER" },
-  { "supplier": "Long Reach Heavy & Light Trucks Transport LLC", "equipment": "15 TON HIAB" },
-  { "supplier": "Long Reach Heavy & Light Trucks Transport LLC", "equipment": "3XL TIPPER" },
-  { "supplier": "Long Reach Heavy & Light Trucks Transport LLC", "equipment": "10 TON HIAB" },
-  { "supplier": "Long Reach Heavy & Light Trucks Transport LLC", "equipment": "25 TON ASPHALT DUMBER" },
-  { "supplier": "Qasr Al AMan Transport LLC", "equipment": "10 TON HIAB" },
-  { "supplier": "Qasr Al AMan Transport LLC", "equipment": "3 TON TIPPER" },
-  { "supplier": "Qasr Al AMan Transport LLC", "equipment": "40 FT TRAILER" },
-  { "supplier": "SWISS STAR TRANSPORT LLC", "equipment": "SWEET WATER 5000 GLN" },
-  { "supplier": "SWISS STAR TRANSPORT LLC", "equipment": "FLUSHING WATER REMOVAL 5000 GLN" },
-  { "supplier": "SWISS STAR TRANSPORT LLC", "equipment": "SALT WATER TANKER - 5000 GLN" },
-  { "supplier": "SWISS STAR TRANSPORT LLC", "equipment": "SWEET WATER TANKER - 5000GLN" },
-  { "supplier": "SWISS STAR TRANSPORT LLC", "equipment": "DEWATERING TANKER - 5000 GLN" },
-  { "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC", "equipment": "7 TON HAIB" },
-  { "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC", "equipment": "3 TON TIPPER" },
-  { "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC", "equipment": "20 CBM TRUCK" },
-  { "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC", "equipment": "DUMP TRUCK - 20 CBM" },
-  { "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC", "equipment": "TRAILER" },
-  { "supplier": "VIRK Transport LLC", "equipment": "TRAILER" },
-  { "supplier": "VIRK Transport LLC", "equipment": "12 MTR TRAILER" },
-  { "supplier": "ABDUL WAKIL AMNA TRANSPORTATION LLC - SPC", "equipment": "CHAIN EXCAVATOR" },
-  { "supplier": "AL JAMAL TRANSPORT L.L.C", "equipment": "30 TON CHAIN EXCAVATOR" },
-  { "supplier": "BAHWALPUR WATER TRANSPORT LLC", "equipment": "SWEET WATER SUPPLY 3000 GLN" },
-  { "supplier": "BAHWALPUR WATER TRANSPORT LLC", "equipment": "SALT WATER TANKER 3000 GLN" },
-  { "supplier": "BAHWALPUR WATER TRANSPORT LLC", "equipment": "SWEET WATER TANKER 3000 GLN" },
-  { "supplier": "Bawar General Transport LLC", "equipment": "25 TON CRANE" },
-  { "supplier": "BIN ABDULLA GENERAL TRANSPORT LLC", "equipment": "SALT WATER TANKER - 1500 GLN" },
-  { "supplier": "BIN ABDULLA GENERAL TRANSPORT LLC", "equipment": "SALT WATER - 3000 GLN" },
-  { "supplier": "BIN ABDULLA GENERAL TRANSPORT LLC", "equipment": "SWEET WATER 1500 GLN" },
-  { "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...", "equipment": "200 TON MOBILE CRANE" },
-  { "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...", "equipment": "85 TON CRANE" },
-  { "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...", "equipment": "WOODEN MAT FOR CRANE" },
-  { "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...", "equipment": "250 TON MOBILE CRANE" },
-  { "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...", "equipment": "100 TON MOBILE CRANE" },
-  { "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...", "equipment": "160 TON CRANE" },
-  { "supplier": "CONCRETECH EQUIPMENT RENTAL", "equipment": "CONCRETE MIXER" },
-  { "supplier": "DUA HEAVY & LIGHT MACHINERY & EQUIPMENT RENTAL L.L...", "equipment": "3 TON TIPPER TRUCK" },
-  { "supplier": "DUA HEAVY & LIGHT MACHINERY & EQUIPMENT RENTAL L.L...", "equipment": "20 CBM TIPPER" },
-  { "supplier": "FORKLIFT & RECOVERY", "equipment": "FORK LIFT RENTAL" },
-  { "supplier": "Forward Heavy Equipment Rental LLC", "equipment": "TYRE EXCAVATOR" },
-  { "supplier": "Forward Heavy Equipment Rental LLC", "equipment": "SHOVAL" },
-  { "supplier": "Forward Heavy Equipment Rental LLC", "equipment": "20 TON CHAIN EXCAVATOR" },
-  { "supplier": "Forward Heavy Equipment Rental LLC", "equipment": "7 TON HIAB" },
-  { "supplier": "Forward Heavy Equipment Rental LLC", "equipment": "CHAIN EXCAVATOR" },
-  { "supplier": "Forward Heavy Equipment Rental LLC", "equipment": "WHEEL EXCAVATOR" },
-  { "supplier": "Forward Heavy Equipment Rental LLC", "equipment": "20 TON EXCAVATOR WITH BREAKER" },
-  { "supplier": "GLOBAL DEWATERING AND PUMPING LLC", "equipment": "DEWATERING PUMP WITH DISCHARGE HOSE" },
-  { "supplier": "MODERN HILLS TRANSPORT L.L.C", "equipment": "SALT WATER TANKER 5000 GLN" },
-  { "supplier": "NASIR IQBAL AND MUHAMMAD ZUBAIR TRANSPORT LLC", "equipment": "30 TON CHAIN EXCAVATOR" },
-  { "supplier": "NASIR IQBAL AND MUHAMMAD ZUBAIR TRANSPORT LLC", "equipment": "40 TON LONG BOOM" },
-  { "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC", "equipment": "50 TON CRANE" },
-  { "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC", "equipment": "JCB" },
-  { "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC", "equipment": "TRAILER" },
-  { "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC", "equipment": "25 TON CRANE" },
-  { "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC", "equipment": "SHOVEL" },
-  { "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC", "equipment": "FLAT BED TRAILER" },
-  { "supplier": "SAHIL AL MADEENA GEN TRANSPORT", "equipment": "12 MTR TRAILER" },
-  { "supplier": "SEA CORAL GENERAL TRANSPORT L.L.C", "equipment": "10 TON ROLLER" },
-  { "supplier": "Secure Track Transport L.L.C", "equipment": "FLUSHING WATER 10000 GLN SUPPLY" },
-  { "supplier": "Secure Track Transport L.L.C", "equipment": "SWEET WATER 10000 GLN SUPPLY" },
-  { "supplier": "USAID AND UMAIR EQUIPMENT RENTAL L.L.C", "equipment": "WHEEL EXCAVATOR" },
-  { "supplier": "USAID AND UMAIR EQUIPMENT RENTAL L.L.C", "equipment": "BOOM LOADER" },
-  { "supplier": "Wadi Safaa Equipment and Machinery Rental LLC", "equipment": "30 KV GEN SET" },
-  { "supplier": "YASMAC EQUIPMENT RENTAL & REPAIRING L.L.C", "equipment": "ASPHALT CUTTER" },
-  { "supplier": "YASMAC EQUIPMENT RENTAL & REPAIRING L.L.C", "equipment": "15 KG ELECTRIC JACK HAMMER" },
-  { "supplier": "YASMAC EQUIPMENT RENTAL & REPAIRING L.L.C", "equipment": "2 TON ROLLER COMPACTOR" },
-  { "supplier": "ZAMZAM CARGO TRANSPORT L.L.C", "equipment": "3 TON ROLLER" }
+  {
+    "supplier": "Al Shola Transport Co LLC",
+    "equipment": "650 KV GEN SET"
+  },
+  {
+    "supplier": "ANWAR AL MADEENA GEN.TRANSPORTS",
+    "equipment": "SALT WATER 2500 GLN"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "20 CBM TRUCK"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "50 TON CRANE"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "70 TON CRANE"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "TRAILER"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "10 TON ROLLER"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "3 TON ROLLER COMPACTOR"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "10 TON ROLLER COMPACTOR"
+  },
+  {
+    "supplier": "BOMBAY GENERAL LAND TRANSPORT LLC",
+    "equipment": "20 CBM TRUCK"
+  },
+  {
+    "supplier": "BOMBAY GENERAL LAND TRANSPORT LLC",
+    "equipment": "SIX WHEEL TIPPER"
+  },
+  {
+    "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC",
+    "equipment": "50 TON CRANE"
+  },
+  {
+    "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC",
+    "equipment": "CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC",
+    "equipment": "TYRE EXCAVATOR"
+  },
+  {
+    "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC",
+    "equipment": "BOB CAT"
+  },
+  {
+    "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC",
+    "equipment": "SHOVEL"
+  },
+  {
+    "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC",
+    "equipment": "20 TON CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "Ghulam Mustafa Construction Equipment&Machinary Rental LLC",
+    "equipment": "ROLLER COMPACTOR"
+  },
+  {
+    "supplier": "K I M HEAVY MACHINERY CO.L.L.C",
+    "equipment": "CONCRETE MIXER"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "7 TON HAIB"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "12 MTR TRAILER"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "15 TON HIAB"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "3XL TIPPER"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "10 TON HIAB"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "25 TON ASPHALT DUMBER"
+  },
+  {
+    "supplier": "Qasr Al AMan Transport LLC",
+    "equipment": "10 TON HIAB"
+  },
+  {
+    "supplier": "Qasr Al AMan Transport LLC",
+    "equipment": "3 TON TIPPER"
+  },
+  {
+    "supplier": "Qasr Al AMan Transport LLC",
+    "equipment": "40 FT TRAILER"
+  },
+  {
+    "supplier": "SWISS STAR TRANSPORT LLC",
+    "equipment": "SWEET WATER 5000 GLN"
+  },
+  {
+    "supplier": "SWISS STAR TRANSPORT LLC",
+    "equipment": "FLUSHING WATER REMOVAL 5000 GLN"
+  },
+  {
+    "supplier": "SWISS STAR TRANSPORT LLC",
+    "equipment": "SALT WATER TANKER - 5000 GLN"
+  },
+  {
+    "supplier": "SWISS STAR TRANSPORT LLC",
+    "equipment": "SWEET WATER TANKER - 5000GLN"
+  },
+  {
+    "supplier": "SWISS STAR TRANSPORT LLC",
+    "equipment": "DEWATERING TANKER - 5000 GLN"
+  },
+  {
+    "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC",
+    "equipment": "7 TON HAIB"
+  },
+  {
+    "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC",
+    "equipment": "3 TON TIPPER"
+  },
+  {
+    "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC",
+    "equipment": "20 CBM TRUCK"
+  },
+  {
+    "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC",
+    "equipment": "DUMP TRUCK - 20 CBM"
+  },
+  {
+    "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC",
+    "equipment": "TRAILER"
+  },
+  {
+    "supplier": "VIRK Transport LLC",
+    "equipment": "TRAILER"
+  },
+  {
+    "supplier": "VIRK Transport LLC",
+    "equipment": "12 MTR TRAILER"
+  },
+  {
+    "supplier": "ABDUL WAKIL AMNA TRANSPORTATION LLC - SPC",
+    "equipment": "CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "AL JAMAL TRANSPORT L.L.C",
+    "equipment": "30 TON CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "BAHWALPUR WATER TRANSPORT LLC",
+    "equipment": "SWEET WATER SUPPLY 3000 GLN"
+  },
+  {
+    "supplier": "BAHWALPUR WATER TRANSPORT LLC",
+    "equipment": "SALT WATER TANKER 3000 GLN"
+  },
+  {
+    "supplier": "BAHWALPUR WATER TRANSPORT LLC",
+    "equipment": "SWEET WATER TANKER 3000 GLN"
+  },
+  {
+    "supplier": "Bawar General Transport LLC",
+    "equipment": "25 TON CRANE"
+  },
+  {
+    "supplier": "BIN ABDULLA GENERAL TRANSPORT LLC",
+    "equipment": "SALT WATER TANKER - 1500 GLN"
+  },
+  {
+    "supplier": "BIN ABDULLA GENERAL TRANSPORT LLC",
+    "equipment": "SALT WATER - 3000 GLN"
+  },
+  {
+    "supplier": "BIN ABDULLA GENERAL TRANSPORT LLC",
+    "equipment": "SWEET WATER 1500 GLN"
+  },
+  {
+    "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...",
+    "equipment": "200 TON MOBILE CRANE"
+  },
+  {
+    "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...",
+    "equipment": "85 TON CRANE"
+  },
+  {
+    "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...",
+    "equipment": "WOODEN MAT FOR CRANE"
+  },
+  {
+    "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...",
+    "equipment": "250 TON MOBILE CRANE"
+  },
+  {
+    "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...",
+    "equipment": "100 TON MOBILE CRANE"
+  },
+  {
+    "supplier": "BOB HEAVY EQUIPMENT RENTAL - SOLE PROPRIETORSHIP L...",
+    "equipment": "160 TON CRANE"
+  },
+  {
+    "supplier": "CONCRETECH EQUIPMENT RENTAL",
+    "equipment": "CONCRETE MIXER"
+  },
+  {
+    "supplier": "DUA HEAVY & LIGHT MACHINERY & EQUIPMENT RENTAL L.L...",
+    "equipment": "3 TON TIPPER TRUCK"
+  },
+  {
+    "supplier": "DUA HEAVY & LIGHT MACHINERY & EQUIPMENT RENTAL L.L...",
+    "equipment": "20 CBM TIPPER"
+  },
+  {
+    "supplier": "FORKLIFT & RECOVERY",
+    "equipment": "FORK LIFT RENTAL"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "TYRE EXCAVATOR"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "SHOVAL"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "20 TON CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "7 TON HIAB"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "WHEEL EXCAVATOR"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "20 TON EXCAVATOR WITH BREAKER"
+  },
+  {
+    "supplier": "GLOBAL DEWATERING AND PUMPING LLC",
+    "equipment": "DEWATERING PUMP WITH DISCHARGE HOSE"
+  },
+  {
+    "supplier": "MODERN HILLS TRANSPORT L.L.C",
+    "equipment": "SALT WATER TANKER 5000 GLN"
+  },
+  {
+    "supplier": "NASIR IQBAL AND MUHAMMAD ZUBAIR TRANSPORT LLC",
+    "equipment": "30 TON CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "NASIR IQBAL AND MUHAMMAD ZUBAIR TRANSPORT LLC",
+    "equipment": "40 TON LONG BOOM"
+  },
+  {
+    "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC",
+    "equipment": "50 TON CRANE"
+  },
+  {
+    "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC",
+    "equipment": "JCB"
+  },
+  {
+    "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC",
+    "equipment": "TRAILER"
+  },
+  {
+    "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC",
+    "equipment": "25 TON CRANE"
+  },
+  {
+    "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC",
+    "equipment": "SHOVEL"
+  },
+  {
+    "supplier": "Prime Pillar Construction Equipment & Machinery Rental LLC",
+    "equipment": "FLAT BED TRAILER"
+  },
+  {
+    "supplier": "SAHIL AL MADEENA GEN TRANSPORT",
+    "equipment": "12 MTR TRAILER"
+  },
+  {
+    "supplier": "SEA CORAL GENERAL TRANSPORT L.L.C",
+    "equipment": "10 TON ROLLER"
+  },
+  {
+    "supplier": "Secure Track Transport L.L.C",
+    "equipment": "FLUSHING WATER 10000 GLN SUPPLY"
+  },
+  {
+    "supplier": "Secure Track Transport L.L.C",
+    "equipment": "SWEET WATER 10000 GLN SUPPLY"
+  },
+  {
+    "supplier": "USAID AND UMAIR EQUIPMENT RENTAL L.L.C",
+    "equipment": "WHEEL EXCAVATOR"
+  },
+  {
+    "supplier": "USAID AND UMAIR EQUIPMENT RENTAL L.L.C",
+    "equipment": "BOOM LOADER"
+  },
+  {
+    "supplier": "Wadi Safaa Equipment and Machinery Rental LLC",
+    "equipment": "30 KV GEN SET"
+  },
+  {
+    "supplier": "YASMAC EQUIPMENT RENTAL & REPAIRING L.L.C",
+    "equipment": "ASPHALT CUTTER"
+  },
+  {
+    "supplier": "YASMAC EQUIPMENT RENTAL & REPAIRING L.L.C",
+    "equipment": "15 KG ELECTRIC JACK HAMMER"
+  },
+  {
+    "supplier": "YASMAC EQUIPMENT RENTAL & REPAIRING L.L.C",
+    "equipment": "2 TON ROLLER COMPACTOR"
+  },
+  {
+    "supplier": "ZAMZAM CARGO TRANSPORT L.L.C",
+    "equipment": "3 TON ROLLER"
+  },
+  {
+    "supplier": "BAHWALPUR WATER TRANSPORT LLC",
+    "equipment": "SWEET WATER 3000GLN"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "25 TON CRANE"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "BOB CAT"
+  },
+  {
+    "supplier": "BBC Trader and Transport Services LLC",
+    "equipment": "JCB"
+  },
+  {
+    "supplier": "CAT 7 HEAVY EQUIPMENT RENTAL LLC",
+    "equipment": "LOW BED TRAILER"
+  },
+  {
+    "supplier": "Forward Heavy Equipment Rental LLC",
+    "equipment": "20 TON EXCAVATOR"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "7 TON HIAB"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "TRAILER"
+  },
+  {
+    "supplier": "Long Reach Heavy & Light Trucks Transport LLC",
+    "equipment": "CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "PUNJAB LAND TRANSPORT L.L.C",
+    "equipment": "MINI CHAIN EXCAVATOR"
+  },
+  {
+    "supplier": "PUNJAB LAND TRANSPORT L.L.C",
+    "equipment": "LOW BED"
+  },
+  {
+    "supplier": "Qasr Al AMan Transport LLC",
+    "equipment": "12 MTR TRAILER"
+  },
+  {
+    "supplier": "Qasr Al AMan Transport LLC",
+    "equipment": "3 TON PICK UP"
+  },
+  {
+    "supplier": "Siddique Sohal General Land Transport LLC",
+    "equipment": "WHEEL EXCAVATOR"
+  },
+  {
+    "supplier": "Tauseef Cargo Transport By Heavy &Light Trucks LLC",
+    "equipment": "20 CBM DUMP TRUCK"
+  }
 ]
