@@ -12,6 +12,7 @@ import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 import mockJobs from '../../../mock_jobs.json';
 import mockSuppliersEquipment from '../../../mock_suppliers_equipment.json';
+import { resolveSupplierId } from '../../../lib/masterData';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
 type Supplier = { id: string; supplier_name: string };
@@ -142,7 +143,7 @@ export default function LabourEntryScreen() {
       }
 
       if (id) {
-        const { data: entryData } = await supabase.from('labour_entries').select('*').eq('id', id).eq('created_by', user.id).single();
+        const { data: entryData } = await supabase.from('labour_entries').select('*').eq('id', id).eq('created_by', user!.id).single();
         if (entryData) {
           setEntryDate(entryData.entry_date);
           if (jobsRes.data) setSelectedJob(jobsRes.data.find((j: any) => j.id === entryData.job_id) || null);
@@ -225,12 +226,16 @@ export default function LabourEntryScreen() {
         }
       }
 
+      // selectedSupplier comes from the mock catalogue (name only), so resolve/create the
+      // matching `suppliers` row before submitting — supplier_id is a UUID column.
+      const resolvedSupplierId = await resolveSupplierId(selectedSupplier!.id);
+
       const payload = {
         entry_date: entryDate,
-        job_id: selectedJob.id,
-        supplier_id: selectedSupplier.id,
+        job_id: selectedJob!.id,
+        supplier_id: resolvedSupplierId,
         employee_name: employeeName,
-        designation_id: selectedDesignation.id,
+        designation_id: selectedDesignation!.id,
         start_time: startTime,
         end_time: endTime,
         break_hours: parseFloat(breakHours) || 0,
@@ -254,7 +259,7 @@ export default function LabourEntryScreen() {
       }
 
       if (error) {
-        if (error.code === '23503') {
+        if (error.code === '23503' && error.message?.includes('created_by')) {
           throw new Error('Your account profile is not fully set up. Please log out completely and log back in to fix this automatically.');
         }
         throw error;

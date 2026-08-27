@@ -423,7 +423,7 @@ export default function AdminLabour() {
                           <View className="flex-1">
                             <Text className="text-xs font-bold text-slate-400 mb-1 uppercase">Job Details</Text>
                             <Text className="text-slate-900 font-bold">{entry.jobs?.job_number}</Text>
-                            <Text className="text-slate-500 text-xs">{entry.jobs?.job_name}</Text>
+                            <Text className="text-slate-500 text-xs" numberOfLines={1}>{entry.jobs?.job_name}</Text>
                           </View>
                           <View className="items-end">
                             <Text className="text-xs font-bold text-slate-400 mb-1 uppercase">Hours</Text>
@@ -478,7 +478,7 @@ export default function AdminLabour() {
                         <Text className="flex-1 text-slate-900 font-medium">{entry.entry_date}</Text>
                         <View style={{flex: 2}}>
                           <Text className="text-slate-900 font-bold">{entry.jobs?.job_number}</Text>
-                          <Text className="text-slate-500 text-xs">{entry.jobs?.job_name}</Text>
+                          <Text className="text-slate-500 text-xs" numberOfLines={1}>{entry.jobs?.job_name}</Text>
                         </View>
                         <View style={{flex: 2}}>
                           <Text className="text-slate-900 font-bold">{entry.employee_name}</Text>

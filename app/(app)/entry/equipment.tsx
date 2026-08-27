@@ -15,6 +15,7 @@ import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
 import mockJobs from '../../../mock_jobs.json';
 import mockSuppliersEquipment from '../../../mock_suppliers_equipment.json';
+import { resolveSupplierId, resolveEquipmentId } from '../../../lib/masterData';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -385,11 +386,18 @@ export default function EquipmentEntryScreen() {
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
       };
 
+      // formData.supplier_id / equipment_id hold the mock catalogue's names, not real
+      // suppliers/equipment_master UUIDs, so resolve them to the matching database row.
+      const [resolvedSupplierId, resolvedEquipmentId] = await Promise.all([
+        resolveSupplierId(formData.supplier_id),
+        resolveEquipmentId(formData.equipment_id),
+      ]);
+
       const payload = {
         entry_date: formData.entry_date,
         job_id: formData.job_id,
-        supplier_id: formData.supplier_id,
-        equipment_master_id: formData.equipment_id,
+        supplier_id: resolvedSupplierId,
+        equipment_master_id: resolvedEquipmentId,
         rental_type: formData.rental_type,
         start_time: convertTo24h(formData.start_time, formData.start_am_pm),
         end_time: convertTo24h(formData.end_time, formData.end_am_pm),
@@ -419,7 +427,7 @@ export default function EquipmentEntryScreen() {
       }
       
       if (error) {
-        if (error.code === '23503') {
+        if (error.code === '23503' && error.message?.includes('created_by')) {
           throw new Error('Your account profile is not fully set up. Please log out completely and log back in to fix this automatically.');
         }
         throw error;
