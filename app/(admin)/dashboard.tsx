@@ -80,14 +80,27 @@ export default function AdminDashboard() {
   const exportDailyReport = async () => {
     setExporting(true);
     try {
-      // Fetch both equipment and labour data for the selected date
+      // Fetch both equipment and labour data for the selected date, with every related field joined in
       let equipQuery = supabase
         .from('equipment_entries')
-        .select('entry_date, foreman_name, rental_type, working_hours, status, equipment_master(equipment_name)');
-        
+        .select(`
+          entry_date, rental_type, start_time, end_time, break_hours, working_hours, number_of_trips,
+          vehicle_number, foreman_name, engineer_name, fuel_provided, fuel_quantity, fuel_unit,
+          remarks, status, rejection_reason, equipment_photo_url,
+          jobs(job_number, job_name, location),
+          suppliers(supplier_name),
+          equipment_master(equipment_name)
+        `);
+
       let labourQuery = supabase
         .from('labour_entries')
-        .select('entry_date, foreman_name, employee_name, total_working_hours, status');
+        .select(`
+          entry_date, employee_name, start_time, end_time, break_hours, total_working_hours,
+          foreman_name, engineer_name, remarks, status, rejection_reason, labour_photo_url,
+          jobs(job_number, job_name, location),
+          suppliers(supplier_name),
+          labour_designations(designation_name)
+        `);
 
       if (fromDate) {
         equipQuery = equipQuery.gte('entry_date', fromDate);
@@ -109,16 +122,35 @@ export default function AdminDashboard() {
         return;
       }
 
-      const headers = ['Type', 'Date', 'Foreman', 'Details', 'Hours', 'Status'];
+      const headers = [
+        'Type', 'Date', 'Job Number', 'Job Name', 'Location', 'Supplier',
+        'Equipment Name', 'Rental Type', 'Employee Name', 'Designation',
+        'Vehicle Number', 'Number of Trips', 'Start Time', 'End Time', 'Break Hours', 'Working Hours',
+        'Fuel Provided', 'Fuel Quantity', 'Fuel Unit',
+        'Foreman', 'Engineer', 'Remarks', 'Status', 'Rejection Reason', 'Photo URL',
+      ];
       const rows: unknown[][] = [];
 
       equipData?.forEach((e: any) => {
-        const equipName = e.equipment_master?.equipment_name || 'Unknown Equipment';
-        rows.push(['Equipment', e.entry_date, e.foreman_name || '', `${equipName} (${e.rental_type})`, e.working_hours, e.status]);
+        rows.push([
+          'Equipment', e.entry_date, e.jobs?.job_number || '', e.jobs?.job_name || '', e.jobs?.location || '',
+          e.suppliers?.supplier_name || '',
+          e.equipment_master?.equipment_name || '', e.rental_type, '', '',
+          e.vehicle_number || '', e.number_of_trips ?? '', e.start_time || '', e.end_time || '', e.break_hours ?? '', e.working_hours ?? '',
+          e.fuel_provided ? 'Yes' : 'No', e.fuel_quantity ?? '', e.fuel_unit || '',
+          e.foreman_name || '', e.engineer_name || '', e.remarks || '', e.status, e.rejection_reason || '', e.equipment_photo_url || '',
+        ]);
       });
 
       labourData?.forEach((l: any) => {
-        rows.push(['Labour', l.entry_date, l.foreman_name || '', `Emp: ${l.employee_name}`, l.total_working_hours, l.status]);
+        rows.push([
+          'Labour', l.entry_date, l.jobs?.job_number || '', l.jobs?.job_name || '', l.jobs?.location || '',
+          l.suppliers?.supplier_name || '',
+          '', '', l.employee_name || '', l.labour_designations?.designation_name || '',
+          '', '', l.start_time || '', l.end_time || '', l.break_hours ?? '', l.total_working_hours ?? '',
+          '', '', '',
+          l.foreman_name || '', l.engineer_name || '', l.remarks || '', l.status, l.rejection_reason || '', l.labour_photo_url || '',
+        ]);
       });
 
       const csvString = buildCSV(headers, rows);
