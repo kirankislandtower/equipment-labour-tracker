@@ -171,14 +171,20 @@ export default function AdminDashboard() {
         }
       });
 
+      const statusRowStyles: Record<string, { fill: string; font: string }> = {
+        APPROVED: { fill: 'FFC6EFCE', font: 'FF006100' },
+        REJECTED: { fill: 'FFFFC7CE', font: 'FF9C0006' },
+      };
+
       rows.forEach((row, rowIndex) => {
-        if (row[statusColIndex] !== 'APPROVED') return;
+        const rowStyle = statusRowStyles[row[statusColIndex] as string];
+        if (!rowStyle) return;
         headers.forEach((_, colIndex) => {
           const cellRef = XLSX.utils.encode_cell({ r: rowIndex + 1, c: colIndex });
           if (worksheet[cellRef]) {
             worksheet[cellRef].s = {
-              fill: { fgColor: { rgb: 'FFC6EFCE' } },
-              font: { color: { rgb: 'FF006100' } },
+              fill: { fgColor: { rgb: rowStyle.fill } },
+              font: { color: { rgb: rowStyle.font } },
             };
           }
         });
