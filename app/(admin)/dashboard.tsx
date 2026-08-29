@@ -157,6 +157,13 @@ export default function AdminDashboard() {
       const statusColIndex = headers.indexOf('Status');
       const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
+      const columnWidths = [
+        10, 12, 12, 20, 18, 22, 22, 12, 16, 14,
+        14, 14, 10, 10, 11, 13, 12, 12, 10,
+        14, 14, 24, 12, 20, 45,
+      ];
+      worksheet['!cols'] = columnWidths.map(wch => ({ wch }));
+
       headers.forEach((_, colIndex) => {
         const cellRef = XLSX.utils.encode_cell({ r: 0, c: colIndex });
         if (worksheet[cellRef]) {
