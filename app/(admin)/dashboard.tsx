@@ -158,20 +158,6 @@ export default function AdminDashboard() {
       if (Platform.OS === 'web') {
         const fileName = `Report_${fromDate}_to_${toDate}.csv`;
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-        
-        try {
-          const file = new File([blob], fileName, { type: 'text/csv' });
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: 'Export Daily Report',
-            });
-            setExporting(false);
-            return;
-          }
-        } catch (err) {
-          // Fall through
-        }
 
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
