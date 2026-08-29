@@ -9,7 +9,7 @@ import DatePickerModal from '../../components/DatePickerModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Download } from 'lucide-react-native';
-import { buildCSV } from '../../lib/csv';
+import * as XLSX from 'xlsx-js-style';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -153,11 +153,37 @@ export default function AdminDashboard() {
         ]);
       });
 
-      const csvString = buildCSV(headers, rows);
+      // Build a styled worksheet so APPROVED rows can be shaded green
+      const statusColIndex = headers.indexOf('Status');
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+      headers.forEach((_, colIndex) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: colIndex });
+        if (worksheet[cellRef]) {
+          worksheet[cellRef].s = { font: { bold: true }, fill: { fgColor: { rgb: 'FFE2E8F0' } } };
+        }
+      });
+
+      rows.forEach((row, rowIndex) => {
+        if (row[statusColIndex] !== 'APPROVED') return;
+        headers.forEach((_, colIndex) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIndex + 1, c: colIndex });
+          if (worksheet[cellRef]) {
+            worksheet[cellRef].s = {
+              fill: { fgColor: { rgb: 'FFC6EFCE' } },
+              font: { color: { rgb: 'FF006100' } },
+            };
+          }
+        });
+      });
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Report');
 
       if (Platform.OS === 'web') {
-        const fileName = `Report_${fromDate}_to_${toDate}.csv`;
-        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const fileName = `Report_${fromDate}_to_${toDate}.xlsx`;
+        const wbArray = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+        const blob = new Blob([wbArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -168,12 +194,13 @@ export default function AdminDashboard() {
         link.click();
         document.body.removeChild(link);
       } else {
-        const fileUri = `${FileSystem.documentDirectory}Report_${fromDate}_to_${toDate}.csv`;
-        await FileSystem.writeAsStringAsync(fileUri, csvString, { encoding: FileSystem.EncodingType.UTF8 });
+        const fileUri = `${FileSystem.documentDirectory}Report_${fromDate}_to_${toDate}.xlsx`;
+        const wbBase64 = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+        await FileSystem.writeAsStringAsync(fileUri, wbBase64, { encoding: FileSystem.EncodingType.Base64 });
 
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(fileUri, {
-            mimeType: 'text/csv',
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             dialogTitle: 'Export Daily Report',
           });
         } else {
