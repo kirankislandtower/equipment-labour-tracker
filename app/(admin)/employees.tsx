@@ -49,7 +49,7 @@ export default function EmployeesScreen() {
     setIsSubmitting(true);
     try {
       // Create user directly via GoTrue API to prevent logging the Admin out of their session
-      const pseudoEmail = `${form.username.toLowerCase().trim()}@truxo.local`;
+      const pseudoEmail = `${form.username.toLowerCase().trim()}@islandtower.local`;
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
       
