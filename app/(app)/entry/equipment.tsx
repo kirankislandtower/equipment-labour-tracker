@@ -312,6 +312,8 @@ export default function EquipmentEntryScreen() {
           location: ''
         }));
         setPhotoUri(null);
+        setInitialPhotoUri(null);
+        setErrors({});
       }
       
     } catch (error) {

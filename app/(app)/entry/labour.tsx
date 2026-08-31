@@ -179,6 +179,24 @@ export default function LabourEntryScreen() {
             setInitialPhotoUri(entryData.labour_photo_url);
           }
         }
+      } else {
+        // Tabs.Screen keeps this component mounted across tab switches, so a fresh
+        // "new entry" visit (no id) needs an explicit reset -- otherwise the last
+        // submission's values would still be sitting in every field.
+        setEntryDate(getLocalDateString());
+        setSelectedJob(null);
+        setSelectedLocation(null);
+        setSelectedSupplier(null);
+        setEmployeeName('');
+        setSelectedDesignation(null);
+        setStartTime('08:00');
+        setEndTime('17:00');
+        setBreakHours('1');
+        setEngineerName('');
+        setRemarks('');
+        setPhotoUri(null);
+        setInitialPhotoUri(null);
+        setErrors({});
       }
     } catch (error) {
       console.error(error);

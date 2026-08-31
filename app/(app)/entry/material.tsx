@@ -197,6 +197,8 @@ export default function MaterialTransferEntryScreen() {
           remarks: '',
         }));
         setPhotoUri(null);
+        setInitialPhotoUri(null);
+        setErrors({});
       }
       
     } catch (error) {
