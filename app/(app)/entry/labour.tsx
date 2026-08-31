@@ -12,6 +12,7 @@ import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 import mockJobs from '../../../mock_jobs.json';
 import mockSuppliersEquipment from '../../../mock_suppliers_equipment.json';
+import mockSupplierEmployees from '../../../mock_supplier_employees.json';
 import { resolveSupplierId } from '../../../lib/masterData';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
@@ -36,6 +37,8 @@ export default function LabourEntryScreen() {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [employeeName, setEmployeeName] = useState('');
+  const [employeeOptions, setEmployeeOptions] = useState<string[]>([]);
+  const [employeeManualEntry, setEmployeeManualEntry] = useState(false);
   const [selectedDesignation, setSelectedDesignation] = useState<Designation | null>(null);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('17:00');
@@ -47,6 +50,7 @@ export default function LabourEntryScreen() {
   const [jobModalVisible, setJobModalVisible] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [supplierModalVisible, setSupplierModalVisible] = useState(false);
+  const [employeeModalVisible, setEmployeeModalVisible] = useState(false);
   const [designationModalVisible, setDesignationModalVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -106,6 +110,17 @@ export default function LabourEntryScreen() {
   
   useEffect(() => {
     if (selectedSupplier && errors.supplier) setErrors(prev => ({ ...prev, supplier: '' }));
+
+    // Suppliers with a known employee roster get a picker instead of free text.
+    const options = selectedSupplier
+      ? Array.from(new Set(
+          mockSupplierEmployees
+            .filter(item => item.supplier === selectedSupplier.supplier_name)
+            .map(item => item.employee)
+        )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      : [];
+    setEmployeeOptions(options);
+    setEmployeeManualEntry(false);
   }, [selectedSupplier]);
   
   useEffect(() => {
@@ -305,7 +320,7 @@ export default function LabourEntryScreen() {
                 }}
               >
                 <Text className="text-slate-700 text-lg font-medium">
-                  {item.supplier_name || item.designation_name || item.location_name || item.job_number || ''}
+                  {item.supplier_name || item.designation_name || item.location_name || item.job_number || item.employee_name || ''}
                 </Text>
               </TouchableOpacity>
             )}
@@ -510,19 +525,46 @@ export default function LabourEntryScreen() {
           <Text className="text-sm font-medium text-slate-700 mb-1">
             Employee Name <Text className="text-red-500">*</Text>
           </Text>
-          <View className={`flex-row items-center bg-white border ${errors.employee_name ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}>
-            <User size={20} color={errors.employee_name ? "#ef4444" : "#94a3b8"} className="mr-3" />
-            <TextInput
-              className="flex-1 text-slate-900 text-base font-medium"
-              placeholder="Enter employee name"
-              placeholderTextColor="#94a3b8"
-              value={employeeName}
-              onChangeText={(t) => {
-                setEmployeeName(t);
-                if (errors.employee_name) setErrors(prev => ({ ...prev, employee_name: '' }));
-              }}
-            />
-          </View>
+          {employeeOptions.length > 0 && !employeeManualEntry ? (
+            <>
+              <TouchableOpacity
+                onPress={() => setEmployeeModalVisible(true)}
+                className={`flex-row items-center bg-white border ${errors.employee_name ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 py-3 h-14 active:opacity-70`}
+              >
+                <View className="mr-3">
+                  <User size={20} color={errors.employee_name ? "#ef4444" : "#94a3b8"} />
+                </View>
+                <Text className={`flex-1 text-base ${employeeName ? 'text-slate-900' : 'text-slate-400'}`}>
+                  {employeeName || 'Select Employee'}
+                </Text>
+                <ChevronDown size={20} color={errors.employee_name ? "#ef4444" : "#94a3b8"} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEmployeeManualEntry(true)} className="mt-1.5 ml-1">
+                <Text className="text-xs text-slate-500 underline">Not listed? Enter name manually</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View className={`flex-row items-center bg-white border ${errors.employee_name ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}>
+                <User size={20} color={errors.employee_name ? "#ef4444" : "#94a3b8"} className="mr-3" />
+                <TextInput
+                  className="flex-1 text-slate-900 text-base font-medium"
+                  placeholder="Enter employee name"
+                  placeholderTextColor="#94a3b8"
+                  value={employeeName}
+                  onChangeText={(t) => {
+                    setEmployeeName(t);
+                    if (errors.employee_name) setErrors(prev => ({ ...prev, employee_name: '' }));
+                  }}
+                />
+              </View>
+              {employeeOptions.length > 0 && (
+                <TouchableOpacity onPress={() => setEmployeeManualEntry(false)} className="mt-1.5 ml-1">
+                  <Text className="text-xs text-slate-500 underline">Choose from list instead</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
           {errors.employee_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.employee_name}</Text> : null}
         </View>
 
@@ -715,6 +757,21 @@ export default function LabourEntryScreen() {
       )}
 
       {renderModal(supplierModalVisible, setSupplierModalVisible, suppliers, (item) => item.id, setSelectedSupplier, 'Select Supplier')}
+      {renderModal(
+        employeeModalVisible,
+        setEmployeeModalVisible,
+        [...employeeOptions.map(e => ({ id: e, employee_name: e })), { id: '__manual__', employee_name: 'Other (enter manually)' }],
+        (item) => item.id,
+        (item) => {
+          if (item.id === '__manual__') {
+            setEmployeeManualEntry(true);
+          } else {
+            setEmployeeName(item.employee_name);
+            if (errors.employee_name) setErrors(prev => ({ ...prev, employee_name: '' }));
+          }
+        },
+        'Select Employee'
+      )}
       {renderModal(designationModalVisible, setDesignationModalVisible, designations, (item) => item.id, setSelectedDesignation, 'Select Designation')}
     </SafeAreaView>
   );

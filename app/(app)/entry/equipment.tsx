@@ -186,9 +186,12 @@ export default function EquipmentEntryScreen() {
   }, [formData.start_time, formData.end_time, formData.start_am_pm, formData.end_am_pm, formData.break_hours]);
 
   useEffect(() => {
-    // Populate all unique suppliers, alphabetically so new additions don't just pile up at the end
-    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)))
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    // Populate all unique suppliers, alphabetically so new additions don't just pile up at the end.
+    // Labour-only suppliers (no equipment rows) are excluded -- they'd otherwise show up here
+    // with an empty Equipment picker and nothing to actually select.
+    const uniqueSuppliers = Array.from(new Set(
+      mockSuppliersEquipment.filter(item => item.equipment && item.equipment.trim() !== '').map(item => item.supplier)
+    )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     setSuppliers(uniqueSuppliers.map(s => ({ label: s, value: s })));
 
     // Filter equipment based on selected supplier
