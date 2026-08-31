@@ -90,8 +90,9 @@ export default function LabourEntryScreen() {
   );
 
   useEffect(() => {
-    // Populate all unique suppliers
-    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)));
+    // Populate all unique suppliers, alphabetically so new additions don't just pile up at the end
+    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)))
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     setAllSuppliers(uniqueSuppliers.map(s => ({ id: s, supplier_name: s })));
     setSuppliers(uniqueSuppliers.map(s => ({ id: s, supplier_name: s })));
   }, []);

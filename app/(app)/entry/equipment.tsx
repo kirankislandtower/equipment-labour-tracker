@@ -186,18 +186,20 @@ export default function EquipmentEntryScreen() {
   }, [formData.start_time, formData.end_time, formData.start_am_pm, formData.end_am_pm, formData.break_hours]);
 
   useEffect(() => {
-    // Populate all unique suppliers
-    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)));
+    // Populate all unique suppliers, alphabetically so new additions don't just pile up at the end
+    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)))
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     setSuppliers(uniqueSuppliers.map(s => ({ label: s, value: s })));
-    
+
     // Filter equipment based on selected supplier
     if (formData.supplier_id) {
       const equipForSupplier = mockSuppliersEquipment
         .filter(item => item.supplier === formData.supplier_id)
         .map(item => ({ label: item.equipment, value: item.equipment }));
-      
-      // Make unique list of equipment for this supplier
-      const uniqueEquip = Array.from(new Map(equipForSupplier.map(item => [item.value, item])).values());
+
+      // Make unique list of equipment for this supplier, alphabetically
+      const uniqueEquip = Array.from(new Map(equipForSupplier.map(item => [item.value, item])).values())
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
       setEquipmentList(uniqueEquip);
       
       if (formData.equipment_id && !uniqueEquip.find(e => e.value === formData.equipment_id)) {
