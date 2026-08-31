@@ -9,7 +9,6 @@ import DatePickerModal from '../../components/DatePickerModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Download } from 'lucide-react-native';
-import * as XLSX from 'xlsx-js-style';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -80,6 +79,12 @@ export default function AdminDashboard() {
   const exportDailyReport = async () => {
     setExporting(true);
     try {
+      // Loaded on demand (not at module scope) so the ~400KB xlsx library only ships to
+      // clients that actually click Export, instead of bloating every page's bundle.
+      // Handle both possible CJS/ESM interop shapes for the dynamic import.
+      const xlsxModule: any = await import('xlsx-js-style');
+      const XLSX = xlsxModule.utils ? xlsxModule : xlsxModule.default;
+
       // Fetch both equipment and labour data for the selected date, with every related field joined in
       let equipQuery = supabase
         .from('equipment_entries')
