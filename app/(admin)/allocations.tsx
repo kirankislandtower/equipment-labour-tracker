@@ -200,24 +200,32 @@ export default function SiteAllocationsScreen() {
     setSaving(true);
     try {
       // 1. Delete all existing mappings for this job
-      await Promise.all([
+      const [delEquip, delSupp] = await Promise.all([
         supabase.from('job_equipment').delete().eq('job_id', selectedJob),
         supabase.from('job_suppliers').delete().eq('job_id', selectedJob)
       ]);
-      
+      if (delEquip.error) throw delEquip.error;
+      if (delSupp.error) throw delSupp.error;
+
       // 2. Insert new ones
       const equipInserts = Array.from(allocatedEquipmentIds).map(id => ({ job_id: selectedJob, equipment_master_id: id }));
       const suppInserts = Array.from(allocatedSupplierIds).map(id => ({ job_id: selectedJob, supplier_id: id }));
 
-      await Promise.all([
-        equipInserts.length > 0 ? supabase.from('job_equipment').insert(equipInserts) : Promise.resolve(),
-        suppInserts.length > 0 ? supabase.from('job_suppliers').insert(suppInserts) : Promise.resolve()
+      const [insEquip, insSupp] = await Promise.all([
+        equipInserts.length > 0 ? supabase.from('job_equipment').insert(equipInserts) : Promise.resolve({ error: null } as any),
+        suppInserts.length > 0 ? supabase.from('job_suppliers').insert(suppInserts) : Promise.resolve({ error: null } as any)
       ]);
-      
+      if (insEquip.error) throw insEquip.error;
+      if (insSupp.error) throw insSupp.error;
+
+      // 3. Re-fetch from the DB rather than trusting local state, so the UI reflects
+      // what actually persisted, not just what we attempted to save.
+      await fetchAllocationsForJob(selectedJob);
+
       alert('Allocations saved successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save allocations. Have you created the job_equipment and job_suppliers tables?');
+      alert(`Failed to save allocations: ${err?.message || 'Unknown error. Have you created the job_equipment and job_suppliers tables?'}`);
     } finally {
       setSaving(false);
     }
