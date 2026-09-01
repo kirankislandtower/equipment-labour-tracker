@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Users, Plus, X, User, Eye, EyeOff } from 'lucide-react-native';
+import { Users, Plus, X, User, Eye, EyeOff, Search } from 'lucide-react-native';
 
 export default function EmployeesScreen() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const [loading, setLoading] = useState(true);
   const [usersList, setUsersList] = useState<any[]>([]);
-  
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Modal state
   const [addModal, setAddModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,9 +94,16 @@ export default function EmployeesScreen() {
     }
   };
 
+  const filteredUsers = usersList.filter((u) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    const username = u.email ? u.email.split('@')[0] : '';
+    return (u.full_name || '').toLowerCase().includes(q) || username.toLowerCase().includes(q);
+  });
+
   return (
     <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
-      <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
+      <View className={`flex-row justify-between items-center mb-6 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
         <View>
           <View className="flex-row items-center">
             <Text className="text-slate-900 text-3xl font-black tracking-tight mr-3">Foremans</Text>
@@ -105,13 +113,30 @@ export default function EmployeesScreen() {
           </View>
           <Text className="text-slate-500 mt-1">Manage Foremen and system access.</Text>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setAddModal(true)}
           className="bg-[#1e3a8a] px-5 py-3 rounded-xl flex-row items-center active:opacity-80"
         >
           <Plus size={20} color="#fff" />
           <Text className="text-white font-bold ml-2">New Foreman</Text>
         </TouchableOpacity>
+      </View>
+
+      <View className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 h-12 mb-6">
+        <Search size={18} color="#94a3b8" />
+        <TextInput
+          placeholder="Search by name or username"
+          placeholderTextColor="#94a3b8"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          className="flex-1 ml-3 text-slate-900"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
+            <X size={16} color="#94a3b8" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View className="flex-1 bg-transparent overflow-hidden">
@@ -131,9 +156,15 @@ export default function EmployeesScreen() {
                 </View>
               )}
               
-              {usersList.map((u) => {
+              {filteredUsers.length === 0 && (
+                <View className="py-12 items-center">
+                  <Text className="text-slate-500 font-medium">No foremen match "{searchQuery}".</Text>
+                </View>
+              )}
+
+              {filteredUsers.map((u) => {
                 const username = u.email ? u.email.split('@')[0] : 'unknown';
-                
+
                 return (
                   <View key={u.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
                     <View className={`${isMobile ? 'mb-4 border-b border-slate-100 pb-3' : 'flex-1'} flex-row items-center justify-between`}>
