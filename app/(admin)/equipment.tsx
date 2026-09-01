@@ -383,7 +383,7 @@ export default function AdminEquipment() {
               <Text className="flex-1 font-bold text-slate-700 text-sm">Date</Text>
               <Text className="flex-2 font-bold text-slate-700 text-sm" style={{flex: 2}}>Job</Text>
               <Text className="flex-2 font-bold text-slate-700 text-sm" style={{flex: 2}}>Equipment</Text>
-              <Text className="flex-1 font-bold text-slate-700 text-sm text-center">Hours</Text>
+              <Text className="flex-1 font-bold text-slate-700 text-sm">Foreman</Text>
               <Text className="flex-1 font-bold text-slate-700 text-sm text-center">Status</Text>
               <Text className="flex-1 font-bold text-slate-700 text-sm text-right">Actions</Text>
             </View>
@@ -483,7 +483,7 @@ export default function AdminEquipment() {
                           <Text className="text-slate-900 font-bold">{entry.equipment_master?.equipment_name}</Text>
                           <Text className="text-slate-500 text-xs">{entry.suppliers?.supplier_name}</Text>
                         </View>
-                        <Text className="flex-1 text-slate-900 font-bold text-center">{entry.working_hours}</Text>
+                        <Text className="flex-1 text-slate-900 font-medium" numberOfLines={1}>{entry.foreman_name}</Text>
                         <View className="flex-1 items-center justify-center">
                           <StatusPill status={entry.status} />
                         </View>
