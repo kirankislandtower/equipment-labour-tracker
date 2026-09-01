@@ -185,30 +185,49 @@ export default function EquipmentEntryScreen() {
   }, [formData.start_time, formData.end_time, formData.start_am_pm, formData.end_am_pm, formData.break_hours]);
 
   useEffect(() => {
-    // Supplier and Equipment options are exactly what's allocated to the selected job in
-    // Site Allocations -- nothing more. No job selected, or nothing allocated to it yet,
-    // means an empty list, not a fallback to the full catalogue.
-    const loadJobAllocations = async () => {
+    // Supplier options are exactly what's allocated to the selected job in Site
+    // Allocations -- nothing more. No job selected, or nothing allocated yet, means
+    // an empty list, not a fallback to the full catalogue.
+    const loadSuppliersForJob = async () => {
       if (!formData.job_id) {
         setSuppliers([]);
-        setEquipmentList([]);
         return;
       }
+      const { data } = await supabase
+        .from('job_suppliers')
+        .select('supplier_id, suppliers(id, supplier_name)')
+        .eq('job_id', formData.job_id);
 
-      const [suppAllocRes, equipAllocRes] = await Promise.all([
-        supabase.from('job_suppliers').select('supplier_id, suppliers(id, supplier_name)').eq('job_id', formData.job_id),
-        supabase.from('job_equipment').select('equipment_master_id, equipment_master(id, equipment_name)').eq('job_id', formData.job_id),
-      ]);
-
-      const supplierOptions = (suppAllocRes.data || [])
+      const supplierOptions = (data || [])
         .filter((row: any) => row.suppliers)
         .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
       setSuppliers(supplierOptions);
+    };
 
-      const equipmentOptions = (equipAllocRes.data || [])
+    loadSuppliersForJob();
+  }, [formData.job_id]);
+
+  useEffect(() => {
+    // Equipment options are scoped to the selected supplier: whatever's allocated to
+    // this job specifically under that supplier, plus anything allocated generally
+    // (not tied to any one supplier). No supplier selected means no equipment shown.
+    const loadEquipmentForSupplier = async () => {
+      if (!formData.job_id || !formData.supplier_id) {
+        setEquipmentList([]);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('job_equipment')
+        .select('equipment_master_id, supplier_id, equipment_master(id, equipment_name)')
+        .eq('job_id', formData.job_id)
+        .or(`supplier_id.eq.${formData.supplier_id},supplier_id.is.null`);
+
+      const rawOptions = (data || [])
         .filter((row: any) => row.equipment_master)
-        .map((row: any) => ({ label: row.equipment_master.equipment_name, value: row.equipment_master.id }))
+        .map((row: any) => ({ label: row.equipment_master.equipment_name, value: row.equipment_master.id }));
+      const equipmentOptions = Array.from(new Map(rawOptions.map(e => [e.value, e])).values())
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
       setEquipmentList(equipmentOptions);
 
@@ -217,8 +236,8 @@ export default function EquipmentEntryScreen() {
       }
     };
 
-    loadJobAllocations();
-  }, [formData.job_id]);
+    loadEquipmentForSupplier();
+  }, [formData.job_id, formData.supplier_id]);
 
   const fetchData = async () => {
     try {
