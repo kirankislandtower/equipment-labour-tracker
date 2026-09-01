@@ -11,7 +11,6 @@ import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 import mockJobs from '../../../mock_jobs.json';
-import mockSupplierEmployees from '../../../mock_supplier_employees.json';
 import { resolveSupplierId } from '../../../lib/masterData';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
@@ -123,18 +122,29 @@ export default function LabourEntryScreen() {
   
   useEffect(() => {
     if (selectedSupplier && errors.supplier) setErrors(prev => ({ ...prev, supplier: '' }));
-
-    // Suppliers with a known employee roster get a picker instead of free text.
-    const options = selectedSupplier
-      ? Array.from(new Set(
-          mockSupplierEmployees
-            .filter(item => item.supplier === selectedSupplier.supplier_name)
-            .map(item => item.employee)
-        )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-      : [];
-    setEmployeeOptions(options);
     setEmployeeManualEntry(false);
-  }, [selectedSupplier]);
+
+    // Suppliers with a known employee roster for this specific job get a picker
+    // instead of free text -- the same supplier can bring different employees to
+    // different jobs, so this is scoped to (job, supplier), not supplier alone.
+    const loadEmployeesForSupplier = async () => {
+      if (!selectedJob || !selectedSupplier) {
+        setEmployeeOptions([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('job_supplier_employees')
+        .select('employee_name')
+        .eq('job_id', selectedJob.id)
+        .eq('supplier_id', selectedSupplier.id);
+
+      const options = Array.from(new Set((data || []).map((row: any) => row.employee_name)))
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      setEmployeeOptions(options);
+    };
+
+    loadEmployeesForSupplier();
+  }, [selectedJob, selectedSupplier]);
   
   useEffect(() => {
     if (selectedDesignation && errors.designation) setErrors(prev => ({ ...prev, designation: '' }));
