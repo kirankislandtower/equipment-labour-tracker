@@ -60,9 +60,11 @@ export default function SiteAllocationsScreen() {
 
   const [allEquipment, setAllEquipment] = useState<any[]>([]);
   const [allocatedEquipmentIds, setAllocatedEquipmentIds] = useState<Set<string>>(new Set());
-  
+  const [equipmentSearch, setEquipmentSearch] = useState('');
+
   const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
   const [allocatedSupplierIds, setAllocatedSupplierIds] = useState<Set<string>>(new Set());
+  const [supplierSearch, setSupplierSearch] = useState('');
 
   const [saving, setSaving] = useState(false);
 
@@ -229,13 +231,20 @@ export default function SiteAllocationsScreen() {
     );
   }
 
-  // Group equipment by category
-  const groupedEquipment = allEquipment.reduce((acc, curr) => {
+  // Filter, then group equipment by category
+  const filteredEquipment = equipmentSearch.trim()
+    ? allEquipment.filter(e => e.equipment_name.toLowerCase().includes(equipmentSearch.trim().toLowerCase()))
+    : allEquipment;
+  const groupedEquipment = filteredEquipment.reduce((acc, curr) => {
     const cat = curr.equipment_category || 'Uncategorized';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(curr);
     return acc;
   }, {} as Record<string, any[]>);
+
+  const filteredSuppliers = supplierSearch.trim()
+    ? allSuppliers.filter(s => s.supplier_name.toLowerCase().includes(supplierSearch.trim().toLowerCase()))
+    : allSuppliers;
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -275,6 +284,26 @@ export default function SiteAllocationsScreen() {
                   </Text>
                 </View>
               </View>
+              <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 mb-6">
+                <Search size={18} color="#94a3b8" />
+                <TextInput
+                  placeholder="Search equipment"
+                  placeholderTextColor="#94a3b8"
+                  value={equipmentSearch}
+                  onChangeText={setEquipmentSearch}
+                  autoCapitalize="none"
+                  className="flex-1 ml-3 text-slate-900"
+                  style={{ outlineStyle: 'none' } as any}
+                />
+                {equipmentSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setEquipmentSearch('')} className="p-1">
+                    <X size={16} color="#94a3b8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {filteredEquipment.length === 0 && (
+                <Text className="text-slate-500 font-medium text-center py-6">No equipment matches "{equipmentSearch}".</Text>
+              )}
               {Object.keys(groupedEquipment).map(category => (
                 <View key={category} className="mb-6">
                   <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100">
@@ -326,7 +355,27 @@ export default function SiteAllocationsScreen() {
                   </Text>
                 </View>
               </View>
-              {allSuppliers.map(supp => {
+              <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 mb-6">
+                <Search size={18} color="#94a3b8" />
+                <TextInput
+                  placeholder="Search suppliers"
+                  placeholderTextColor="#94a3b8"
+                  value={supplierSearch}
+                  onChangeText={setSupplierSearch}
+                  autoCapitalize="none"
+                  className="flex-1 ml-3 text-slate-900"
+                  style={{ outlineStyle: 'none' } as any}
+                />
+                {supplierSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setSupplierSearch('')} className="p-1">
+                    <X size={16} color="#94a3b8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {filteredSuppliers.length === 0 && (
+                <Text className="text-slate-500 font-medium text-center py-6">No suppliers match "{supplierSearch}".</Text>
+              )}
+              {filteredSuppliers.map(supp => {
                 const isSelected = allocatedSupplierIds.has(supp.id);
                 return (
                   <TouchableOpacity
