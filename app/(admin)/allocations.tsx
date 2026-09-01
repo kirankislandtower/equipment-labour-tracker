@@ -59,7 +59,11 @@ export default function SiteAllocationsScreen() {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
 
   const [allEquipment, setAllEquipment] = useState<any[]>([]);
-  const [allocatedEquipmentIds, setAllocatedEquipmentIds] = useState<Set<string>>(new Set());
+  // Keyed by supplier_id, or the literal string 'GENERAL' for equipment not tied to
+  // any one supplier (job-wide, matches how allocations worked before per-supplier
+  // scoping existed).
+  const [allocatedEquipmentByScope, setAllocatedEquipmentByScope] = useState<Record<string, Set<string>>>({ GENERAL: new Set() });
+  const [equipmentScope, setEquipmentScope] = useState('GENERAL');
   const [equipmentSearch, setEquipmentSearch] = useState('');
 
   const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
@@ -120,10 +124,11 @@ export default function SiteAllocationsScreen() {
   }, []);
 
   useEffect(() => {
+    setEquipmentScope('GENERAL');
     if (selectedJob) {
       fetchAllocationsForJob(selectedJob);
     } else {
-      setAllocatedEquipmentIds(new Set());
+      setAllocatedEquipmentByScope({ GENERAL: new Set() });
       setAllocatedSupplierIds(new Set());
     }
   }, [selectedJob]);
@@ -162,12 +167,18 @@ export default function SiteAllocationsScreen() {
   const fetchAllocationsForJob = async (jobId: string) => {
     try {
       const [equipAlloc, suppAlloc] = await Promise.all([
-        supabase.from('job_equipment').select('equipment_master_id').eq('job_id', jobId),
+        supabase.from('job_equipment').select('equipment_master_id, supplier_id').eq('job_id', jobId),
         supabase.from('job_suppliers').select('supplier_id').eq('job_id', jobId)
       ]);
-        
+
       if (equipAlloc.data) {
-        setAllocatedEquipmentIds(new Set(equipAlloc.data.map(d => d.equipment_master_id)));
+        const byScope: Record<string, Set<string>> = { GENERAL: new Set() };
+        equipAlloc.data.forEach((row: any) => {
+          const scope = row.supplier_id || 'GENERAL';
+          if (!byScope[scope]) byScope[scope] = new Set();
+          byScope[scope].add(row.equipment_master_id);
+        });
+        setAllocatedEquipmentByScope(byScope);
       }
       if (suppAlloc.data) {
         setAllocatedSupplierIds(new Set(suppAlloc.data.map(d => d.supplier_id)));
@@ -178,10 +189,12 @@ export default function SiteAllocationsScreen() {
   };
 
   const toggleEquipment = (equipId: string) => {
-    setAllocatedEquipmentIds(prev => {
-      const next = new Set(prev);
-      if (next.has(equipId)) next.delete(equipId);
-      else next.add(equipId);
+    setAllocatedEquipmentByScope(prev => {
+      const next = { ...prev };
+      const current = new Set(next[equipmentScope] || []);
+      if (current.has(equipId)) current.delete(equipId);
+      else current.add(equipId);
+      next[equipmentScope] = current;
       return next;
     });
   };
@@ -207,8 +220,18 @@ export default function SiteAllocationsScreen() {
       if (delEquip.error) throw delEquip.error;
       if (delSupp.error) throw delSupp.error;
 
-      // 2. Insert new ones
-      const equipInserts = Array.from(allocatedEquipmentIds).map(id => ({ job_id: selectedJob, equipment_master_id: id }));
+      // 2. Insert new ones. Only keep equipment scoped to a supplier that's still
+      // actually allocated to this job (or the job-wide GENERAL scope) -- a supplier
+      // toggled off in the Supplier List shouldn't leave orphaned equipment rows
+      // referencing it.
+      const equipInserts: { job_id: string; equipment_master_id: string; supplier_id: string | null }[] = [];
+      Object.entries(allocatedEquipmentByScope).forEach(([scope, ids]) => {
+        if (scope !== 'GENERAL' && !allocatedSupplierIds.has(scope)) return;
+        const supplierId = scope === 'GENERAL' ? null : scope;
+        ids.forEach(equipId => {
+          equipInserts.push({ job_id: selectedJob, equipment_master_id: equipId, supplier_id: supplierId });
+        });
+      });
       const suppInserts = Array.from(allocatedSupplierIds).map(id => ({ job_id: selectedJob, supplier_id: id }));
 
       const [insEquip, insSupp] = await Promise.all([
@@ -276,82 +299,11 @@ export default function SiteAllocationsScreen() {
         {selectedJob ? (
           <View className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-20">
             
-            <View className="mb-6">
-              <View className="flex-row items-center justify-between mb-6">
-                <Text className="text-xl font-black text-slate-900">Equipment List</Text>
-                <View className="flex-row items-center">
-                  <TouchableOpacity 
-                    onPress={() => setShowAddEquipModal(true)}
-                    className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-full mr-2 active:bg-blue-100"
-                  >
-                    <Plus size={14} color="#1d4ed8" />
-                    <Text className="text-blue-700 font-bold text-xs ml-1">New</Text>
-                  </TouchableOpacity>
-                  <Text className="text-slate-500 font-bold bg-slate-100 px-3 py-1 rounded-full text-xs">
-                    {allocatedEquipmentIds.size} Selected
-                  </Text>
-                </View>
-              </View>
-              <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 mb-6">
-                <Search size={18} color="#94a3b8" />
-                <TextInput
-                  placeholder="Search equipment"
-                  placeholderTextColor="#94a3b8"
-                  value={equipmentSearch}
-                  onChangeText={setEquipmentSearch}
-                  autoCapitalize="none"
-                  className="flex-1 ml-3 text-slate-900"
-                  style={{ outlineStyle: 'none' } as any}
-                />
-                {equipmentSearch.length > 0 && (
-                  <TouchableOpacity onPress={() => setEquipmentSearch('')} className="p-1">
-                    <X size={16} color="#94a3b8" />
-                  </TouchableOpacity>
-                )}
-              </View>
-              {filteredEquipment.length === 0 && (
-                <Text className="text-slate-500 font-medium text-center py-6">No equipment matches "{equipmentSearch}".</Text>
-              )}
-              {Object.keys(groupedEquipment).map(category => (
-                <View key={category} className="mb-6">
-                  <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100">
-                    {category}
-                  </Text>
-                  {groupedEquipment[category].map(equip => {
-                    const isSelected = allocatedEquipmentIds.has(equip.id);
-                    return (
-                      <TouchableOpacity
-                        key={equip.id}
-                        activeOpacity={0.7}
-                        onPress={() => toggleEquipment(equip.id)}
-                        className={`flex-row items-center justify-between p-4 mb-2 rounded-xl border ${isSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-white'}`}
-                      >
-                        <View className="flex-row items-center flex-1 pr-4">
-                          <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${isSelected ? 'bg-blue-100' : 'bg-slate-100'}`}>
-                            <Truck size={20} color={isSelected ? '#1d4ed8' : '#94a3b8'} />
-                          </View>
-                          <Text className={`font-semibold text-base ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>
-                            {equip.equipment_name}
-                          </Text>
-                        </View>
-                        <Switch 
-                          value={isSelected} 
-                          onValueChange={() => toggleEquipment(equip.id)}
-                          trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
-                          thumbColor={isSelected ? '#1d4ed8' : '#f8fafc'}
-                        />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-
             <View className="mb-2">
-              <View className="flex-row items-center justify-between mb-6 pt-6 border-t border-slate-100">
+              <View className="flex-row items-center justify-between mb-6">
                 <Text className="text-xl font-black text-slate-900">Supplier List</Text>
                 <View className="flex-row items-center">
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => setShowAddSuppModal(true)}
                     className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-full mr-2 active:bg-blue-100"
                   >
@@ -400,8 +352,8 @@ export default function SiteAllocationsScreen() {
                         {supp.supplier_name}
                       </Text>
                     </View>
-                    <Switch 
-                      value={isSelected} 
+                    <Switch
+                      value={isSelected}
                       onValueChange={() => toggleSupplier(supp.id)}
                       trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
                       thumbColor={isSelected ? '#1d4ed8' : '#f8fafc'}
@@ -409,6 +361,98 @@ export default function SiteAllocationsScreen() {
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            <View className="mb-6 pt-6 border-t border-slate-100">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-xl font-black text-slate-900">Equipment List</Text>
+                <View className="flex-row items-center">
+                  <TouchableOpacity
+                    onPress={() => setShowAddEquipModal(true)}
+                    className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-full mr-2 active:bg-blue-100"
+                  >
+                    <Plus size={14} color="#1d4ed8" />
+                    <Text className="text-blue-700 font-bold text-xs ml-1">New</Text>
+                  </TouchableOpacity>
+                  <Text className="text-slate-500 font-bold bg-slate-100 px-3 py-1 rounded-full text-xs">
+                    {allocatedEquipmentByScope[equipmentScope]?.size || 0} Selected
+                  </Text>
+                </View>
+              </View>
+
+              <View className="mb-4">
+                <CustomPicker
+                  label="Assign Equipment To"
+                  value={equipmentScope}
+                  options={[
+                    { label: 'General (not tied to a supplier)', value: 'GENERAL' },
+                    ...allSuppliers
+                      .filter(s => allocatedSupplierIds.has(s.id))
+                      .map(s => ({ label: s.supplier_name, value: s.id })),
+                  ]}
+                  onSelect={setEquipmentScope}
+                  placeholder="General (not tied to a supplier)"
+                />
+                <Text className="text-xs text-slate-400 -mt-2">
+                  Toggles below allocate equipment under whichever scope is selected here. Switch to a
+                  supplier to give that supplier its own equipment list on the foreman side; only
+                  suppliers already toggled on above show up here.
+                </Text>
+              </View>
+
+              <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 mb-6">
+                <Search size={18} color="#94a3b8" />
+                <TextInput
+                  placeholder="Search equipment"
+                  placeholderTextColor="#94a3b8"
+                  value={equipmentSearch}
+                  onChangeText={setEquipmentSearch}
+                  autoCapitalize="none"
+                  className="flex-1 ml-3 text-slate-900"
+                  style={{ outlineStyle: 'none' } as any}
+                />
+                {equipmentSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setEquipmentSearch('')} className="p-1">
+                    <X size={16} color="#94a3b8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {filteredEquipment.length === 0 && (
+                <Text className="text-slate-500 font-medium text-center py-6">No equipment matches "{equipmentSearch}".</Text>
+              )}
+              {Object.keys(groupedEquipment).map(category => (
+                <View key={category} className="mb-6">
+                  <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100">
+                    {category}
+                  </Text>
+                  {groupedEquipment[category].map(equip => {
+                    const isSelected = allocatedEquipmentByScope[equipmentScope]?.has(equip.id) || false;
+                    return (
+                      <TouchableOpacity
+                        key={equip.id}
+                        activeOpacity={0.7}
+                        onPress={() => toggleEquipment(equip.id)}
+                        className={`flex-row items-center justify-between p-4 mb-2 rounded-xl border ${isSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-white'}`}
+                      >
+                        <View className="flex-row items-center flex-1 pr-4">
+                          <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${isSelected ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                            <Truck size={20} color={isSelected ? '#1d4ed8' : '#94a3b8'} />
+                          </View>
+                          <Text className={`font-semibold text-base ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>
+                            {equip.equipment_name}
+                          </Text>
+                        </View>
+                        <Switch
+                          value={isSelected}
+                          onValueChange={() => toggleEquipment(equip.id)}
+                          trackColor={{ false: '#e2e8f0', true: '#93c5fd' }}
+                          thumbColor={isSelected ? '#1d4ed8' : '#f8fafc'}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
             </View>
 
             <TouchableOpacity
