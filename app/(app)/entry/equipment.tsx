@@ -30,7 +30,7 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder, required =
         className={`bg-white border ${error ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 py-3.5 flex-row items-center justify-between active:opacity-70`}
       >
         <Text className={value ? "text-slate-900" : "text-slate-400"}>
-          {value ? options.find(o => o.value === value)?.label || placeholder : placeholder}
+          {value ? options.find((o: any) => o.value === value)?.label || placeholder : placeholder}
         </Text>
         <ChevronDown size={20} color={error ? "#ef4444" : "#64748b"} />
       </TouchableOpacity>
@@ -113,10 +113,10 @@ export default function EquipmentEntryScreen() {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
-  const [jobs, setJobs] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  const [jobs, setJobs] = useState<{ label: string; value: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ label: string; value: string }[]>([]);
   const [allSuppliersList, setAllSuppliersList] = useState<any[]>([]);
-  const [equipmentList, setEquipmentList] = useState([]);
+  const [equipmentList, setEquipmentList] = useState<{ label: string; value: string }[]>([]);
   const [allEquipmentList, setAllEquipmentList] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
@@ -278,7 +278,7 @@ export default function EquipmentEntryScreen() {
       }
       
       if (id) {
-        const { data: entryData } = await supabase.from('equipment_entries').select('*').eq('id', id).eq('created_by', user.id).single();
+        const { data: entryData } = await supabase.from('equipment_entries').select('*').eq('id', id).eq('created_by', user?.id).single();
         if (entryData) {
           
           const formatTo12h = (time24: string) => {
@@ -293,7 +293,8 @@ export default function EquipmentEntryScreen() {
           const startParts = formatTo12h(entryData.start_time ? entryData.start_time.substring(0, 5) : '');
           const endParts = formatTo12h(entryData.end_time ? entryData.end_time.substring(0, 5) : '');
 
-          setFormData({
+          setFormData(prev => ({
+            ...prev,
             entry_date: entryData.entry_date,
             job_id: entryData.job_id,
             supplier_id: entryData.supplier_id,
@@ -313,7 +314,7 @@ export default function EquipmentEntryScreen() {
             fuel_provided: entryData.fuel_provided || false,
             fuel_quantity: entryData.fuel_quantity ? entryData.fuel_quantity.toString() : '',
             fuel_unit: entryData.fuel_unit || 'Gallons'
-          });
+          }));
           if (entryData.equipment_photo_url && entryData.equipment_photo_url !== 'pending') {
             setPhotoUri(entryData.equipment_photo_url);
             setInitialPhotoUri(entryData.equipment_photo_url);
@@ -728,7 +729,7 @@ export default function EquipmentEntryScreen() {
           required={true}
           value={formData.rental_type}
           options={rentalTypes}
-          onSelect={(v) => updateForm('rental_type', v)}
+          onSelect={(v: string) => updateForm('rental_type', v)}
           placeholder="Select Rental Type"
         />
 
