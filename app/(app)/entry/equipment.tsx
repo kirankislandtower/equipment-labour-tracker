@@ -185,21 +185,27 @@ export default function EquipmentEntryScreen() {
   }, [formData.start_time, formData.end_time, formData.start_am_pm, formData.end_am_pm, formData.break_hours]);
 
   useEffect(() => {
-    // Supplier options are exactly what's allocated to the selected job in Site
-    // Allocations -- nothing more. No job selected, or nothing allocated yet, means
-    // an empty list, not a fallback to the full catalogue.
+    // Supplier options are suppliers allocated to the job in Site Allocations AND
+    // that actually have equipment behind them for this job -- a supplier allocated
+    // only for labour purposes (e.g. an Employee roster on the Labour form) has
+    // nothing to offer here, so it's excluded rather than leading to a dead-end
+    // empty Equipment picker.
     const loadSuppliersForJob = async () => {
       if (!formData.job_id) {
         setSuppliers([]);
         return;
       }
-      const { data } = await supabase
-        .from('job_suppliers')
-        .select('supplier_id, suppliers(id, supplier_name)')
-        .eq('job_id', formData.job_id);
+      const [suppAllocRes, equipAllocRes] = await Promise.all([
+        supabase.from('job_suppliers').select('supplier_id, suppliers(id, supplier_name)').eq('job_id', formData.job_id),
+        supabase.from('job_equipment').select('supplier_id').eq('job_id', formData.job_id),
+      ]);
 
-      const supplierOptions = (data || [])
-        .filter((row: any) => row.suppliers)
+      const equipRows = equipAllocRes.data || [];
+      const hasGeneralEquipment = equipRows.some((row: any) => !row.supplier_id);
+      const suppliersWithEquipment = new Set(equipRows.filter((row: any) => row.supplier_id).map((row: any) => row.supplier_id));
+
+      const supplierOptions = (suppAllocRes.data || [])
+        .filter((row: any) => row.suppliers && (hasGeneralEquipment || suppliersWithEquipment.has(row.suppliers.id)))
         .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
       setSuppliers(supplierOptions);
