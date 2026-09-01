@@ -131,6 +131,7 @@ export default function EmployeesScreen() {
           onChangeText={setSearchQuery}
           autoCapitalize="none"
           className="flex-1 ml-3 text-slate-900"
+          style={{ outlineStyle: 'none' } as any}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
