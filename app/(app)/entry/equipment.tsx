@@ -14,7 +14,6 @@ import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cl
 import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
 import mockJobs from '../../../mock_jobs.json';
-import mockSuppliersEquipment from '../../../mock_suppliers_equipment.json';
 import { resolveSupplierId, resolveEquipmentId } from '../../../lib/masterData';
 
 // Helper for modal picker
@@ -186,32 +185,40 @@ export default function EquipmentEntryScreen() {
   }, [formData.start_time, formData.end_time, formData.start_am_pm, formData.end_am_pm, formData.break_hours]);
 
   useEffect(() => {
-    // Populate all unique suppliers, alphabetically so new additions don't just pile up at the end.
-    // Labour-only suppliers (no equipment rows) are excluded -- they'd otherwise show up here
-    // with an empty Equipment picker and nothing to actually select.
-    const uniqueSuppliers = Array.from(new Set(
-      mockSuppliersEquipment.filter(item => item.equipment && item.equipment.trim() !== '').map(item => item.supplier)
-    )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    setSuppliers(uniqueSuppliers.map(s => ({ label: s, value: s })));
+    // Supplier and Equipment options are exactly what's allocated to the selected job in
+    // Site Allocations -- nothing more. No job selected, or nothing allocated to it yet,
+    // means an empty list, not a fallback to the full catalogue.
+    const loadJobAllocations = async () => {
+      if (!formData.job_id) {
+        setSuppliers([]);
+        setEquipmentList([]);
+        return;
+      }
 
-    // Filter equipment based on selected supplier
-    if (formData.supplier_id) {
-      const equipForSupplier = mockSuppliersEquipment
-        .filter(item => item.supplier === formData.supplier_id)
-        .map(item => ({ label: item.equipment, value: item.equipment }));
+      const [suppAllocRes, equipAllocRes] = await Promise.all([
+        supabase.from('job_suppliers').select('supplier_id, suppliers(id, supplier_name)').eq('job_id', formData.job_id),
+        supabase.from('job_equipment').select('equipment_master_id, equipment_master(id, equipment_name)').eq('job_id', formData.job_id),
+      ]);
 
-      // Make unique list of equipment for this supplier, alphabetically
-      const uniqueEquip = Array.from(new Map(equipForSupplier.map(item => [item.value, item])).values())
+      const supplierOptions = (suppAllocRes.data || [])
+        .filter((row: any) => row.suppliers)
+        .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-      setEquipmentList(uniqueEquip);
-      
-      if (formData.equipment_id && !uniqueEquip.find(e => e.value === formData.equipment_id)) {
+      setSuppliers(supplierOptions);
+
+      const equipmentOptions = (equipAllocRes.data || [])
+        .filter((row: any) => row.equipment_master)
+        .map((row: any) => ({ label: row.equipment_master.equipment_name, value: row.equipment_master.id }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+      setEquipmentList(equipmentOptions);
+
+      if (formData.equipment_id && !equipmentOptions.find(e => e.value === formData.equipment_id)) {
         setFormData(prev => ({ ...prev, equipment_id: '' }));
       }
-    } else {
-      setEquipmentList([]);
-    }
-  }, [formData.supplier_id]);
+    };
+
+    loadJobAllocations();
+  }, [formData.job_id]);
 
   const fetchData = async () => {
     try {

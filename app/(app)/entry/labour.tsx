@@ -11,7 +11,6 @@ import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 import mockJobs from '../../../mock_jobs.json';
-import mockSuppliersEquipment from '../../../mock_suppliers_equipment.json';
 import mockSupplierEmployees from '../../../mock_supplier_employees.json';
 import { resolveSupplierId } from '../../../lib/masterData';
 
@@ -94,18 +93,32 @@ export default function LabourEntryScreen() {
   );
 
   useEffect(() => {
-    // Populate all unique suppliers, alphabetically so new additions don't just pile up at the end
-    const uniqueSuppliers = Array.from(new Set(mockSuppliersEquipment.map(item => item.supplier)))
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    setAllSuppliers(uniqueSuppliers.map(s => ({ id: s, supplier_name: s })));
-    setSuppliers(uniqueSuppliers.map(s => ({ id: s, supplier_name: s })));
-  }, []);
-
-  useEffect(() => {
     if (selectedJob && errors.job) setErrors(prev => ({ ...prev, job: '' }));
     // Reset dependent fields when job changes
     setSelectedLocation(null);
     setSelectedSupplier(null);
+
+    // Supplier options are exactly what's allocated to this job in Site Allocations --
+    // nothing more. No job, or nothing allocated to it yet, means an empty list.
+    const loadSuppliersForJob = async () => {
+      if (!selectedJob) {
+        setAllSuppliers([]);
+        setSuppliers([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('job_suppliers')
+        .select('supplier_id, suppliers(id, supplier_name)')
+        .eq('job_id', selectedJob.id);
+
+      const options = (data || [])
+        .filter((row: any) => row.suppliers)
+        .map((row: any) => ({ id: row.suppliers.id, supplier_name: row.suppliers.supplier_name }))
+        .sort((a, b) => a.supplier_name.localeCompare(b.supplier_name, undefined, { sensitivity: 'base' }));
+      setAllSuppliers(options);
+      setSuppliers(options);
+    };
+    loadSuppliersForJob();
   }, [selectedJob]);
   
   useEffect(() => {
