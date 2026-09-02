@@ -10,7 +10,6 @@ import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cl
 import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
-import mockJobs from '../../../mock_jobs.json';
 import { resolveSupplierId } from '../../../lib/masterData';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
@@ -154,13 +153,13 @@ export default function LabourEntryScreen() {
     try {
       setFetching(true);
       const [jobsRes, suppliersRes, designationsRes, { data: { user } }] = await Promise.all([
-        supabase.from('jobs').select('id, job_number, job_name').order('job_number'),
+        supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number'),
         supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
         supabase.from('labour_designations').select('id, designation_name').order('designation_name'),
         supabase.auth.getUser()
       ]);
 
-      setJobs(mockJobs.map((j: any) => ({
+      setJobs((jobsRes.data || []).map((j: any) => ({
         id: j.id,
         job_number: j.job_number,
         job_name: j.job_name,

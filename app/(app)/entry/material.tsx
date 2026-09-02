@@ -12,7 +12,6 @@ import { getLocalDateString } from '../../../lib/dateUtils';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
-import mockJobs from '../../../mock_jobs.json';
 
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -143,12 +142,12 @@ export default function MaterialTransferEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, { data: { user } }] = await Promise.all([
-        supabase.from('jobs').select('id, job_number, job_name').order('job_number'),
+        supabase.from('jobs').select('id, job_number, job_name').eq('is_active', true).order('job_number'),
         supabase.auth.getUser()
       ]);
 
       if (jobsRes.data) {
-        setJobs(mockJobs.map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id })));
+        setJobs(jobsRes.data.map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id })));
       }
       
       if (user) {

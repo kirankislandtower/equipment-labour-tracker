@@ -13,7 +13,6 @@ import WebCamera from '../../../components/WebCamera';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
-import mockJobs from '../../../mock_jobs.json';
 import { resolveSupplierId, resolveEquipmentId } from '../../../lib/masterData';
 
 // Helper for modal picker
@@ -114,6 +113,7 @@ export default function EquipmentEntryScreen() {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
   const [jobs, setJobs] = useState<{ label: string; value: string }[]>([]);
+  const [allJobsData, setAllJobsData] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<{ label: string; value: string }[]>([]);
   const [allSuppliersList, setAllSuppliersList] = useState<any[]>([]);
   const [equipmentList, setEquipmentList] = useState<{ label: string; value: string }[]>([]);
@@ -248,7 +248,7 @@ export default function EquipmentEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, suppliersRes, equipmentRes, { data: { user } }] = await Promise.all([
-        supabase.from('jobs').select('id, job_number, job_name').order('job_number'),
+        supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number'),
         supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
         supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name'),
         supabase.auth.getUser(),
@@ -256,8 +256,8 @@ export default function EquipmentEntryScreen() {
       ]);
 
       if (jobsRes.data) {
-        // Use mock data for testing as requested
-        setJobs(mockJobs.map((j: any) => ({ label: j.job_number, value: j.id })));
+        setJobs(jobsRes.data.map((j: any) => ({ label: j.job_number, value: j.id })));
+        setAllJobsData(jobsRes.data);
       }
       if (suppliersRes.data) {
         setAllSuppliersList(suppliersRes.data);
@@ -676,7 +676,7 @@ export default function EquipmentEntryScreen() {
         />
 
         {(() => {
-          const selectedJobObj = mockJobs.find((j: any) => j.id === formData.job_id);
+          const selectedJobObj = allJobsData.find((j: any) => j.id === formData.job_id);
           if (!selectedJobObj) return null;
           
           const locationsArray = selectedJobObj.location && selectedJobObj.location !== 'N/A' 
