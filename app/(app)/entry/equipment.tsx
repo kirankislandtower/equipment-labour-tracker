@@ -196,7 +196,7 @@ export default function EquipmentEntryScreen() {
         return;
       }
       const [suppAllocRes, equipAllocRes] = await Promise.all([
-        supabase.from('job_suppliers').select('supplier_id, suppliers(id, supplier_name)').eq('job_id', formData.job_id),
+        supabase.from('job_suppliers').select('supplier_id, suppliers!inner(id, supplier_name)').eq('job_id', formData.job_id).eq('suppliers.is_active', true),
         supabase.from('job_equipment').select('supplier_id').eq('job_id', formData.job_id),
       ]);
 
@@ -226,8 +226,9 @@ export default function EquipmentEntryScreen() {
 
       const { data } = await supabase
         .from('job_equipment')
-        .select('equipment_master_id, supplier_id, equipment_master(id, equipment_name)')
+        .select('equipment_master_id, supplier_id, equipment_master!inner(id, equipment_name)')
         .eq('job_id', formData.job_id)
+        .eq('equipment_master.is_active', true)
         .or(`supplier_id.eq.${formData.supplier_id},supplier_id.is.null`);
 
       const rawOptions = (data || [])

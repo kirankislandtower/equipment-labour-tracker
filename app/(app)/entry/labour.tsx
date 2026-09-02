@@ -106,8 +106,9 @@ export default function LabourEntryScreen() {
       }
       const { data } = await supabase
         .from('job_suppliers')
-        .select('supplier_id, suppliers(id, supplier_name)')
-        .eq('job_id', selectedJob.id);
+        .select('supplier_id, suppliers!inner(id, supplier_name)')
+        .eq('job_id', selectedJob.id)
+        .eq('suppliers.is_active', true);
 
       const options = (data || [])
         .filter((row: any) => row.suppliers)
