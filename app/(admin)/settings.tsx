@@ -15,6 +15,8 @@ export default function AdminSettings() {
   const [equipment, setEquipment] = useState<any[]>([]);
   const [designations, setDesignations] = useState<any[]>([]);
 
+  const [counts, setCounts] = useState({ jobs: 0, suppliers: 0, equipment: 0, designations: 0 });
+
   // Inline editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
@@ -34,6 +36,29 @@ export default function AdminSettings() {
   useEffect(() => {
     fetchData();
   }, [activeTab]);
+
+  useEffect(() => {
+    fetchCounts();
+  }, []);
+
+  const fetchCounts = async () => {
+    try {
+      const [jobsRes, suppliersRes, equipmentRes, designationsRes] = await Promise.all([
+        supabase.from('jobs').select('*', { count: 'exact', head: true }),
+        supabase.from('suppliers').select('*', { count: 'exact', head: true }),
+        supabase.from('equipment_master').select('*', { count: 'exact', head: true }),
+        supabase.from('labour_designations').select('*', { count: 'exact', head: true }),
+      ]);
+      setCounts({
+        jobs: jobsRes.count || 0,
+        suppliers: suppliersRes.count || 0,
+        equipment: equipmentRes.count || 0,
+        designations: designationsRes.count || 0,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -98,6 +123,7 @@ export default function AdminSettings() {
           throw error;
         }
         fetchData();
+        fetchCounts();
       } catch (error: any) {
         if (Platform.OS === 'web') {
           window.alert('Delete Failed: ' + (error.message || 'Could not delete record.'));
@@ -135,6 +161,7 @@ export default function AdminSettings() {
       setAddJobModal(false);
       setJobForm({ job_number: '', job_name: '', location: '' });
       fetchData();
+      fetchCounts();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -147,6 +174,7 @@ export default function AdminSettings() {
       setAddSupplierModal(false);
       setSupplierForm({ supplier_name: '', contact_person: '', phone_number: '' });
       fetchData();
+      fetchCounts();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -159,6 +187,7 @@ export default function AdminSettings() {
       setAddEquipModal(false);
       setEquipForm({ equipment_category: 'Tankers', equipment_name: '' });
       fetchData();
+      fetchCounts();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -171,6 +200,7 @@ export default function AdminSettings() {
       setAddDesigModal(false);
       setDesigForm({ designation_name: '' });
       fetchData();
+      fetchCounts();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -192,28 +222,28 @@ export default function AdminSettings() {
           className={`${isMobile ? 'w-[48%] mb-1' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'JOBS' ? 'bg-slate-900' : 'bg-transparent'}`}
         >
           <Briefcase size={16} color={activeTab === 'JOBS' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'JOBS' ? 'text-white' : 'text-slate-500'}`}>Jobs</Text>
+          <Text className={`font-bold ml-2 text-sm ${activeTab === 'JOBS' ? 'text-white' : 'text-slate-500'}`}>Jobs ({counts.jobs})</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setActiveTab('SUPPLIERS')}
           className={`${isMobile ? 'w-[48%] mb-1' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'SUPPLIERS' ? 'bg-slate-900' : 'bg-transparent'}`}
         >
           <Building2 size={16} color={activeTab === 'SUPPLIERS' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'SUPPLIERS' ? 'text-white' : 'text-slate-500'}`}>Suppliers</Text>
+          <Text className={`font-bold ml-2 text-sm ${activeTab === 'SUPPLIERS' ? 'text-white' : 'text-slate-500'}`}>Suppliers ({counts.suppliers})</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setActiveTab('EQUIPMENT')}
           className={`${isMobile ? 'w-[48%]' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'EQUIPMENT' ? 'bg-slate-900' : 'bg-transparent'}`}
         >
           <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'EQUIPMENT' ? 'text-white' : 'text-slate-500'}`}>Equipment</Text>
+          <Text className={`font-bold ml-2 text-sm ${activeTab === 'EQUIPMENT' ? 'text-white' : 'text-slate-500'}`}>Equipment ({counts.equipment})</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setActiveTab('DESIGNATIONS')}
           className={`${isMobile ? 'w-[48%]' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'DESIGNATIONS' ? 'bg-slate-900' : 'bg-transparent'}`}
         >
           <Users size={16} color={activeTab === 'DESIGNATIONS' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'DESIGNATIONS' ? 'text-white' : 'text-slate-500'}`}>Roles</Text>
+          <Text className={`font-bold ml-2 text-sm ${activeTab === 'DESIGNATIONS' ? 'text-white' : 'text-slate-500'}`}>Roles ({counts.designations})</Text>
         </TouchableOpacity>
       </View>
 
