@@ -186,10 +186,10 @@ export default function EquipmentEntryScreen() {
 
   useEffect(() => {
     // Supplier options are suppliers allocated to the job in Site Allocations AND
-    // that actually have equipment behind them for this job -- a supplier allocated
-    // only for labour purposes (e.g. an Employee roster on the Labour form) has
-    // nothing to offer here, so it's excluded rather than leading to a dead-end
-    // empty Equipment picker.
+    // that have equipment specifically toggled on for them under that supplier in
+    // Site Allocations -- a supplier with nothing scoped to it (e.g. allocated only
+    // for labour purposes) has nothing to offer here, so it's excluded rather than
+    // leading to a dead-end empty Equipment picker.
     const loadSuppliersForJob = async () => {
       if (!formData.job_id) {
         setSuppliers([]);
@@ -201,11 +201,10 @@ export default function EquipmentEntryScreen() {
       ]);
 
       const equipRows = equipAllocRes.data || [];
-      const hasGeneralEquipment = equipRows.some((row: any) => !row.supplier_id);
       const suppliersWithEquipment = new Set(equipRows.filter((row: any) => row.supplier_id).map((row: any) => row.supplier_id));
 
       const supplierOptions = (suppAllocRes.data || [])
-        .filter((row: any) => row.suppliers && (hasGeneralEquipment || suppliersWithEquipment.has(row.suppliers.id)))
+        .filter((row: any) => row.suppliers && suppliersWithEquipment.has(row.suppliers.id))
         .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
       setSuppliers(supplierOptions);
@@ -215,9 +214,9 @@ export default function EquipmentEntryScreen() {
   }, [formData.job_id]);
 
   useEffect(() => {
-    // Equipment options are scoped to the selected supplier: whatever's allocated to
-    // this job specifically under that supplier, plus anything allocated generally
-    // (not tied to any one supplier). No supplier selected means no equipment shown.
+    // Equipment options are strictly whatever's toggled on for this exact supplier
+    // under this job in Site Allocations -- no sharing across suppliers. No supplier
+    // selected means no equipment shown.
     const loadEquipmentForSupplier = async () => {
       if (!formData.job_id || !formData.supplier_id) {
         setEquipmentList([]);
@@ -228,8 +227,8 @@ export default function EquipmentEntryScreen() {
         .from('job_equipment')
         .select('equipment_master_id, supplier_id, equipment_master!inner(id, equipment_name)')
         .eq('job_id', formData.job_id)
-        .eq('equipment_master.is_active', true)
-        .or(`supplier_id.eq.${formData.supplier_id},supplier_id.is.null`);
+        .eq('supplier_id', formData.supplier_id)
+        .eq('equipment_master.is_active', true);
 
       const rawOptions = (data || [])
         .filter((row: any) => row.equipment_master)
