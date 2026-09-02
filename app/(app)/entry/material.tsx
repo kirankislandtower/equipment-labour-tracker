@@ -246,6 +246,7 @@ export default function MaterialTransferEntryScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       
       let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
+      let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
@@ -255,7 +256,10 @@ export default function MaterialTransferEntryScreen() {
           uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, `From: ${jobName}`);
           downloadImageToDevice(uploadedPhotoUrl, `Material_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
         } catch (err: any) {
-          throw new Error('Photo upload failed: ' + (err.message || ''));
+          // Don't let a Cloudinary failure (quota, network) lose the whole entry --
+          // save it with the photo marked pending so it can be attached later on edit.
+          console.error('Cloudinary upload failed, saving entry without photo:', err);
+          photoUploadFailed = true;
         }
       } else if (!id) {
          setErrors(prev => ({ ...prev, photo: 'Live photo is required' }));
@@ -298,8 +302,16 @@ export default function MaterialTransferEntryScreen() {
       if (error) {
         throw error;
       }
-      
-      setSuccessVisible(true);
+
+      if (photoUploadFailed) {
+        Alert.alert(
+          'Saved — Photo Pending',
+          'Your entry was saved, but the photo could not be uploaded right now (connection issue or storage limit). Edit this entry later to attach the photo once you\'re back online.',
+          [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
+        );
+      } else {
+        setSuccessVisible(true);
+      }
     } catch (error: any) {
       console.error('Submit error:', error);
       const errorMessage = error.message || (error.code ? `Error ${error.code}: ${error.details || ''}` : JSON.stringify(error));
