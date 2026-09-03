@@ -1,7 +1,9 @@
 import { Slot, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { AuthProvider, useAuth } from '../lib/auth';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { supabase } from '../lib/supabase';
+import { injectPwaMetaTags } from '../lib/pwaMeta';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -10,6 +12,7 @@ function RootLayoutNav() {
   const { initialized, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [resumingSession, setResumingSession] = useState(false);
 
   useEffect(() => {
     if (!initialized) return;
@@ -20,14 +23,19 @@ function RootLayoutNav() {
       // Redirect to login if unauthenticated but trying to access protected routes
       router.replace('/');
     } else if (user && !inAuthGroup) {
-      // If they are logged in but on the login screen, we don't know their role directly here.
-      // They should sign in again, or we could fetch the role here and route them.
-      // For simplicity, if they land on the login screen while logged in, let them click a 
-      // "Continue to Dashboard" button which we will add to the login screen, or just log them out.
+      // Already have a valid persisted session (e.g. reopening the installed home-screen
+      // app after closing it) -- skip straight past the login form to the right portal
+      // instead of making them log in again every time.
+      setResumingSession(true);
+      (async () => {
+        const { data } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+        router.replace(data?.role === 'ADMIN' ? '/(admin)/dashboard' : '/(app)/home');
+        setResumingSession(false);
+      })();
     }
   }, [user, initialized, segments]);
 
-  if (!initialized) {
+  if (!initialized || resumingSession) {
     return (
       <View className="flex-1 justify-center items-center bg-slate-900">
         <ActivityIndicator size="large" color="#0284c7" />
@@ -41,6 +49,7 @@ function RootLayoutNav() {
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
+    injectPwaMetaTags();
   }, []);
 
   return (
