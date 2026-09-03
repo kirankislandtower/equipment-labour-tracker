@@ -419,7 +419,7 @@ export default function ForemanReports() {
             </View>
             
             {selectedEntry && (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }} style={{ minHeight: 0 }}>
                 <View className="flex-row justify-between mb-4">
                   <View>
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Date</Text>
