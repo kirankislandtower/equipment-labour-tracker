@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../lib/crossAlert';
 import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2 } from 'lucide-react-native';
 
 export default function AdminSettings() {
@@ -89,7 +90,7 @@ export default function AdminSettings() {
       if (error) throw error;
       fetchData();
     } catch (error) {
-      Alert.alert('Error', 'Could not update status');
+      showAlert('Error', 'Could not update status');
     }
   };
 
@@ -108,7 +109,7 @@ export default function AdminSettings() {
       setEditForm({});
       fetchData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Could not save changes');
+      showAlert('Error', error.message || 'Could not save changes');
     }
   };
 
@@ -163,7 +164,7 @@ export default function AdminSettings() {
       fetchData();
       fetchCounts();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showAlert('Error', error.message);
     }
   };
 
@@ -176,7 +177,7 @@ export default function AdminSettings() {
       fetchData();
       fetchCounts();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showAlert('Error', error.message);
     }
   };
 
@@ -189,7 +190,7 @@ export default function AdminSettings() {
       fetchData();
       fetchCounts();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showAlert('Error', error.message);
     }
   };
 
@@ -202,7 +203,7 @@ export default function AdminSettings() {
       fetchData();
       fetchCounts();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showAlert('Error', error.message);
     }
   };
 

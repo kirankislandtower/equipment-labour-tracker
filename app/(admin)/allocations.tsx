@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Switch, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Switch, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../lib/crossAlert';
 import { Truck, ChevronDown, Check, X, Search, Save, MapPin, Users, Plus } from 'lucide-react-native';
 
 // Helper for modal picker
@@ -83,7 +84,7 @@ export default function SiteAllocationsScreen() {
   const [isAddingSupp, setIsAddingSupp] = useState(false);
 
   const handleAddEquipment = async () => {
-    if (!newEquipName.trim()) return Alert.alert('Error', 'Please enter equipment name');
+    if (!newEquipName.trim()) return showAlert('Error', 'Please enter equipment name');
     setIsAddingEquip(true);
     try {
       const { error } = await supabase.from('equipment_master').insert([{
@@ -95,14 +96,14 @@ export default function SiteAllocationsScreen() {
       setShowAddEquipModal(false);
       await fetchInitialData();
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     } finally {
       setIsAddingEquip(false);
     }
   };
 
   const handleAddSupplier = async () => {
-    if (!newSuppName.trim()) return Alert.alert('Error', 'Please enter supplier name');
+    if (!newSuppName.trim()) return showAlert('Error', 'Please enter supplier name');
     setIsAddingSupp(true);
     try {
       const { error } = await supabase.from('suppliers').insert([{
@@ -113,7 +114,7 @@ export default function SiteAllocationsScreen() {
       setShowAddSuppModal(false);
       await fetchInitialData();
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     } finally {
       setIsAddingSupp(false);
     }
