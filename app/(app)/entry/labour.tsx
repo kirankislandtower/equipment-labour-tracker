@@ -75,7 +75,7 @@ export default function LabourEntryScreen() {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        const compressedUri = await compressImageToDataUri(asset.uri, asset.width);
+        const compressedUri = await compressImageToDataUri(asset.uri, asset.width, asset.height);
         setPhotoUri(compressedUri);
         if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
       }
