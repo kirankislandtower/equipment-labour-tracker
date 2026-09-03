@@ -599,7 +599,7 @@ export default function AdminEquipment() {
                   </View>
                 )}
 
-                {selectedEntry.remarks && (
+                {!!selectedEntry.remarks && (
                   <View className="mb-4">
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Remarks</Text>
                     <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -608,7 +608,7 @@ export default function AdminEquipment() {
                   </View>
                 )}
 
-                {selectedEntry.rejection_reason && (
+                {!!selectedEntry.rejection_reason && (
                   <View className="mb-4">
                     <Text className="text-xs font-bold text-red-400 uppercase mb-1">Rejection Reason</Text>
                     <View className="bg-red-50 p-4 rounded-2xl border border-red-100">

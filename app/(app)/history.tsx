@@ -320,14 +320,14 @@ export default function HistoryScreen() {
                       : `${entry.from_job?.job_name} -> ${entry.to_job?.job_name}`}
                 </Text>
 
-                {entry.status === 'REJECTED' && entry.rejection_reason && (
+                {entry.status === 'REJECTED' && !!entry.rejection_reason && (
                   <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
                     <Text className="text-red-800 font-bold text-xs uppercase mb-1">Reason for Rejection</Text>
                     <Text className="text-red-600 text-sm">{entry.rejection_reason}</Text>
                   </View>
                 )}
 
-                {entry.remarks && (
+                {!!entry.remarks && (
                   <View className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-3">
                     <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider mb-1">Remarks</Text>
                     <Text className="text-slate-700 text-sm leading-tight italic">"{entry.remarks}"</Text>

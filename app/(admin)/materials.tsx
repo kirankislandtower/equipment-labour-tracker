@@ -305,7 +305,7 @@ export default function AdminMaterials() {
                   <Text className="text-slate-500 font-bold">{selectedEntry.entry_date}</Text>
                 </View>
 
-                {selectedEntry.status === 'REJECTED' && selectedEntry.rejection_reason && (
+                {selectedEntry.status === 'REJECTED' && !!selectedEntry.rejection_reason && (
                   <View className="bg-red-50 border border-red-200 p-4 rounded-xl mb-6 flex-row">
                     <X size={20} color="#dc2626" className="mt-0.5 mr-2" />
                     <View className="flex-1">
@@ -355,14 +355,14 @@ export default function AdminMaterials() {
                   </View>
                 </View>
 
-                {selectedEntry.remarks && (
+                {!!selectedEntry.remarks && (
                   <View className="bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-6">
                     <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Remarks</Text>
                     <Text className="text-slate-700 leading-relaxed">{selectedEntry.remarks}</Text>
                   </View>
                 )}
 
-                {selectedEntry.photo_url && selectedEntry.photo_url !== 'pending' && (
+                {!!selectedEntry.photo_url && selectedEntry.photo_url !== 'pending' && (
                   <View className="mb-6">
                     <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 ml-1">Live Photo Evidence</Text>
                     <TouchableOpacity 
