@@ -1,6 +1,7 @@
 import React, { createElement } from 'react';
 import { View, Text, Platform } from 'react-native';
 import { Camera } from 'lucide-react-native';
+import { compressImageToDataUri } from '../lib/imageUtils';
 
 interface WebCameraProps {
   onImageCaptured: (uri: string) => void;
@@ -27,9 +28,15 @@ export default function WebCamera({ onImageCaptured, colorTheme }: WebCameraProp
       const file = e.target.files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = async (ev) => {
           if (ev.target?.result) {
-            onImageCaptured(ev.target.result as string);
+            try {
+              const compressed = await compressImageToDataUri(ev.target.result as string);
+              onImageCaptured(compressed);
+            } catch (err) {
+              console.error('Image compression failed, using original:', err);
+              onImageCaptured(ev.target.result as string);
+            }
           }
         };
         reader.readAsDataURL(file);

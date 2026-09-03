@@ -10,6 +10,7 @@ import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
+import { compressImageToDataUri } from '../../../lib/imageUtils';
 import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 
@@ -125,12 +126,12 @@ export default function MaterialTransferEntryScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.7,
-        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const base64Uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
-        setPhotoUri(base64Uri);
+        const asset = result.assets[0];
+        const compressedUri = await compressImageToDataUri(asset.uri, asset.width);
+        setPhotoUri(compressedUri);
         if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
       }
     } catch (error) {
