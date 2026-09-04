@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Switch, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/crossAlert';
-import { Truck, ChevronDown, Check, X, Search, Save, MapPin, Users, Plus } from 'lucide-react-native';
+import { Truck, ChevronDown, Check, X, Search, Save, MapPin, Users, Plus, UserPlus } from 'lucide-react-native';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => {
@@ -71,6 +71,12 @@ export default function SiteAllocationsScreen() {
   const [allocatedSupplierIds, setAllocatedSupplierIds] = useState<Set<string>>(new Set());
   const [supplierSearch, setSupplierSearch] = useState('');
 
+  // Employee rosters are always scoped to one specific supplier (job_supplier_employees.supplier_id
+  // is NOT NULL) -- unlike equipment there's no job-wide "General" bucket for employees.
+  const [employeesByScope, setEmployeesByScope] = useState<Record<string, Set<string>>>({});
+  const [employeeScope, setEmployeeScope] = useState('');
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+
   const [saving, setSaving] = useState(false);
 
   // New Add-ons State
@@ -126,11 +132,13 @@ export default function SiteAllocationsScreen() {
 
   useEffect(() => {
     setEquipmentScope('GENERAL');
+    setEmployeeScope('');
     if (selectedJob) {
       fetchAllocationsForJob(selectedJob);
     } else {
       setAllocatedEquipmentByScope({ GENERAL: new Set() });
       setAllocatedSupplierIds(new Set());
+      setEmployeesByScope({});
     }
   }, [selectedJob]);
 
@@ -167,9 +175,10 @@ export default function SiteAllocationsScreen() {
 
   const fetchAllocationsForJob = async (jobId: string) => {
     try {
-      const [equipAlloc, suppAlloc] = await Promise.all([
+      const [equipAlloc, suppAlloc, empAlloc] = await Promise.all([
         supabase.from('job_equipment').select('equipment_master_id, supplier_id').eq('job_id', jobId),
-        supabase.from('job_suppliers').select('supplier_id').eq('job_id', jobId)
+        supabase.from('job_suppliers').select('supplier_id').eq('job_id', jobId),
+        supabase.from('job_supplier_employees').select('supplier_id, employee_name').eq('job_id', jobId)
       ]);
 
       if (equipAlloc.data) {
@@ -183,6 +192,14 @@ export default function SiteAllocationsScreen() {
       }
       if (suppAlloc.data) {
         setAllocatedSupplierIds(new Set(suppAlloc.data.map(d => d.supplier_id)));
+      }
+      if (empAlloc.data) {
+        const byScope: Record<string, Set<string>> = {};
+        empAlloc.data.forEach((row: any) => {
+          if (!byScope[row.supplier_id]) byScope[row.supplier_id] = new Set();
+          byScope[row.supplier_id].add(row.employee_name);
+        });
+        setEmployeesByScope(byScope);
       }
     } catch (err) {
       console.error('Failed to fetch allocations', err);
@@ -209,17 +226,42 @@ export default function SiteAllocationsScreen() {
     });
   };
 
+  const addEmployee = () => {
+    const name = newEmployeeName.trim();
+    if (!employeeScope || !name) return;
+    setEmployeesByScope(prev => {
+      const next = { ...prev };
+      const current = new Set(next[employeeScope] || []);
+      current.add(name);
+      next[employeeScope] = current;
+      return next;
+    });
+    setNewEmployeeName('');
+  };
+
+  const removeEmployee = (name: string) => {
+    setEmployeesByScope(prev => {
+      const next = { ...prev };
+      const current = new Set(next[employeeScope] || []);
+      current.delete(name);
+      next[employeeScope] = current;
+      return next;
+    });
+  };
+
   const handleSave = async () => {
     if (!selectedJob) return;
     setSaving(true);
     try {
       // 1. Delete all existing mappings for this job
-      const [delEquip, delSupp] = await Promise.all([
+      const [delEquip, delSupp, delEmp] = await Promise.all([
         supabase.from('job_equipment').delete().eq('job_id', selectedJob),
-        supabase.from('job_suppliers').delete().eq('job_id', selectedJob)
+        supabase.from('job_suppliers').delete().eq('job_id', selectedJob),
+        supabase.from('job_supplier_employees').delete().eq('job_id', selectedJob)
       ]);
       if (delEquip.error) throw delEquip.error;
       if (delSupp.error) throw delSupp.error;
+      if (delEmp.error) throw delEmp.error;
 
       // 2. Insert new ones. Only keep equipment scoped to a supplier that's still
       // actually allocated to this job (or the job-wide GENERAL scope) -- a supplier
@@ -235,12 +277,24 @@ export default function SiteAllocationsScreen() {
       });
       const suppInserts = Array.from(allocatedSupplierIds).map(id => ({ job_id: selectedJob, supplier_id: id }));
 
-      const [insEquip, insSupp] = await Promise.all([
+      // Same orphan-prevention rule as equipment: only keep employees under a supplier
+      // that's still actually allocated to this job.
+      const empInserts: { job_id: string; supplier_id: string; employee_name: string }[] = [];
+      Object.entries(employeesByScope).forEach(([supplierId, names]) => {
+        if (!allocatedSupplierIds.has(supplierId)) return;
+        names.forEach(name => {
+          empInserts.push({ job_id: selectedJob, supplier_id: supplierId, employee_name: name });
+        });
+      });
+
+      const [insEquip, insSupp, insEmp] = await Promise.all([
         equipInserts.length > 0 ? supabase.from('job_equipment').insert(equipInserts) : Promise.resolve({ error: null } as any),
-        suppInserts.length > 0 ? supabase.from('job_suppliers').insert(suppInserts) : Promise.resolve({ error: null } as any)
+        suppInserts.length > 0 ? supabase.from('job_suppliers').insert(suppInserts) : Promise.resolve({ error: null } as any),
+        empInserts.length > 0 ? supabase.from('job_supplier_employees').insert(empInserts) : Promise.resolve({ error: null } as any)
       ]);
       if (insEquip.error) throw insEquip.error;
       if (insSupp.error) throw insSupp.error;
+      if (insEmp.error) throw insEmp.error;
 
       // 3. Re-fetch from the DB rather than trusting local state, so the UI reflects
       // what actually persisted, not just what we attempted to save.
@@ -454,6 +508,88 @@ export default function SiteAllocationsScreen() {
                   })}
                 </View>
               ))}
+            </View>
+
+            <View className="mb-2 pt-6 border-t border-slate-100">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-xl font-black text-slate-900">Employees</Text>
+                <Text className="text-slate-500 font-bold bg-slate-100 px-3 py-1 rounded-full text-xs">
+                  {employeesByScope[employeeScope]?.size || 0} Added
+                </Text>
+              </View>
+
+              <View className="mb-4">
+                <CustomPicker
+                  label="Assign Employees To"
+                  value={employeeScope}
+                  options={allSuppliers
+                    .filter(s => allocatedSupplierIds.has(s.id))
+                    .map(s => ({ label: s.supplier_name, value: s.id }))}
+                  onSelect={setEmployeeScope}
+                  placeholder="Select a supplier..."
+                />
+                <Text className="text-xs text-slate-400 -mt-2">
+                  The same supplier can bring different workers to different jobs, so this
+                  roster is scoped to this supplier on this job specifically -- it's what
+                  shows up as a pickable list on the Labour entry form instead of a blank
+                  text box. Only suppliers already toggled on above show up here.
+                </Text>
+              </View>
+
+              {employeeScope ? (
+                <>
+                  <View className="flex-row items-center mb-4">
+                    <TextInput
+                      value={newEmployeeName}
+                      onChangeText={setNewEmployeeName}
+                      onSubmitEditing={addEmployee}
+                      placeholder="e.g. John Doe"
+                      placeholderTextColor="#94a3b8"
+                      autoCapitalize="words"
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-semibold mr-2"
+                      style={{ outlineStyle: 'none' } as any}
+                    />
+                    <TouchableOpacity
+                      onPress={addEmployee}
+                      disabled={!newEmployeeName.trim()}
+                      className={`px-4 py-3 rounded-xl ${newEmployeeName.trim() ? 'bg-blue-50 active:bg-blue-100' : 'bg-slate-100'}`}
+                    >
+                      <Plus size={20} color={newEmployeeName.trim() ? '#1d4ed8' : '#94a3b8'} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {(!employeesByScope[employeeScope] || employeesByScope[employeeScope].size === 0) ? (
+                    <View className="py-6 items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
+                      <Text className="text-slate-500 font-medium">No employees added yet for this supplier.</Text>
+                    </View>
+                  ) : (
+                    Array.from(employeesByScope[employeeScope]).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })).map(name => (
+                      <View
+                        key={name}
+                        className="flex-row items-center justify-between p-4 mb-2 rounded-xl border border-slate-100 bg-white"
+                      >
+                        <View className="flex-row items-center flex-1 pr-4">
+                          <View className="w-10 h-10 rounded-full items-center justify-center mr-3 bg-blue-100">
+                            <UserPlus size={18} color="#1d4ed8" />
+                          </View>
+                          <Text className="font-semibold text-base text-slate-700">{name}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => removeEmployee(name)} className="p-2 active:opacity-60">
+                          <X size={18} color="#94a3b8" />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  )}
+                </>
+              ) : (
+                <View className="py-6 items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
+                  <Text className="text-slate-500 font-medium text-center px-4">
+                    {allSuppliers.filter(s => allocatedSupplierIds.has(s.id)).length === 0
+                      ? 'Toggle on a supplier above first, then come back here to add its employees.'
+                      : 'Select a supplier above to manage its employee roster.'}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
