@@ -2,7 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/crossAlert';
-import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2 } from 'lucide-react-native';
+import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2, Search } from 'lucide-react-native';
+
+const SearchBox = ({ value, onChangeText, placeholder }: { value: string; onChangeText: (t: string) => void; placeholder: string }) => (
+  <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 m-4">
+    <Search size={18} color="#94a3b8" />
+    <TextInput
+      placeholder={placeholder}
+      placeholderTextColor="#94a3b8"
+      value={value}
+      onChangeText={onChangeText}
+      autoCapitalize="none"
+      className="flex-1 ml-3 text-slate-900"
+      style={{ outlineStyle: 'none' } as any}
+    />
+    {value.length > 0 && (
+      <TouchableOpacity onPress={() => onChangeText('')} className="p-1">
+        <X size={16} color="#94a3b8" />
+      </TouchableOpacity>
+    )}
+  </View>
+);
 
 export default function AdminSettings() {
   const { width } = useWindowDimensions();
@@ -15,6 +35,11 @@ export default function AdminSettings() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [equipment, setEquipment] = useState<any[]>([]);
   const [designations, setDesignations] = useState<any[]>([]);
+
+  const [jobSearch, setJobSearch] = useState('');
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [equipSearch, setEquipSearch] = useState('');
+  const [desigSearch, setDesigSearch] = useState('');
 
   const [counts, setCounts] = useState({ jobs: 0, suppliers: 0, equipment: 0, designations: 0 });
 
@@ -207,6 +232,19 @@ export default function AdminSettings() {
     }
   };
 
+  const filteredJobs = jobSearch.trim()
+    ? jobs.filter(j => j.job_number.toLowerCase().includes(jobSearch.trim().toLowerCase()) || j.job_name.toLowerCase().includes(jobSearch.trim().toLowerCase()))
+    : jobs;
+  const filteredSuppliers = supplierSearch.trim()
+    ? suppliers.filter(s => s.supplier_name.toLowerCase().includes(supplierSearch.trim().toLowerCase()))
+    : suppliers;
+  const filteredEquipment = equipSearch.trim()
+    ? equipment.filter(e => e.equipment_name.toLowerCase().includes(equipSearch.trim().toLowerCase()))
+    : equipment;
+  const filteredDesignations = desigSearch.trim()
+    ? designations.filter(d => d.designation_name.toLowerCase().includes(desigSearch.trim().toLowerCase()))
+    : designations;
+
   return (
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
@@ -258,15 +296,19 @@ export default function AdminSettings() {
             {/* JOBS TAB */}
             {activeTab === 'JOBS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <SearchBox value={jobSearch} onChangeText={setJobSearch} placeholder="Search jobs" />
                 {!isMobile && (
-                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
+                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
                     <Text className="flex-[0.5] font-bold text-slate-500 text-xs uppercase">Job #</Text>
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Job Name</Text>
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Location</Text>
                     <Text className="w-28 font-bold text-slate-500 text-xs uppercase text-center">Actions</Text>
                   </View>
                 )}
-                {jobs.map((job) => (
+                {filteredJobs.length === 0 && (
+                  <Text className="text-slate-500 font-medium text-center py-6">No jobs match "{jobSearch}".</Text>
+                )}
+                {filteredJobs.map((job) => (
                   <View key={job.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
                     {editingId === job.id ? (
                       <>
@@ -334,8 +376,9 @@ export default function AdminSettings() {
             {/* SUPPLIERS TAB */}
             {activeTab === 'SUPPLIERS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <SearchBox value={supplierSearch} onChangeText={setSupplierSearch} placeholder="Search suppliers" />
                 {!isMobile && (
-                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
+                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Supplier Name</Text>
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Contact Person</Text>
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Phone</Text>
@@ -343,7 +386,10 @@ export default function AdminSettings() {
                     <Text className="w-28 font-bold text-slate-500 text-xs uppercase text-center">Actions</Text>
                   </View>
                 )}
-                {suppliers.map((sup) => (
+                {filteredSuppliers.length === 0 && (
+                  <Text className="text-slate-500 font-medium text-center py-6">No suppliers match "{supplierSearch}".</Text>
+                )}
+                {filteredSuppliers.map((sup) => (
                   <View key={sup.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
                     {editingId === sup.id ? (
                       <>
@@ -356,13 +402,13 @@ export default function AdminSettings() {
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">CONTACT PERSON</Text>}
                         <TextInput
                           className={`${isMobile ? 'mb-2' : 'flex-1 mr-2'} bg-slate-50 border border-slate-200 rounded p-2 text-slate-900`}
-                          value={editForm.contact_person}
+                          value={editForm.contact_person || ''}
                           onChangeText={(t) => setEditForm({ ...editForm, contact_person: t })}
                         />
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">PHONE</Text>}
                         <TextInput
                           className={`${isMobile ? 'mb-3' : 'flex-1 mr-2'} bg-slate-50 border border-slate-200 rounded p-2 text-slate-900`}
-                          value={editForm.phone_number}
+                          value={editForm.phone_number || ''}
                           onChangeText={(t) => setEditForm({ ...editForm, phone_number: t })}
                         />
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">TYPE</Text>}
@@ -441,14 +487,18 @@ export default function AdminSettings() {
             {/* EQUIPMENT TAB */}
             {activeTab === 'EQUIPMENT' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <SearchBox value={equipSearch} onChangeText={setEquipSearch} placeholder="Search equipment" />
                 {!isMobile && (
-                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
+                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Category</Text>
                     <Text className="flex-[2] font-bold text-slate-500 text-xs uppercase">Equipment Name</Text>
                     <Text className="w-28 font-bold text-slate-500 text-xs uppercase text-center">Actions</Text>
                   </View>
                 )}
-                {equipment.map((eq) => (
+                {filteredEquipment.length === 0 && (
+                  <Text className="text-slate-500 font-medium text-center py-6">No equipment matches "{equipSearch}".</Text>
+                )}
+                {filteredEquipment.map((eq) => (
                   <View key={eq.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
                     {editingId === eq.id ? (
                       <>
@@ -507,13 +557,17 @@ export default function AdminSettings() {
             {/* DESIGNATIONS TAB */}
             {activeTab === 'DESIGNATIONS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <SearchBox value={desigSearch} onChangeText={setDesigSearch} placeholder="Search designations" />
                 {!isMobile && (
-                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
+                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Role Name</Text>
                     <Text className="w-28 font-bold text-slate-500 text-xs uppercase text-center">Actions</Text>
                   </View>
                 )}
-                {designations.map((des) => (
+                {filteredDesignations.length === 0 && (
+                  <Text className="text-slate-500 font-medium text-center py-6">No designations match "{desigSearch}".</Text>
+                )}
+                {filteredDesignations.map((des) => (
                   <View key={des.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
                     {editingId === des.id ? (
                       <>
