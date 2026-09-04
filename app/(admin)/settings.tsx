@@ -412,17 +412,21 @@ export default function AdminSettings() {
                           onChangeText={(t) => setEditForm({ ...editForm, phone_number: t })}
                         />
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">TYPE</Text>}
-                        <View className={`${isMobile ? 'mb-3' : 'w-40'} flex-row`}>
-                          {(['LABOUR', 'EQUIPMENT'] as const).map(type => {
-                            const isSelected = editForm.supplier_type === type;
+                        <View className={`${isMobile ? 'mb-3' : 'w-40'} flex-row flex-wrap`}>
+                          {([
+                            { value: 'LABOUR', label: 'Labour', bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-700' },
+                            { value: null, label: 'Both', bg: 'bg-slate-200', border: 'border-slate-300', text: 'text-slate-700' },
+                            { value: 'EQUIPMENT', label: 'Equipment', bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
+                          ] as const).map(opt => {
+                            const isSelected = (editForm.supplier_type ?? null) === opt.value;
                             return (
                               <TouchableOpacity
-                                key={type}
-                                onPress={() => setEditForm({ ...editForm, supplier_type: isSelected ? null : type })}
-                                className={`px-2 py-1 rounded-full mr-1.5 border ${isSelected ? (type === 'LABOUR' ? 'bg-emerald-100 border-emerald-300' : 'bg-blue-100 border-blue-300') : 'bg-slate-50 border-slate-200'}`}
+                                key={opt.label}
+                                onPress={() => setEditForm({ ...editForm, supplier_type: opt.value })}
+                                className={`px-2 py-1 rounded-full mr-1.5 mb-1.5 border ${isSelected ? `${opt.bg} ${opt.border}` : 'bg-slate-50 border-slate-200'}`}
                               >
-                                <Text className={`text-[10px] font-bold ${isSelected ? (type === 'LABOUR' ? 'text-emerald-700' : 'text-blue-700') : 'text-slate-500'}`}>
-                                  {type === 'LABOUR' ? 'Labour' : 'Equipment'}
+                                <Text className={`text-[10px] font-bold ${isSelected ? opt.text : 'text-slate-500'}`}>
+                                  {opt.label}
                                 </Text>
                               </TouchableOpacity>
                             );
@@ -442,15 +446,11 @@ export default function AdminSettings() {
 
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">TYPE</Text>}
                         <View className={isMobile ? 'mb-3' : 'w-40'}>
-                          {sup.supplier_type ? (
-                            <View className={`self-start px-2 py-1 rounded-full ${sup.supplier_type === 'LABOUR' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
-                              <Text className={`text-[10px] font-bold ${sup.supplier_type === 'LABOUR' ? 'text-emerald-700' : 'text-blue-700'}`}>
-                                {sup.supplier_type === 'LABOUR' ? 'Labour' : 'Equipment'}
-                              </Text>
-                            </View>
-                          ) : (
-                            <Text className="text-slate-400 text-xs">Untagged</Text>
-                          )}
+                          <View className={`self-start px-2 py-1 rounded-full ${sup.supplier_type === 'LABOUR' ? 'bg-emerald-100' : sup.supplier_type === 'EQUIPMENT' ? 'bg-blue-100' : 'bg-slate-200'}`}>
+                            <Text className={`text-[10px] font-bold ${sup.supplier_type === 'LABOUR' ? 'text-emerald-700' : sup.supplier_type === 'EQUIPMENT' ? 'text-blue-700' : 'text-slate-700'}`}>
+                              {sup.supplier_type === 'LABOUR' ? 'Labour' : sup.supplier_type === 'EQUIPMENT' ? 'Equipment' : 'Both'}
+                            </Text>
+                          </View>
                         </View>
                       </>
                     )}
