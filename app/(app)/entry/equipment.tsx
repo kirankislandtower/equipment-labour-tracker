@@ -197,7 +197,7 @@ export default function EquipmentEntryScreen() {
         return;
       }
       const [suppAllocRes, equipAllocRes] = await Promise.all([
-        supabase.from('job_suppliers').select('supplier_id, suppliers!inner(id, supplier_name)').eq('job_id', formData.job_id).eq('suppliers.is_active', true),
+        supabase.from('job_suppliers').select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)').eq('job_id', formData.job_id).eq('suppliers.is_active', true),
         supabase.from('job_equipment').select('supplier_id').eq('job_id', formData.job_id),
       ]);
 
@@ -205,7 +205,7 @@ export default function EquipmentEntryScreen() {
       const suppliersWithEquipment = new Set(equipRows.filter((row: any) => row.supplier_id).map((row: any) => row.supplier_id));
 
       const supplierOptions = (suppAllocRes.data || [])
-        .filter((row: any) => row.suppliers && suppliersWithEquipment.has(row.suppliers.id))
+        .filter((row: any) => row.suppliers && row.suppliers.supplier_type !== 'LABOUR' && suppliersWithEquipment.has(row.suppliers.id))
         .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
       setSuppliers(supplierOptions);

@@ -339,6 +339,7 @@ export default function AdminSettings() {
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Supplier Name</Text>
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Contact Person</Text>
                     <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Phone</Text>
+                    <Text className="w-40 font-bold text-slate-500 text-xs uppercase">Type</Text>
                     <Text className="w-28 font-bold text-slate-500 text-xs uppercase text-center">Actions</Text>
                   </View>
                 )}
@@ -360,21 +361,51 @@ export default function AdminSettings() {
                         />
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">PHONE</Text>}
                         <TextInput
-                          className={`${isMobile ? 'mb-3' : 'flex-1'} bg-slate-50 border border-slate-200 rounded p-2 text-slate-900`}
+                          className={`${isMobile ? 'mb-3' : 'flex-1 mr-2'} bg-slate-50 border border-slate-200 rounded p-2 text-slate-900`}
                           value={editForm.phone_number}
                           onChangeText={(t) => setEditForm({ ...editForm, phone_number: t })}
                         />
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">TYPE</Text>}
+                        <View className={`${isMobile ? 'mb-3' : 'w-40'} flex-row`}>
+                          {(['LABOUR', 'EQUIPMENT'] as const).map(type => {
+                            const isSelected = editForm.supplier_type === type;
+                            return (
+                              <TouchableOpacity
+                                key={type}
+                                onPress={() => setEditForm({ ...editForm, supplier_type: isSelected ? null : type })}
+                                className={`px-2 py-1 rounded-full mr-1.5 border ${isSelected ? (type === 'LABOUR' ? 'bg-emerald-100 border-emerald-300' : 'bg-blue-100 border-blue-300') : 'bg-slate-50 border-slate-200'}`}
+                              >
+                                <Text className={`text-[10px] font-bold ${isSelected ? (type === 'LABOUR' ? 'text-emerald-700' : 'text-blue-700') : 'text-slate-500'}`}>
+                                  {type === 'LABOUR' ? 'Labour' : 'Equipment'}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
                       </>
                     ) : (
                       <>
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">SUPPLIER NAME</Text>}
                         <Text className={`${isMobile ? 'mb-2' : 'flex-1'} text-slate-900 font-bold`}>{sup.supplier_name}</Text>
-                        
+
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">CONTACT PERSON</Text>}
                         <Text className={`${isMobile ? 'mb-2' : 'flex-1'} text-slate-600`}>{sup.contact_person || '-'}</Text>
-                        
+
                         {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">PHONE</Text>}
                         <Text className={`${isMobile ? 'mb-3' : 'flex-1'} text-slate-500`}>{sup.phone_number || '-'}</Text>
+
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">TYPE</Text>}
+                        <View className={isMobile ? 'mb-3' : 'w-40'}>
+                          {sup.supplier_type ? (
+                            <View className={`self-start px-2 py-1 rounded-full ${sup.supplier_type === 'LABOUR' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                              <Text className={`text-[10px] font-bold ${sup.supplier_type === 'LABOUR' ? 'text-emerald-700' : 'text-blue-700'}`}>
+                                {sup.supplier_type === 'LABOUR' ? 'Labour' : 'Equipment'}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text className="text-slate-400 text-xs">Untagged</Text>
+                          )}
+                        </View>
                       </>
                     )}
                     

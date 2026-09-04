@@ -148,7 +148,7 @@ export default function SiteAllocationsScreen() {
       const [jobsRes, equipRes, suppRes] = await Promise.all([
         supabase.from('jobs').select('id, job_number, job_name').order('job_number'),
         supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name'),
-        supabase.from('suppliers').select('id, supplier_name').order('supplier_name')
+        supabase.from('suppliers').select('id, supplier_name, supplier_type').order('supplier_name')
       ]);
 
       if (jobsRes.data && jobsRes.data.length > 0) {
@@ -442,7 +442,7 @@ export default function SiteAllocationsScreen() {
                   options={[
                     { label: 'General (not tied to a supplier)', value: 'GENERAL' },
                     ...allSuppliers
-                      .filter(s => allocatedSupplierIds.has(s.id))
+                      .filter(s => allocatedSupplierIds.has(s.id) && s.supplier_type !== 'LABOUR')
                       .map(s => ({ label: s.supplier_name, value: s.id })),
                   ]}
                   onSelect={setEquipmentScope}
@@ -451,7 +451,8 @@ export default function SiteAllocationsScreen() {
                 <Text className="text-xs text-slate-400 -mt-2">
                   Toggles below allocate equipment under whichever scope is selected here. Switch to a
                   supplier to give that supplier its own equipment list on the foreman side; only
-                  suppliers already toggled on above show up here.
+                  suppliers already toggled on above show up here, and any supplier tagged "Labour"
+                  in Master Data is left out of this list.
                 </Text>
               </View>
 
@@ -523,7 +524,7 @@ export default function SiteAllocationsScreen() {
                   label="Assign Employees To"
                   value={employeeScope}
                   options={allSuppliers
-                    .filter(s => allocatedSupplierIds.has(s.id))
+                    .filter(s => allocatedSupplierIds.has(s.id) && s.supplier_type !== 'EQUIPMENT')
                     .map(s => ({ label: s.supplier_name, value: s.id }))}
                   onSelect={setEmployeeScope}
                   placeholder="Select a supplier..."
@@ -532,7 +533,8 @@ export default function SiteAllocationsScreen() {
                   The same supplier can bring different workers to different jobs, so this
                   roster is scoped to this supplier on this job specifically -- it's what
                   shows up as a pickable list on the Labour entry form instead of a blank
-                  text box. Only suppliers already toggled on above show up here.
+                  text box. Only suppliers already toggled on above show up here, and any
+                  supplier tagged "Equipment" in Master Data is left out of this list.
                 </Text>
               </View>
 
@@ -584,8 +586,8 @@ export default function SiteAllocationsScreen() {
               ) : (
                 <View className="py-6 items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
                   <Text className="text-slate-500 font-medium text-center px-4">
-                    {allSuppliers.filter(s => allocatedSupplierIds.has(s.id)).length === 0
-                      ? 'Toggle on a supplier above first, then come back here to add its employees.'
+                    {allSuppliers.filter(s => allocatedSupplierIds.has(s.id) && s.supplier_type !== 'EQUIPMENT').length === 0
+                      ? 'Toggle on a supplier above first (not tagged "Equipment" in Master Data), then come back here to add its employees.'
                       : 'Select a supplier above to manage its employee roster.'}
                   </Text>
                 </View>

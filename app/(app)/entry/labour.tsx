@@ -97,8 +97,9 @@ export default function LabourEntryScreen() {
     setSelectedLocation(null);
     setSelectedSupplier(null);
 
-    // Supplier options are exactly what's allocated to this job in Site Allocations --
-    // nothing more. No job, or nothing allocated to it yet, means an empty list.
+    // Supplier options are what's allocated to this job in Site Allocations, excluding
+    // suppliers explicitly tagged as equipment-only in Master Data -- an untagged
+    // supplier (supplier_type null) still shows here, same as before that tag existed.
     const loadSuppliersForJob = async () => {
       if (!selectedJob) {
         setAllSuppliers([]);
@@ -107,12 +108,12 @@ export default function LabourEntryScreen() {
       }
       const { data } = await supabase
         .from('job_suppliers')
-        .select('supplier_id, suppliers!inner(id, supplier_name)')
+        .select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)')
         .eq('job_id', selectedJob.id)
         .eq('suppliers.is_active', true);
 
       const options = (data || [])
-        .filter((row: any) => row.suppliers)
+        .filter((row: any) => row.suppliers && row.suppliers.supplier_type !== 'EQUIPMENT')
         .map((row: any) => ({ id: row.suppliers.id, supplier_name: row.suppliers.supplier_name }))
         .sort((a, b) => a.supplier_name.localeCompare(b.supplier_name, undefined, { sensitivity: 'base' }));
       setAllSuppliers(options);
