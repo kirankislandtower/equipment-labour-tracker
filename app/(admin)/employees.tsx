@@ -9,6 +9,11 @@ export default function EmployeesScreen() {
   const [loading, setLoading] = useState(true);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'loggedin'>('all');
+  // A foreman is "currently logged in" when their single most recent
+  // attendance_logs row is a LOGIN with no LOGOUT after it -- the same signal the
+  // Attendance screen shows per-day, just taken across all time and per account.
+  const [loggedInIds, setLoggedInIds] = useState<Set<string>>(new Set());
 
   // Modal state
   const [addModal, setAddModal] = useState(false);
@@ -20,6 +25,7 @@ export default function EmployeesScreen() {
 
   useEffect(() => {
     fetchUsers();
+    fetchLoginStatus();
   }, []);
 
   const fetchUsers = async () => {
@@ -30,7 +36,7 @@ export default function EmployeesScreen() {
         .select('*')
         .eq('role', 'FOREMAN')
         .order('full_name');
-        
+
       if (error) throw error;
       setUsersList(data || []);
     } catch (error: any) {
@@ -38,6 +44,27 @@ export default function EmployeesScreen() {
       Alert.alert('Error', 'Failed to fetch users');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLoginStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('attendance_logs')
+        .select('user_id, action, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const seen = new Set<string>();
+      const loggedIn = new Set<string>();
+      (data || []).forEach((log: any) => {
+        if (seen.has(log.user_id)) return;
+        seen.add(log.user_id);
+        if (log.action === 'LOGIN') loggedIn.add(log.user_id);
+      });
+      setLoggedInIds(loggedIn);
+    } catch (error) {
+      console.error('Error fetching login status:', error);
     }
   };
 
@@ -85,6 +112,7 @@ export default function EmployeesScreen() {
       setShowPassword(false);
       setForm({ username: '', fullName: '', password: '' });
       fetchUsers(); // Refresh the list
+      fetchLoginStatus();
       
     } catch (error: any) {
       console.error(error);
@@ -94,7 +122,10 @@ export default function EmployeesScreen() {
     }
   };
 
+  const loggedInCount = usersList.filter((u) => loggedInIds.has(u.id)).length;
+
   const filteredUsers = usersList.filter((u) => {
+    if (activeTab === 'loggedin' && !loggedInIds.has(u.id)) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.trim().toLowerCase();
     const username = u.email ? u.email.split('@')[0] : '';
@@ -106,7 +137,7 @@ export default function EmployeesScreen() {
       <View className={`flex-row justify-between items-center mb-6 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
         <View>
           <View className="flex-row items-center">
-            <Text className="text-slate-900 text-3xl font-black tracking-tight mr-3">Foremans</Text>
+            <Text className="text-slate-900 text-3xl font-black tracking-tight mr-3">Foreman</Text>
             <View className="bg-blue-100 px-3 py-1 rounded-full border border-blue-200">
               <Text className="text-blue-700 font-bold text-xs">{usersList.length} Total</Text>
             </View>
@@ -119,6 +150,28 @@ export default function EmployeesScreen() {
         >
           <Plus size={20} color="#fff" />
           <Text className="text-white font-bold ml-2">New Foreman</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View className="flex-row items-center gap-2 mb-4">
+        <TouchableOpacity
+          onPress={() => setActiveTab('all')}
+          className={`px-4 py-2 rounded-full border flex-row items-center ${activeTab === 'all' ? 'bg-[#1e3a8a] border-[#1e3a8a]' : 'bg-white border-slate-200'}`}
+        >
+          <Text className={`font-bold text-sm ${activeTab === 'all' ? 'text-white' : 'text-slate-600'}`}>All</Text>
+          <View className={`ml-2 px-2 py-0.5 rounded-full ${activeTab === 'all' ? 'bg-white/20' : 'bg-slate-100'}`}>
+            <Text className={`text-xs font-bold ${activeTab === 'all' ? 'text-white' : 'text-slate-500'}`}>{usersList.length}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('loggedin')}
+          className={`px-4 py-2 rounded-full border flex-row items-center ${activeTab === 'loggedin' ? 'bg-green-600 border-green-600' : 'bg-white border-slate-200'}`}
+        >
+          <View className={`w-2 h-2 rounded-full mr-2 ${activeTab === 'loggedin' ? 'bg-white' : 'bg-green-500'}`} />
+          <Text className={`font-bold text-sm ${activeTab === 'loggedin' ? 'text-white' : 'text-slate-600'}`}>Logged In</Text>
+          <View className={`ml-2 px-2 py-0.5 rounded-full ${activeTab === 'loggedin' ? 'bg-white/20' : 'bg-green-50'}`}>
+            <Text className={`text-xs font-bold ${activeTab === 'loggedin' ? 'text-white' : 'text-green-700'}`}>{loggedInCount}</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -159,7 +212,13 @@ export default function EmployeesScreen() {
               
               {filteredUsers.length === 0 && (
                 <View className="py-12 items-center">
-                  <Text className="text-slate-500 font-medium">No foremen match "{searchQuery}".</Text>
+                  <Text className="text-slate-500 font-medium">
+                    {searchQuery
+                      ? `No foremen match "${searchQuery}".`
+                      : activeTab === 'loggedin'
+                      ? 'No foremen are currently logged in.'
+                      : 'No foremen found.'}
+                  </Text>
                 </View>
               )}
 
@@ -170,8 +229,13 @@ export default function EmployeesScreen() {
                   <View key={u.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
                     <View className={`${isMobile ? 'mb-4 border-b border-slate-100 pb-3' : 'flex-1'} flex-row items-center justify-between`}>
                       <View className="flex-row items-center">
-                        <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${u.role === 'ADMIN' ? 'bg-blue-100' : 'bg-slate-100'}`}>
-                          <User size={14} color={u.role === 'ADMIN' ? '#2563eb' : '#64748b'} />
+                        <View className="relative mr-3">
+                          <View className={`w-8 h-8 rounded-full items-center justify-center ${u.role === 'ADMIN' ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                            <User size={14} color={u.role === 'ADMIN' ? '#2563eb' : '#64748b'} />
+                          </View>
+                          {loggedInIds.has(u.id) && (
+                            <View className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white" />
+                          )}
                         </View>
                         <Text className="text-slate-900 font-bold">{u.full_name}</Text>
                       </View>

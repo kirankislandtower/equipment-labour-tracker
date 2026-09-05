@@ -113,7 +113,7 @@ export default function AdminLayout() {
         <NavItem icon={AttendanceIcon} label="Attendance" href="/(admin)/attendance" />
         <NavItem icon={MapPin} label="Site Allocations" href="/(admin)/allocations" />
         <NavItem icon={Settings} label="Master Data" href="/(admin)/settings" />
-        <NavItem icon={UserPlus} label="Foremans" href="/(admin)/employees" />
+        <NavItem icon={UserPlus} label="Foreman" href="/(admin)/employees" />
         <NavItem icon={Shield} label="Admins" href="/(admin)/admins" />
       </View>
 
