@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Users, Plus, X, User, Eye, EyeOff, Search } from 'lucide-react-native';
+import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check } from 'lucide-react-native';
 
 export default function EmployeesScreen() {
   const { width } = useWindowDimensions();
@@ -19,9 +19,14 @@ export default function EmployeesScreen() {
   const [addModal, setAddModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Form state
   const [form, setForm] = useState({ username: '', fullName: '', password: '' });
+
+  // Foreman details/edit modal state
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [savingPhone, setSavingPhone] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -119,6 +124,34 @@ export default function EmployeesScreen() {
       Alert.alert('Error', error.message || 'Could not create user');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openUserDetails = (u: any) => {
+    setSelectedUser(u);
+    setEditPhoneNumber(u.phone_number || '');
+  };
+
+  const handleSavePhone = async () => {
+    if (!selectedUser) return;
+    setSavingPhone(true);
+    try {
+      const trimmed = editPhoneNumber.trim();
+      const { error } = await supabase
+        .from('users')
+        .update({ phone_number: trimmed || null })
+        .eq('id', selectedUser.id);
+
+      if (error) throw error;
+
+      setUsersList(prev => prev.map(u => u.id === selectedUser.id ? { ...u, phone_number: trimmed || null } : u));
+      setSelectedUser((prev: any) => prev ? { ...prev, phone_number: trimmed || null } : prev);
+      Alert.alert('Saved', 'Phone number updated.');
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to save phone number');
+    } finally {
+      setSavingPhone(false);
     }
   };
 
@@ -226,7 +259,12 @@ export default function EmployeesScreen() {
                 const username = u.email ? u.email.split('@')[0] : 'unknown';
 
                 return (
-                  <View key={u.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
+                  <TouchableOpacity
+                    key={u.id}
+                    onPress={() => openUserDetails(u)}
+                    activeOpacity={0.7}
+                    className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}
+                  >
                     <View className={`${isMobile ? 'mb-4 border-b border-slate-100 pb-3' : 'flex-1'} flex-row items-center justify-between`}>
                       <View className="flex-row items-center">
                         <View className="relative mr-3">
@@ -273,7 +311,7 @@ export default function EmployeesScreen() {
                         </View>
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -349,6 +387,67 @@ export default function EmployeesScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text className="text-white font-bold text-lg">Create Account</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Foreman Details / Edit Modal */}
+      <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
+        <View className="flex-1 bg-black/50 justify-center items-center p-8">
+          <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
+            <View className="flex-row justify-between items-center mb-6">
+              <View className="flex-row items-center">
+                <View className={`p-2 rounded-lg mr-3 ${selectedUser?.role === 'ADMIN' ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                  <User size={20} color={selectedUser?.role === 'ADMIN' ? '#2563eb' : '#64748b'} />
+                </View>
+                <View>
+                  <Text className="text-xl font-black text-slate-900">{selectedUser?.full_name}</Text>
+                  <Text className="text-slate-400 text-xs font-mono">{selectedUser?.email?.split('@')[0]}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedUser(null)}><X size={24} color="#94a3b8" /></TouchableOpacity>
+            </View>
+
+            <View className="flex-row mb-4">
+              <View className="flex-1 mr-2">
+                <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Role</Text>
+                <Text className="text-slate-900 font-bold">{selectedUser?.role}</Text>
+              </View>
+              <View className="flex-1 ml-2">
+                <Text className="text-xs font-bold text-slate-400 uppercase mb-1">User ID</Text>
+                <Text className="text-slate-500 text-xs font-mono">{selectedUser?.id?.split('-')[0]}...</Text>
+              </View>
+            </View>
+
+            <View className="mb-6">
+              <Text className="text-sm font-bold text-slate-700 mb-1">Phone Number</Text>
+              <View className="w-full bg-slate-50 border border-slate-200 rounded-lg flex-row items-center px-4">
+                <Phone size={16} color="#94a3b8" />
+                <TextInput
+                  placeholder="e.g. +971 50 123 4567"
+                  placeholderTextColor="#94a3b8"
+                  value={editPhoneNumber}
+                  onChangeText={setEditPhoneNumber}
+                  keyboardType="phone-pad"
+                  className="flex-1 p-4 ml-2 text-slate-900"
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleSavePhone}
+              disabled={savingPhone}
+              className={`bg-[#1e3a8a] py-4 rounded-xl items-center flex-row justify-center ${savingPhone ? 'opacity-70' : ''}`}
+            >
+              {savingPhone ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Check size={18} color="#fff" />
+                  <Text className="text-white font-bold text-base ml-2">Save</Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
