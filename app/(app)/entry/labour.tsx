@@ -48,12 +48,15 @@ export default function LabourEntryScreen() {
   const [foremanName, setForemanName] = useState('');
   const [engineerName, setEngineerName] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [requestedBy, setRequestedBy] = useState('');
+  const [assignedJob, setAssignedJob] = useState<Job | null>(null);
 
   const [jobModalVisible, setJobModalVisible] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [supplierModalVisible, setSupplierModalVisible] = useState(false);
   const [employeeModalVisible, setEmployeeModalVisible] = useState(false);
   const [designationModalVisible, setDesignationModalVisible] = useState(false);
+  const [assignedJobModalVisible, setAssignedJobModalVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
@@ -220,7 +223,9 @@ export default function LabourEntryScreen() {
           setForemanName(entryData.foreman_name || '');
           setEngineerName(entryData.engineer_name || '');
           setRemarks(entryData.remarks || '');
-          
+          setRequestedBy(entryData.requested_by || '');
+          if (jobsRes.data) setAssignedJob(jobsRes.data.find((j: any) => j.id === entryData.assigned_job_id) || null);
+
           if (entryData.labour_photo_url && entryData.labour_photo_url !== 'pending' && entryData.labour_photo_url !== 'NOT_REQUIRED') {
             setPhotoUri(entryData.labour_photo_url);
             setInitialPhotoUri(entryData.labour_photo_url);
@@ -241,6 +246,8 @@ export default function LabourEntryScreen() {
         setBreakHours('1');
         setEngineerName('');
         setRemarks('');
+        setRequestedBy('');
+        setAssignedJob(null);
         setPhotoUri(null);
         setPhotoCapturedAt(null);
         setInitialPhotoUri(null);
@@ -285,6 +292,10 @@ export default function LabourEntryScreen() {
     if (!isStoreUser && !endTime) newErrors.end_time = 'End Time is required';
     if (!foremanName) newErrors.foreman_name = 'Foreman Name is required';
     if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
+    if (isStoreUser) {
+      if (!requestedBy) newErrors.requested_by = 'Requested By is required';
+      if (!assignedJob) newErrors.assigned_job = 'Assign to Job is required';
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -316,7 +327,9 @@ export default function LabourEntryScreen() {
         remarks: remarks || null,
         created_by: userData?.user?.id || null,
         status: 'SUBMITTED',
-        rejection_reason: null
+        rejection_reason: null,
+        requested_by: isStoreUser ? requestedBy : null,
+        assigned_job_id: isStoreUser ? (assignedJob?.id || null) : null
       };
 
       // New entries only (not edits) go through the offline queue -- an edit while
@@ -705,6 +718,48 @@ export default function LabourEntryScreen() {
           {errors.designation ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.designation}</Text> : null}
         </View>
 
+        {isStoreUser && (
+          <>
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-slate-700 mb-1">
+                Requested By <Text className="text-red-500">*</Text>
+              </Text>
+              <View className={`bg-white border ${errors.requested_by ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14 justify-center`}>
+                <TextInput
+                  className="flex-1 text-slate-900 text-base"
+                  placeholder="Who requested this labour"
+                  placeholderTextColor="#94a3b8"
+                  value={requestedBy}
+                  onChangeText={(t) => {
+                    setRequestedBy(t);
+                    if (errors.requested_by) setErrors(prev => ({ ...prev, requested_by: '' }));
+                  }}
+                />
+              </View>
+              {errors.requested_by ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.requested_by}</Text> : null}
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-slate-700 mb-1">
+                Assign to Job <Text className="text-red-500">*</Text>
+              </Text>
+              <TouchableOpacity
+                onPress={() => setAssignedJobModalVisible(true)}
+                className={`flex-row items-center bg-white border ${errors.assigned_job ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 py-3 h-14 active:opacity-70`}
+              >
+                <View className="mr-3">
+                  <Briefcase size={20} color={errors.assigned_job ? "#ef4444" : "#94a3b8"} />
+                </View>
+                <Text className={`flex-1 text-base ${assignedJob ? 'text-slate-900' : 'text-slate-400'}`}>
+                  {assignedJob ? assignedJob.job_number : 'Select Job to Assign'}
+                </Text>
+                <ChevronDown size={20} color={errors.assigned_job ? "#ef4444" : "#94a3b8"} />
+              </TouchableOpacity>
+              {errors.assigned_job ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.assigned_job}</Text> : null}
+            </View>
+          </>
+        )}
+
         {!isStoreUser && (
           <>
             <View className="flex-row mb-4 gap-x-4">
@@ -897,6 +952,10 @@ export default function LabourEntryScreen() {
         'Select Employee'
       )}
       {renderModal(designationModalVisible, setDesignationModalVisible, designations, (item) => item.id, setSelectedDesignation, 'Select Designation')}
+      {renderModal(assignedJobModalVisible, setAssignedJobModalVisible, jobs, (item) => item.id, (item) => {
+        setAssignedJob(item);
+        if (errors.assigned_job) setErrors(prev => ({ ...prev, assigned_job: '' }));
+      }, 'Assign to Job')}
     </SafeAreaView>
   );
 }

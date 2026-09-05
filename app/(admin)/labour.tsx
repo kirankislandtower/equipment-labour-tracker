@@ -76,6 +76,7 @@ export default function AdminLabour() {
         .select(`
           *,
           jobs:job_id (job_number, job_name),
+          assigned_job:assigned_job_id (job_number, job_name),
           suppliers:supplier_id (supplier_name),
           labour_designations:designation_id (designation_name)
         `)
@@ -592,6 +593,21 @@ export default function AdminLabour() {
                       </View>
                     </View>
                   </>
+                )}
+
+                {!!selectedEntry.requested_by && (
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Requested By</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.requested_by}</Text>
+                  </View>
+                )}
+
+                {!!selectedEntry.assigned_job && (
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Assigned to Job</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.assigned_job.job_number}</Text>
+                    <Text className="text-slate-500">{selectedEntry.assigned_job.job_name}</Text>
+                  </View>
                 )}
 
                 {selectedEntry.overtime_hours > 0 && (

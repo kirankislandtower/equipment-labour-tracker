@@ -151,7 +151,9 @@ export default function EquipmentEntryScreen() {
     fuel_provided: false,
     fuel_quantity: '',
     fuel_unit: 'Gallons',
-    location: ''
+    location: '',
+    requested_by: '',
+    assigned_job_id: ''
   });
 
   const rentalTypes = [
@@ -340,7 +342,9 @@ export default function EquipmentEntryScreen() {
             remarks: entryData.remarks || '',
             fuel_provided: entryData.fuel_provided || false,
             fuel_quantity: entryData.fuel_quantity ? entryData.fuel_quantity.toString() : '',
-            fuel_unit: entryData.fuel_unit || 'Gallons'
+            fuel_unit: entryData.fuel_unit || 'Gallons',
+            requested_by: entryData.requested_by || '',
+            assigned_job_id: entryData.assigned_job_id || ''
           }));
           if (entryData.equipment_photo_url && entryData.equipment_photo_url !== 'pending') {
             setPhotoUri(entryData.equipment_photo_url);
@@ -369,7 +373,9 @@ export default function EquipmentEntryScreen() {
           fuel_provided: false,
           fuel_quantity: '',
           fuel_unit: 'Gallons',
-          location: ''
+          location: '',
+          requested_by: '',
+          assigned_job_id: ''
         }));
         setPhotoUri(null);
         setPhotoCapturedAt(null);
@@ -413,6 +419,11 @@ export default function EquipmentEntryScreen() {
     
     if (!isStoreUser && formData.rental_type === 'TRIP_BASIS' && !formData.number_of_trips) {
       newErrors.number_of_trips = 'Number of trips is required';
+    }
+
+    if (isStoreUser) {
+      if (!formData.requested_by) newErrors.requested_by = 'Requested By is required';
+      if (!formData.assigned_job_id) newErrors.assigned_job_id = 'Assign to Job is required';
     }
 
     if (formData.fuel_provided) {
@@ -471,7 +482,9 @@ export default function EquipmentEntryScreen() {
         rejection_reason: null,
         fuel_provided: formData.fuel_provided,
         fuel_quantity: formData.fuel_provided && formData.fuel_quantity ? parseFloat(formData.fuel_quantity) : null,
-        fuel_unit: formData.fuel_provided ? formData.fuel_unit : null
+        fuel_unit: formData.fuel_provided ? formData.fuel_unit : null,
+        requested_by: isStoreUser ? formData.requested_by : null,
+        assigned_job_id: isStoreUser ? formData.assigned_job_id : null
       };
 
       // New entries only (not edits) go through the offline queue -- an edit while
@@ -676,7 +689,9 @@ export default function EquipmentEntryScreen() {
                     fuel_provided: false,
                     fuel_quantity: '',
                     fuel_unit: 'Gallons',
-                    location: ''
+                    location: '',
+                    requested_by: '',
+                    assigned_job_id: ''
                   });
                   setPhotoUri(null);
                   setPhotoCapturedAt(null);
@@ -804,6 +819,34 @@ export default function EquipmentEntryScreen() {
             error={errors.equipment_id}
           />
         </View>
+
+        {isStoreUser && (
+          <>
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-slate-700 mb-1">
+                Requested By <Text className="text-red-500">*</Text>
+              </Text>
+              <TextInput
+                value={formData.requested_by}
+                onChangeText={(t) => updateForm('requested_by', t)}
+                className={`bg-white border ${errors.requested_by ? 'border-red-500' : 'border-slate-300'} text-slate-900 rounded-lg px-4 py-3.5`}
+                placeholder="Who requested this item"
+                placeholderTextColor="#94a3b8"
+              />
+              {errors.requested_by ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.requested_by}</Text> : null}
+            </View>
+
+            <CustomPicker
+              label="Assign to Job"
+              required={true}
+              value={formData.assigned_job_id}
+              options={jobs}
+              onSelect={(v: string) => updateForm('assigned_job_id', v)}
+              placeholder="Select Job to Assign"
+              error={errors.assigned_job_id}
+            />
+          </>
+        )}
 
         {!isStoreUser && (
           <>
