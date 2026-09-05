@@ -437,7 +437,7 @@ export default function AdminEquipment() {
                         </View>
                         
                         <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
-                          {entry.equipment_photo_url && entry.equipment_photo_url !== 'pending' && (
+                          {entry.equipment_photo_url && entry.equipment_photo_url !== 'pending' && entry.equipment_photo_url !== 'NOT_REQUIRED' && (
                             <TouchableOpacity 
                               onPress={() => {
                                 setSelectedPhoto(entry.equipment_photo_url);
@@ -488,7 +488,7 @@ export default function AdminEquipment() {
                           <StatusPill status={entry.status} />
                         </View>
                         <View className="flex-1 flex-row justify-end space-x-2">
-                          {entry.equipment_photo_url && entry.equipment_photo_url !== 'pending' && (
+                          {entry.equipment_photo_url && entry.equipment_photo_url !== 'pending' && entry.equipment_photo_url !== 'NOT_REQUIRED' && (
                             <TouchableOpacity 
                               onPress={() => {
                                 setSelectedPhoto(entry.equipment_photo_url);

@@ -12,6 +12,7 @@ import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 import { resolveSupplierId } from '../../../lib/masterData';
+import { isStoreForeman } from '../../../lib/foremanFlags';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
 type Supplier = { id: string; supplier_name: string };
@@ -53,6 +54,7 @@ export default function LabourEntryScreen() {
   const [successVisible, setSuccessVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
+  const [isStoreUser, setIsStoreUser] = useState(false);
 
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
@@ -180,6 +182,7 @@ export default function LabourEntryScreen() {
           } else {
             setForemanName(userData.full_name || '');
           }
+          setIsStoreUser(isStoreForeman(userData.email));
         }
       }
 
@@ -199,7 +202,7 @@ export default function LabourEntryScreen() {
           setEngineerName(entryData.engineer_name || '');
           setRemarks(entryData.remarks || '');
           
-          if (entryData.labour_photo_url && entryData.labour_photo_url !== 'pending') {
+          if (entryData.labour_photo_url && entryData.labour_photo_url !== 'pending' && entryData.labour_photo_url !== 'NOT_REQUIRED') {
             setPhotoUri(entryData.labour_photo_url);
             setInitialPhotoUri(entryData.labour_photo_url);
           }
@@ -258,10 +261,10 @@ export default function LabourEntryScreen() {
     if (!selectedSupplier) newErrors.supplier = 'Supplier is required';
     if (!employeeName) newErrors.employee_name = 'Employee Name is required';
     if (!selectedDesignation) newErrors.designation = 'Designation is required';
-    if (!startTime) newErrors.start_time = 'Start Time is required';
-    if (!endTime) newErrors.end_time = 'End Time is required';
+    if (!isStoreUser && !startTime) newErrors.start_time = 'Start Time is required';
+    if (!isStoreUser && !endTime) newErrors.end_time = 'End Time is required';
     if (!foremanName) newErrors.foreman_name = 'Foreman Name is required';
-    if (!photoUri && !id) newErrors.photo = 'Live photo is required';
+    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -272,7 +275,7 @@ export default function LabourEntryScreen() {
     try {
       const { data: userData } = await supabase.auth.getUser();
       
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
@@ -642,58 +645,62 @@ export default function LabourEntryScreen() {
           {errors.designation ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.designation}</Text> : null}
         </View>
 
-        <View className="flex-row mb-4 gap-x-4">
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-slate-700 mb-1">
-              Start Time <Text className="text-red-500">*</Text>
-            </Text>
-            <TouchableOpacity 
-              onPress={() => setShowStartTimePicker(true)}
-              className={`flex-row items-center bg-white border ${errors.start_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
-            >
-              <Clock size={18} color="#94a3b8" className="mr-2" />
-              <Text className="flex-1 text-slate-900 text-base font-medium">{startTime}</Text>
-            </TouchableOpacity>
-            {errors.start_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.start_time}</Text> : null}
-          </View>
+        {!isStoreUser && (
+          <>
+            <View className="flex-row mb-4 gap-x-4">
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-slate-700 mb-1">
+                  Start Time <Text className="text-red-500">*</Text>
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowStartTimePicker(true)}
+                  className={`flex-row items-center bg-white border ${errors.start_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
+                >
+                  <Clock size={18} color="#94a3b8" className="mr-2" />
+                  <Text className="flex-1 text-slate-900 text-base font-medium">{startTime}</Text>
+                </TouchableOpacity>
+                {errors.start_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.start_time}</Text> : null}
+              </View>
 
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-slate-700 mb-1">
-              End Time <Text className="text-red-500">*</Text>
-            </Text>
-            <TouchableOpacity 
-              onPress={() => setShowEndTimePicker(true)}
-              className={`flex-row items-center bg-white border ${errors.end_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
-            >
-              <Clock size={18} color="#94a3b8" className="mr-2" />
-              <Text className="flex-1 text-slate-900 text-base font-medium">{endTime}</Text>
-            </TouchableOpacity>
-            {errors.end_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.end_time}</Text> : null}
-          </View>
-        </View>
-
-        <View className="flex-row mb-4 gap-x-4">
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-slate-700 mb-1">Break Hours</Text>
-            <View className="bg-white border border-slate-300 rounded-lg px-4 h-14 justify-center">
-              <TextInput
-                className="flex-1 text-slate-900 text-base font-medium"
-                placeholder="1"
-                placeholderTextColor="#94a3b8"
-                value={breakHours}
-                onChangeText={setBreakHours}
-                keyboardType="numeric"
-              />
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-slate-700 mb-1">
+                  End Time <Text className="text-red-500">*</Text>
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowEndTimePicker(true)}
+                  className={`flex-row items-center bg-white border ${errors.end_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
+                >
+                  <Clock size={18} color="#94a3b8" className="mr-2" />
+                  <Text className="flex-1 text-slate-900 text-base font-medium">{endTime}</Text>
+                </TouchableOpacity>
+                {errors.end_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.end_time}</Text> : null}
+              </View>
             </View>
-          </View>
 
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-slate-700 mb-1">Total Hours</Text>
-            <View className="bg-slate-100 border border-slate-200 rounded-lg px-4 h-14 justify-center">
-              <Text className="text-slate-900 text-base font-bold tracking-tight">{totalWorkingHours}</Text>
+            <View className="flex-row mb-4 gap-x-4">
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-slate-700 mb-1">Break Hours</Text>
+                <View className="bg-white border border-slate-300 rounded-lg px-4 h-14 justify-center">
+                  <TextInput
+                    className="flex-1 text-slate-900 text-base font-medium"
+                    placeholder="1"
+                    placeholderTextColor="#94a3b8"
+                    value={breakHours}
+                    onChangeText={setBreakHours}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-slate-700 mb-1">Total Hours</Text>
+                <View className="bg-slate-100 border border-slate-200 rounded-lg px-4 h-14 justify-center">
+                  <Text className="text-slate-900 text-base font-bold tracking-tight">{totalWorkingHours}</Text>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
+          </>
+        )}
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">
@@ -727,49 +734,51 @@ export default function LabourEntryScreen() {
           </View>
         </View>
 
-        <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-          <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo (Live Camera Only) <Text className="text-red-500">*</Text></Text>
-          {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
-          
-          {photoUri ? (
-            <View className="mb-3">
-              <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                
-                {/* Watermark Overlay (Visual Preview) */}
-                <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                  <Text className="text-white text-xs font-bold">
-                    {new Date().toLocaleString()}
-                  </Text>
-                  <Text className="text-white text-xs font-semibold">
-                    {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
-                  </Text>
-                  <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                </View>
+        {!isStoreUser && (
+          <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
+            <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo (Live Camera Only) <Text className="text-red-500">*</Text></Text>
+            {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
 
-                <TouchableOpacity 
-                  onPress={() => setPhotoUri(null)}
-                  className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                >
-                  <X size={20} color="#fff" />
-                </TouchableOpacity>
+            {photoUri ? (
+              <View className="mb-3">
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+
+                  {/* Watermark Overlay (Visual Preview) */}
+                  <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
+                    <Text className="text-white text-xs font-bold">
+                      {new Date().toLocaleString()}
+                    </Text>
+                    <Text className="text-white text-xs font-semibold">
+                      {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
+                    </Text>
+                    <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => setPhotoUri(null)}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          ) : Platform.OS === 'web' ? (
-            <WebCamera onImageCaptured={setPhotoUri} colorTheme="green" />
-          ) : (
-            <TouchableOpacity 
-              onPress={pickImage}
-              className="bg-green-50 border-2 border-dashed border-green-200 rounded-lg py-8 items-center justify-center active:bg-green-100"
-            >
-              <Camera size={32} color="#16a34a" className="mb-2" />
-              <Text className="text-green-900 font-bold text-base">Take Live Photo</Text>
-              <Text className="text-green-600 text-xs mt-1 text-center px-4">
-                Photos are time and location stamped to prevent fraud.
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            ) : Platform.OS === 'web' ? (
+              <WebCamera onImageCaptured={setPhotoUri} colorTheme="green" />
+            ) : (
+              <TouchableOpacity
+                onPress={pickImage}
+                className="bg-green-50 border-2 border-dashed border-green-200 rounded-lg py-8 items-center justify-center active:bg-green-100"
+              >
+                <Camera size={32} color="#16a34a" className="mb-2" />
+                <Text className="text-green-900 font-bold text-base">Take Live Photo</Text>
+                <Text className="text-green-600 text-xs mt-1 text-center px-4">
+                  Photos are time and location stamped to prevent fraud.
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <View className="mb-8">
           <Text className="text-sm font-medium text-slate-700 mb-1">Remarks (Optional)</Text>

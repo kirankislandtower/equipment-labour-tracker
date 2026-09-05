@@ -438,7 +438,7 @@ export default function AdminLabour() {
                         </View>
                         
                         <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
-                          {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && (
+                          {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && entry.labour_photo_url !== 'NOT_REQUIRED' && (
                             <TouchableOpacity 
                               onPress={() => {
                                 setSelectedPhoto(entry.labour_photo_url);
@@ -489,7 +489,7 @@ export default function AdminLabour() {
                           <StatusPill status={entry.status} />
                         </View>
                         <View className="flex-1 flex-row justify-end space-x-2">
-                          {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && (
+                          {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && entry.labour_photo_url !== 'NOT_REQUIRED' && (
                             <TouchableOpacity 
                               onPress={() => {
                                 setSelectedPhoto(entry.labour_photo_url);

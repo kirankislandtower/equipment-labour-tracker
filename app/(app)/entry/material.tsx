@@ -13,6 +13,7 @@ import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cl
 import { compressImageToDataUri } from '../../../lib/imageUtils';
 import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
+import { isStoreForeman } from '../../../lib/foremanFlags';
 
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -80,6 +81,7 @@ export default function MaterialTransferEntryScreen() {
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
+  const [isStoreUser, setIsStoreUser] = useState(false);
 
   // viewShotRef removed
 
@@ -159,6 +161,7 @@ export default function MaterialTransferEntryScreen() {
             name = userData.email.split('@')[0];
           }
           setFormData(prev => ({ ...prev, foreman_name: name }));
+          setIsStoreUser(isStoreForeman(userData.email));
         }
       }
       
@@ -177,7 +180,7 @@ export default function MaterialTransferEntryScreen() {
             foreman_name: entryData.foreman_name || '',
             remarks: entryData.remarks || ''
           });
-          if (entryData.photo_url && entryData.photo_url !== 'pending') {
+          if (entryData.photo_url && entryData.photo_url !== 'pending' && entryData.photo_url !== 'NOT_REQUIRED') {
             setPhotoUri(entryData.photo_url);
             setInitialPhotoUri(entryData.photo_url);
           }
@@ -234,7 +237,7 @@ export default function MaterialTransferEntryScreen() {
     if (formData.from_job_id && formData.to_job_id && formData.from_job_id === formData.to_job_id) {
       newErrors.to_job_id = 'Destination cannot be same as source';
     }
-    if (!photoUri && !id) newErrors.photo = 'Live photo is required';
+    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -245,7 +248,7 @@ export default function MaterialTransferEntryScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
@@ -261,7 +264,7 @@ export default function MaterialTransferEntryScreen() {
           console.error('Cloudinary upload failed, saving entry without photo:', err);
           photoUploadFailed = true;
         }
-      } else if (!id) {
+      } else if (!id && !isStoreUser) {
          setErrors(prev => ({ ...prev, photo: 'Live photo is required' }));
          setSubmitting(false);
          return;
@@ -524,54 +527,56 @@ export default function MaterialTransferEntryScreen() {
           {errors.foreman_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.foreman_name}</Text> : null}
         </View>
 
-        <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-          <Text className="text-slate-700 text-sm font-medium mb-3">
-            Material Photo (Live Camera Only) <Text className="text-red-500">*</Text>
-          </Text>
-          {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
-          
-          {photoUri ? (
-            <View className="mb-3">
-              <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                
-                {/* Watermark Overlay (Visual Preview) */}
-                <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                  <Text className="text-white text-xs font-bold">
-                    {new Date().toLocaleString()}
-                  </Text>
-                  <Text className="text-white text-xs font-semibold">
-                    From: {jobs.find((j: any) => j.value === formData.from_job_id)?.label || 'Unknown'}
-                  </Text>
-                  <Text className="text-white text-xs font-semibold">
-                    To: {jobs.find((j: any) => j.value === formData.to_job_id)?.label || 'Unknown'}
-                  </Text>
-                  <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                </View>
+        {!isStoreUser && (
+          <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
+            <Text className="text-slate-700 text-sm font-medium mb-3">
+              Material Photo (Live Camera Only) <Text className="text-red-500">*</Text>
+            </Text>
+            {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
 
-                <TouchableOpacity 
-                  onPress={() => setPhotoUri(null)}
-                  className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                >
-                  <X size={20} color="#fff" />
-                </TouchableOpacity>
+            {photoUri ? (
+              <View className="mb-3">
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+
+                  {/* Watermark Overlay (Visual Preview) */}
+                  <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
+                    <Text className="text-white text-xs font-bold">
+                      {new Date().toLocaleString()}
+                    </Text>
+                    <Text className="text-white text-xs font-semibold">
+                      From: {jobs.find((j: any) => j.value === formData.from_job_id)?.label || 'Unknown'}
+                    </Text>
+                    <Text className="text-white text-xs font-semibold">
+                      To: {jobs.find((j: any) => j.value === formData.to_job_id)?.label || 'Unknown'}
+                    </Text>
+                    <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => setPhotoUri(null)}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-      ) : Platform.OS === 'web' ? (
-        <WebCamera onImageCaptured={setPhotoUri} colorTheme="amber" />
-      ) : (
-        <TouchableOpacity 
-          onPress={pickImage}
-          className="bg-amber-50 border-2 border-dashed border-amber-200 rounded-lg py-8 items-center justify-center active:bg-amber-100"
-        >
-          <Camera size={32} color="#d97706" className="mb-2" />
-          <Text className="text-amber-900 font-bold text-base">Take Live Photo</Text>
-          <Text className="text-amber-600 text-xs mt-1 text-center px-4">
-            Photos are time and location stamped to prevent fraud.
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
+        ) : Platform.OS === 'web' ? (
+          <WebCamera onImageCaptured={setPhotoUri} colorTheme="amber" />
+        ) : (
+          <TouchableOpacity
+            onPress={pickImage}
+            className="bg-amber-50 border-2 border-dashed border-amber-200 rounded-lg py-8 items-center justify-center active:bg-amber-100"
+          >
+            <Camera size={32} color="#d97706" className="mb-2" />
+            <Text className="text-amber-900 font-bold text-base">Take Live Photo</Text>
+            <Text className="text-amber-600 text-xs mt-1 text-center px-4">
+              Photos are time and location stamped to prevent fraud.
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+        )}
 
         <View className="mb-8">
           <Text className="text-sm font-medium text-slate-700 mb-1">Remarks (Optional)</Text>

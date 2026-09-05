@@ -15,6 +15,7 @@ import { compressImageToDataUri } from '../../../lib/imageUtils';
 import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
 import { resolveSupplierId, resolveEquipmentId } from '../../../lib/masterData';
+import { isStoreForeman } from '../../../lib/foremanFlags';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -82,6 +83,7 @@ export default function EquipmentEntryScreen() {
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
+  const [isStoreUser, setIsStoreUser] = useState(false);
 
   // ViewShot removed
   const pickImage = async () => {
@@ -275,6 +277,7 @@ export default function EquipmentEntryScreen() {
             name = userData.email.split('@')[0];
           }
           setFormData(prev => ({ ...prev, foreman_name: name }));
+          setIsStoreUser(isStoreForeman(userData.email));
         }
       }
       
@@ -384,16 +387,16 @@ export default function EquipmentEntryScreen() {
     if (!formData.foreman_name) newErrors.foreman_name = 'Foreman name is required';
     if (!formData.engineer_name) newErrors.engineer_name = 'Engineer name is required';
     
-    if (formData.rental_type === 'TRIP_BASIS' && !formData.number_of_trips) {
+    if (!isStoreUser && formData.rental_type === 'TRIP_BASIS' && !formData.number_of_trips) {
       newErrors.number_of_trips = 'Number of trips is required';
     }
-    
+
     if (formData.fuel_provided) {
       if (!formData.fuel_quantity) newErrors.fuel_quantity = 'Quantity is required';
       if (!formData.fuel_unit) newErrors.fuel_unit = 'Unit is required';
     }
-    
-    if (!photoUri && !id) newErrors.photo = 'Live photo is required';
+
+    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -404,7 +407,7 @@ export default function EquipmentEntryScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
@@ -737,87 +740,91 @@ export default function EquipmentEntryScreen() {
           />
         </View>
 
-        <CustomPicker 
-          label="Rental Type"
-          required={true}
-          value={formData.rental_type}
-          options={rentalTypes}
-          onSelect={(v: string) => updateForm('rental_type', v)}
-          placeholder="Select Rental Type"
-        />
-
-        {formData.rental_type === 'TRIP_BASIS' && (
-          <View className="mb-4">
-            <Text className="text-sm font-medium text-slate-700 mb-1">
-              Number of Trips <Text className="text-red-500">*</Text>
-            </Text>
-            <TextInput
-              value={formData.number_of_trips}
-              onChangeText={(t) => updateForm('number_of_trips', t)}
-              className={`bg-white border ${errors.number_of_trips ? 'border-red-500' : 'border-slate-300'} text-slate-900 rounded-lg px-4 py-3.5`}
-              placeholder="0"
-              placeholderTextColor="#94a3b8"
-              keyboardType="numeric"
+        {!isStoreUser && (
+          <>
+            <CustomPicker
+              label="Rental Type"
+              required={true}
+              value={formData.rental_type}
+              options={rentalTypes}
+              onSelect={(v: string) => updateForm('rental_type', v)}
+              placeholder="Select Rental Type"
             />
-            {errors.number_of_trips ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.number_of_trips}</Text> : null}
-          </View>
+
+            {formData.rental_type === 'TRIP_BASIS' && (
+              <View className="mb-4">
+                <Text className="text-sm font-medium text-slate-700 mb-1">
+                  Number of Trips <Text className="text-red-500">*</Text>
+                </Text>
+                <TextInput
+                  value={formData.number_of_trips}
+                  onChangeText={(t) => updateForm('number_of_trips', t)}
+                  className={`bg-white border ${errors.number_of_trips ? 'border-red-500' : 'border-slate-300'} text-slate-900 rounded-lg px-4 py-3.5`}
+                  placeholder="0"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                />
+                {errors.number_of_trips ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.number_of_trips}</Text> : null}
+              </View>
+            )}
+
+            <View className="flex-row mb-4 gap-x-4">
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-slate-700 mb-1">Start Time</Text>
+                <TouchableOpacity
+                  onPress={() => setShowStartTimePicker(true)}
+                  className="flex-row items-center justify-between bg-white border border-slate-300 rounded-lg px-4 h-14"
+                >
+                  <View className="flex-row items-center flex-1">
+                    <Clock size={18} color="#94a3b8" className="mr-2" />
+                    <Text className="text-slate-900 text-base font-medium">{formData.start_time}</Text>
+                  </View>
+                  <View className="bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200 ml-1">
+                    <Text className="text-xs font-bold text-slate-700">{formData.start_am_pm}</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-medium text-slate-700 mb-1">End Time</Text>
+                <TouchableOpacity
+                  onPress={() => setShowEndTimePicker(true)}
+                  className="flex-row items-center justify-between bg-white border border-slate-300 rounded-lg px-4 h-14"
+                >
+                  <View className="flex-row items-center flex-1">
+                    <Clock size={18} color="#94a3b8" className="mr-2" />
+                    <Text className="text-slate-900 text-base font-medium">{formData.end_time}</Text>
+                  </View>
+                  <View className="bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200 ml-1">
+                    <Text className="text-xs font-bold text-slate-700">{formData.end_am_pm}</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View className="flex-row space-x-4 mb-4">
+              <View className="flex-1 mr-2">
+                <Text className="text-sm font-medium text-slate-700 mb-1">Break Hours</Text>
+                <TextInput
+                  value={formData.break_hours}
+                  onChangeText={(t) => updateForm('break_hours', t)}
+                  className="bg-white border border-slate-300 text-slate-900 rounded-lg px-4 py-3.5"
+                  placeholder="1"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View className="flex-1 ml-2">
+                <Text className="text-sm font-medium text-slate-700 mb-1">Working Hours</Text>
+                <TextInput
+                  value={formData.working_hours}
+                  onChangeText={(t) => updateForm('working_hours', t)}
+                  className="bg-slate-100 border border-slate-200 text-slate-900 font-bold rounded-lg px-4 py-3.5"
+                  editable={false}
+                />
+              </View>
+            </View>
+          </>
         )}
-
-        <View className="flex-row mb-4 gap-x-4">
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-slate-700 mb-1">Start Time</Text>
-            <TouchableOpacity 
-              onPress={() => setShowStartTimePicker(true)}
-              className="flex-row items-center justify-between bg-white border border-slate-300 rounded-lg px-4 h-14"
-            >
-              <View className="flex-row items-center flex-1">
-                <Clock size={18} color="#94a3b8" className="mr-2" />
-                <Text className="text-slate-900 text-base font-medium">{formData.start_time}</Text>
-              </View>
-              <View className="bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200 ml-1">
-                <Text className="text-xs font-bold text-slate-700">{formData.start_am_pm}</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-slate-700 mb-1">End Time</Text>
-            <TouchableOpacity 
-              onPress={() => setShowEndTimePicker(true)}
-              className="flex-row items-center justify-between bg-white border border-slate-300 rounded-lg px-4 h-14"
-            >
-              <View className="flex-row items-center flex-1">
-                <Clock size={18} color="#94a3b8" className="mr-2" />
-                <Text className="text-slate-900 text-base font-medium">{formData.end_time}</Text>
-              </View>
-              <View className="bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200 ml-1">
-                <Text className="text-xs font-bold text-slate-700">{formData.end_am_pm}</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View className="flex-row space-x-4 mb-4">
-          <View className="flex-1 mr-2">
-            <Text className="text-sm font-medium text-slate-700 mb-1">Break Hours</Text>
-            <TextInput
-              value={formData.break_hours}
-              onChangeText={(t) => updateForm('break_hours', t)}
-              className="bg-white border border-slate-300 text-slate-900 rounded-lg px-4 py-3.5"
-              placeholder="1"
-              placeholderTextColor="#94a3b8"
-              keyboardType="numeric"
-            />
-          </View>
-          <View className="flex-1 ml-2">
-            <Text className="text-sm font-medium text-slate-700 mb-1">Working Hours</Text>
-            <TextInput
-              value={formData.working_hours}
-              onChangeText={(t) => updateForm('working_hours', t)}
-              className="bg-slate-100 border border-slate-200 text-slate-900 font-bold rounded-lg px-4 py-3.5"
-              editable={false}
-            />
-          </View>
-        </View>
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">
@@ -925,49 +932,51 @@ export default function EquipmentEntryScreen() {
           )}
         </View>
 
-        <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-          <Text className="text-slate-700 text-sm font-medium mb-3">
-            Equipment Photo (Live Camera Only) <Text className="text-red-500">*</Text>
-          </Text>
-          {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
-          
-          {photoUri ? (
-              <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-                
-                {/* Watermark Overlay (Visual Preview) */}
-                <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                  <Text className="text-white text-xs font-bold">
-                    {new Date().toLocaleString()}
-                  </Text>
-                  <Text className="text-white text-xs font-semibold">
-                    {jobs.find((j: any) => j.value === formData.job_id)?.label || 'Unknown Site'}
-                  </Text>
-                  <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                </View>
+        {!isStoreUser && (
+          <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
+            <Text className="text-slate-700 text-sm font-medium mb-3">
+              Equipment Photo (Live Camera Only) <Text className="text-red-500">*</Text>
+            </Text>
+            {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
 
-                <TouchableOpacity 
-                  onPress={() => setPhotoUri(null)}
-                  className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                >
-                  <X size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
-      ) : Platform.OS === 'web' ? (
-        <WebCamera onImageCaptured={setPhotoUri} colorTheme="blue" />
-      ) : (
-        <TouchableOpacity 
-          onPress={pickImage}
-          className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-lg py-8 items-center justify-center active:bg-blue-100"
-        >
-          <Camera size={32} color="#1d4ed8" className="mb-2" />
-          <Text className="text-blue-900 font-bold text-base">Take Live Photo</Text>
-          <Text className="text-blue-600 text-xs mt-1 text-center px-4">
-            Photos are time and location stamped to prevent fraud.
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
+            {photoUri ? (
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+
+                  {/* Watermark Overlay (Visual Preview) */}
+                  <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
+                    <Text className="text-white text-xs font-bold">
+                      {new Date().toLocaleString()}
+                    </Text>
+                    <Text className="text-white text-xs font-semibold">
+                      {jobs.find((j: any) => j.value === formData.job_id)?.label || 'Unknown Site'}
+                    </Text>
+                    <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => setPhotoUri(null)}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+        ) : Platform.OS === 'web' ? (
+          <WebCamera onImageCaptured={setPhotoUri} colorTheme="blue" />
+        ) : (
+          <TouchableOpacity
+            onPress={pickImage}
+            className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-lg py-8 items-center justify-center active:bg-blue-100"
+          >
+            <Camera size={32} color="#1d4ed8" className="mb-2" />
+            <Text className="text-blue-900 font-bold text-base">Take Live Photo</Text>
+            <Text className="text-blue-600 text-xs mt-1 text-center px-4">
+              Photos are time and location stamped to prevent fraud.
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+        )}
 
         <View className="mb-8">
           <Text className="text-sm font-medium text-slate-700 mb-1">Remarks (Optional)</Text>
