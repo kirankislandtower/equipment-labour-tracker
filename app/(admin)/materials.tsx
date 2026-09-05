@@ -362,7 +362,7 @@ export default function AdminMaterials() {
                   </View>
                 )}
 
-                {!!selectedEntry.photo_url && selectedEntry.photo_url !== 'pending' && selectedEntry.photo_url !== 'NOT_REQUIRED' && (
+                {!!selectedEntry.photo_url && selectedEntry.photo_url !== 'pending' && (
                   <View className="mb-6">
                     <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 ml-1">Live Photo Evidence</Text>
                     <TouchableOpacity 
@@ -592,7 +592,7 @@ export default function AdminMaterials() {
                 </View>
                 
                 <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
-                  {entry.photo_url && entry.photo_url !== 'pending' && entry.photo_url !== 'NOT_REQUIRED' && (
+                  {entry.photo_url && entry.photo_url !== 'pending' && (
                     <TouchableOpacity 
                       onPress={(e) => {
                         e.stopPropagation();
@@ -672,7 +672,7 @@ export default function AdminMaterials() {
                       <Text className="w-32 text-sm font-medium text-slate-600">{entry.vehicle_number}</Text>
                       <Text className="w-40 text-sm font-medium text-slate-900">{entry.foreman_name}</Text>
                       <View className="w-40 flex-row items-center justify-center space-x-2">
-                        {entry.photo_url && entry.photo_url !== 'pending' && entry.photo_url !== 'NOT_REQUIRED' && (
+                        {entry.photo_url && entry.photo_url !== 'pending' && (
                           <TouchableOpacity 
                             onPress={(e) => {
                               e.stopPropagation();
