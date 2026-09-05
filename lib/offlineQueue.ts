@@ -11,6 +11,13 @@ export interface QueuedEntry {
   photoColumn: string;
   payload: Record<string, any>;
   photoDataUri: string | null;
+  /**
+   * ISO string for the exact moment the photo was taken (not when this queued entry
+   * eventually gets synced) -- an entry can sit here for hours waiting for signal,
+   * and the watermark stamp needs to prove when the photo was really taken, not when
+   * it happened to upload. Null when there's no photo to stamp.
+   */
+  photoCapturedAt: string | null;
   watermarkJobLabel: string;
   downloadFilePrefix: string;
   createdAt: string;
@@ -77,7 +84,8 @@ export async function processQueue(): Promise<void> {
 
         if (entry.photoDataUri) {
           const rawCloudinaryUrl = await uploadToCloudinary(entry.photoDataUri);
-          photoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, entry.watermarkJobLabel);
+          const capturedAt = entry.photoCapturedAt ? new Date(entry.photoCapturedAt) : undefined;
+          photoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, entry.watermarkJobLabel, capturedAt);
         }
 
         const { error } = await supabase

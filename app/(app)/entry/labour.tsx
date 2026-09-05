@@ -56,6 +56,10 @@ export default function LabourEntryScreen() {
   const [successVisible, setSuccessVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
+  // The exact moment the photo was taken -- used for the watermark stamp instead of
+  // whenever the upload happens to complete, since those can differ by hours when an
+  // entry sits in the offline queue.
+  const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
   const [isStoreUser, setIsStoreUser] = useState(false);
 
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
@@ -81,6 +85,7 @@ export default function LabourEntryScreen() {
         const asset = result.assets[0];
         const compressedUri = await compressImageToDataUri(asset.uri, asset.width, asset.height);
         setPhotoUri(compressedUri);
+        setPhotoCapturedAt(new Date());
         if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
       }
     } catch (error) {
@@ -225,6 +230,7 @@ export default function LabourEntryScreen() {
         setEngineerName('');
         setRemarks('');
         setPhotoUri(null);
+        setPhotoCapturedAt(null);
         setInitialPhotoUri(null);
         setErrors({});
       }
@@ -312,6 +318,7 @@ export default function LabourEntryScreen() {
             photoColumn: 'labour_photo_url',
             payload: { ...basePayload, labour_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
             photoDataUri: photoUri,
+            photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
             watermarkJobLabel: jobName,
             downloadFilePrefix: 'Labour',
             displayDate: entryDate,
@@ -337,7 +344,7 @@ export default function LabourEntryScreen() {
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
           const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
-          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
+          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName, photoCapturedAt || undefined);
           downloadImageToDevice(uploadedPhotoUrl, `Labour_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
         } catch (err: any) {
           // Don't let a Cloudinary failure (quota, network) lose the whole entry --
@@ -781,7 +788,7 @@ export default function LabourEntryScreen() {
                   {/* Watermark Overlay (Visual Preview) */}
                   <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
                     <Text className="text-white text-xs font-bold">
-                      {new Date().toLocaleString()}
+                      {(photoCapturedAt || new Date()).toLocaleString()}
                     </Text>
                     <Text className="text-white text-xs font-semibold">
                       {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
@@ -790,7 +797,7 @@ export default function LabourEntryScreen() {
                   </View>
 
                   <TouchableOpacity
-                    onPress={() => setPhotoUri(null)}
+                    onPress={() => { setPhotoUri(null); setPhotoCapturedAt(null); }}
                     className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
                   >
                     <X size={20} color="#fff" />
@@ -798,7 +805,7 @@ export default function LabourEntryScreen() {
                 </View>
               </View>
             ) : Platform.OS === 'web' ? (
-              <WebCamera onImageCaptured={setPhotoUri} colorTheme="green" />
+              <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); }} colorTheme="green" />
             ) : (
               <TouchableOpacity
                 onPress={pickImage}
