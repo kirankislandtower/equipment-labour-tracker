@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, useWindowDimensions, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Calendar, User, Clock, CheckCircle, XCircle, ChevronRight, Activity, X, Check } from 'lucide-react-native';
+import { Calendar, User, Users, Clock, CheckCircle, XCircle, ChevronRight, Activity, X, Check } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString } from '../../lib/dateUtils';
 import { useRouter } from 'expo-router';
@@ -241,6 +241,21 @@ export default function ForemanReports() {
         </View>
       ) : (
         <View className="flex-1 pb-6">
+          <View
+            className="bg-white flex-row items-center p-4 rounded-3xl border border-slate-200 mb-6 self-start"
+            style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 }}
+          >
+            <View className="bg-indigo-50 p-3 rounded-2xl mr-3 border border-indigo-100">
+              <Users size={20} color="#4338ca" />
+            </View>
+            <View>
+              <Text className="text-slate-900 font-black text-2xl tracking-tight">{foremenStats.length}</Text>
+              <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider">
+                {foremenStats.length === 1 ? 'Foreman Reported' : 'Foremen Reported'}
+              </Text>
+            </View>
+          </View>
+
           {foremenStats.length === 0 ? (
             <View className="py-20 items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm mt-4">
               <View className="bg-slate-50 p-4 rounded-full mb-4">
