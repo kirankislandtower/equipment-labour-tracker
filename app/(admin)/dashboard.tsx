@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Truck, Users, CheckCircle, Clock, ChevronRight, LayoutDashboard, Calendar, Filter } from 'lucide-react-native';
+import { Truck, Users, CheckCircle, Clock, ChevronRight, LayoutDashboard, Calendar, Filter, CloudCog, AlertTriangle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString } from '../../lib/dateUtils';
@@ -29,9 +29,42 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
+  const [cloudinaryUsage, setCloudinaryUsage] = useState<{ usedPercent: number; creditsUsed: number; creditsLimit: number; plan: string } | null>(null);
+  const [cloudinaryError, setCloudinaryError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchStats();
   }, [fromDate, toDate]);
+
+  useEffect(() => {
+    fetchCloudinaryUsage();
+  }, []);
+
+  // Reads live account usage from Cloudinary via a small serverless function
+  // (api/cloudinary-usage.js) -- the API Secret this needs can only live server-side,
+  // never in the app bundle, so this can't be called directly from the client.
+  // Fails quietly (no widget shown) in any environment where that endpoint doesn't
+  // exist yet, e.g. local `expo start --web` without `vercel dev`.
+  const fetchCloudinaryUsage = async () => {
+    if (Platform.OS !== 'web') return;
+    try {
+      const response = await fetch('/api/cloudinary-usage');
+      const data = await response.json();
+      if (!response.ok) {
+        setCloudinaryError(data.error || 'Failed to load Cloudinary usage.');
+        return;
+      }
+      setCloudinaryUsage({
+        usedPercent: data.usedPercent ?? 0,
+        creditsUsed: data.creditsUsed ?? 0,
+        creditsLimit: data.creditsLimit ?? 0,
+        plan: data.plan ?? 'Unknown',
+      });
+      setCloudinaryError(null);
+    } catch (error) {
+      setCloudinaryError('Cloudinary usage tracking is not available in this environment.');
+    }
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -396,6 +429,60 @@ export default function AdminDashboard() {
                 </View>
                 <Text className="text-emerald-900 text-xl font-outfit-bold tracking-tight">All caught up!</Text>
                 <Text className="text-emerald-700 text-center mt-1 text-sm font-outfit-medium">No pending entries require approval.</Text>
+              </View>
+            )}
+
+            {/* Cloudinary Usage */}
+            {cloudinaryUsage && (() => {
+              const pct = cloudinaryUsage.usedPercent;
+              const level = pct >= 85 ? 'danger' : pct >= 60 ? 'warning' : 'safe';
+              const colors = {
+                safe: { bar: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-200', bg: 'bg-emerald-50', icon: '#059669' },
+                warning: { bar: 'bg-amber-500', text: 'text-amber-700', border: 'border-amber-200', bg: 'bg-amber-50', icon: '#d97706' },
+                danger: { bar: 'bg-red-500', text: 'text-red-700', border: 'border-red-200', bg: 'bg-red-50', icon: '#dc2626' },
+              }[level];
+
+              return (
+                <View className={`mb-6 p-5 rounded-2xl border ${colors.border} ${colors.bg}`}>
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View className="flex-row items-center">
+                      <CloudCog size={18} color={colors.icon} />
+                      <Text className="text-slate-900 font-outfit-bold text-[15px] ml-2">Cloudinary Storage</Text>
+                    </View>
+                    <Text className={`font-mono-bold text-lg ${colors.text}`}>{pct.toFixed(1)}%</Text>
+                  </View>
+                  <View className="h-2.5 bg-white rounded-full overflow-hidden mb-2 border border-slate-200">
+                    <View style={{ width: `${Math.min(pct, 100)}%` }} className={`h-full ${colors.bar}`} />
+                  </View>
+                  <Text className="text-slate-500 text-[11px] font-outfit-medium">
+                    {cloudinaryUsage.creditsUsed.toFixed(2)} of {cloudinaryUsage.creditsLimit} credits used this cycle ({cloudinaryUsage.plan} plan)
+                  </Text>
+                  {level === 'danger' && (
+                    <View className="flex-row items-center mt-3">
+                      <AlertTriangle size={14} color="#dc2626" />
+                      <Text className="text-red-700 text-[11px] font-outfit-bold ml-1.5">
+                        Approaching your plan limit -- time to upgrade Cloudinary.
+                      </Text>
+                    </View>
+                  )}
+                  {level === 'warning' && (
+                    <View className="flex-row items-center mt-3">
+                      <AlertTriangle size={14} color="#d97706" />
+                      <Text className="text-amber-700 text-[11px] font-outfit-bold ml-1.5">
+                        Usage is climbing -- keep an eye on this over the next few days.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+
+            {!cloudinaryUsage && cloudinaryError && (
+              <View className="mb-6 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                <View className="flex-row items-center">
+                  <CloudCog size={16} color="#94a3b8" />
+                  <Text className="text-slate-500 text-[11px] font-outfit-medium ml-2 flex-1">{cloudinaryError}</Text>
+                </View>
               </View>
             )}
 
