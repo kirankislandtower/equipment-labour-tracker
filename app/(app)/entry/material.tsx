@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, ChevronDown, Check, X, Camera, ArrowRightLeft, Calendar } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Check, X, Camera, ArrowRightLeft, Calendar, WifiOff } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
@@ -15,6 +15,7 @@ import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
+import { fetchWithCache } from '../../../lib/dataCache';
 
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -120,6 +121,13 @@ export default function MaterialTransferEntryScreen() {
     }, [id])
   );
 
+  const [isOffline, setIsOffline] = useState(false);
+  useEffect(() => {
+    NetInfo.fetch().then(s => setIsOffline(!s.isConnected));
+    const unsubscribe = NetInfo.addEventListener(s => setIsOffline(!s.isConnected));
+    return unsubscribe;
+  }, []);
+
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -150,7 +158,9 @@ export default function MaterialTransferEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, { data: { user } }] = await Promise.all([
-        supabase.from('jobs').select('id, job_number, job_name').eq('is_active', true).order('job_number'),
+        // Selects the same fields as equipment.tsx/labour.tsx's jobs fetch (location
+        // included, even though unused here) so they can share one 'jobs' cache entry.
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
         supabase.auth.getUser()
       ]);
 
@@ -439,7 +449,14 @@ export default function MaterialTransferEntryScreen() {
       </Modal>
 
       <ScrollView className="flex-1 px-6 pt-6" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
-        
+
+        {isOffline && (
+          <View className="bg-slate-800 rounded-lg px-4 py-3 mb-4 flex-row items-center">
+            <WifiOff size={16} color="#fbbf24" />
+            <Text className="text-white text-xs font-bold ml-2">Offline -- showing saved data. Entries will upload once you're back online.</Text>
+          </View>
+        )}
+
         <View className="flex-row items-center mb-6">
           <ArrowRightLeft size={24} color="#d97706" />
           <Text className="text-lg font-bold text-[#d97706] ml-2">Transfer Information</Text>

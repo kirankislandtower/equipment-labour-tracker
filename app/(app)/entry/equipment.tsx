@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, Truck, Calendar, Clock, Fuel } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, Truck, Calendar, Clock, Fuel, WifiOff } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
@@ -18,6 +18,7 @@ import { resolveSupplierId, resolveEquipmentId } from '../../../lib/masterData';
 import { isStoreForeman } from '../../../lib/foremanFlags';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
+import { fetchWithCache } from '../../../lib/dataCache';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -167,6 +168,13 @@ export default function EquipmentEntryScreen() {
     }, [id])
   );
 
+  const [isOffline, setIsOffline] = useState(false);
+  useEffect(() => {
+    NetInfo.fetch().then(s => setIsOffline(!s.isConnected));
+    const unsubscribe = NetInfo.addEventListener(s => setIsOffline(!s.isConnected));
+    return unsubscribe;
+  }, []);
+
   useEffect(() => {
     // Auto calculate working hours if valid times provided
     try {
@@ -206,19 +214,24 @@ export default function EquipmentEntryScreen() {
         setSuppliers([]);
         return;
       }
-      const [suppAllocRes, equipAllocRes] = await Promise.all([
-        supabase.from('job_suppliers').select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)').eq('job_id', formData.job_id).eq('suppliers.is_active', true),
-        supabase.from('job_equipment').select('supplier_id').eq('job_id', formData.job_id),
-      ]);
+      const { data: supplierOptions } = await fetchWithCache(`equip-suppliers-for-job:${formData.job_id}`, async () => {
+        const [suppAllocRes, equipAllocRes] = await Promise.all([
+          supabase.from('job_suppliers').select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)').eq('job_id', formData.job_id).eq('suppliers.is_active', true),
+          supabase.from('job_equipment').select('supplier_id').eq('job_id', formData.job_id),
+        ]);
+        if (suppAllocRes.error) return { data: null, error: suppAllocRes.error };
+        if (equipAllocRes.error) return { data: null, error: equipAllocRes.error };
 
-      const equipRows = equipAllocRes.data || [];
-      const suppliersWithEquipment = new Set(equipRows.filter((row: any) => row.supplier_id).map((row: any) => row.supplier_id));
+        const equipRows = equipAllocRes.data || [];
+        const suppliersWithEquipment = new Set(equipRows.filter((row: any) => row.supplier_id).map((row: any) => row.supplier_id));
 
-      const supplierOptions = (suppAllocRes.data || [])
-        .filter((row: any) => row.suppliers && row.suppliers.supplier_type !== 'LABOUR' && suppliersWithEquipment.has(row.suppliers.id))
-        .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
-        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-      setSuppliers(supplierOptions);
+        const options = (suppAllocRes.data || [])
+          .filter((row: any) => row.suppliers && row.suppliers.supplier_type !== 'LABOUR' && suppliersWithEquipment.has(row.suppliers.id))
+          .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
+          .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+        return { data: options, error: null };
+      });
+      setSuppliers(supplierOptions || []);
     };
 
     loadSuppliersForJob();
@@ -234,12 +247,14 @@ export default function EquipmentEntryScreen() {
         return;
       }
 
-      const { data } = await supabase
-        .from('job_equipment')
-        .select('equipment_master_id, supplier_id, equipment_master!inner(id, equipment_name)')
-        .eq('job_id', formData.job_id)
-        .eq('supplier_id', formData.supplier_id)
-        .eq('equipment_master.is_active', true);
+      const { data } = await fetchWithCache(`equipment-for-job-supplier:${formData.job_id}:${formData.supplier_id}`, () =>
+        supabase
+          .from('job_equipment')
+          .select('equipment_master_id, supplier_id, equipment_master!inner(id, equipment_name)')
+          .eq('job_id', formData.job_id)
+          .eq('supplier_id', formData.supplier_id)
+          .eq('equipment_master.is_active', true)
+      );
 
       const rawOptions = (data || [])
         .filter((row: any) => row.equipment_master)
@@ -259,9 +274,9 @@ export default function EquipmentEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, suppliersRes, equipmentRes, { data: { user } }] = await Promise.all([
-        supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number'),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
         supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
-        supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name'),
+        fetchWithCache('equipment_master', () => supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name')),
         supabase.auth.getUser(),
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
@@ -681,7 +696,14 @@ export default function EquipmentEntryScreen() {
       </Modal>
 
       <ScrollView className="flex-1 px-6 pt-6" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
-        
+
+        {isOffline && (
+          <View className="bg-slate-800 rounded-lg px-4 py-3 mb-4 flex-row items-center">
+            <WifiOff size={16} color="#fbbf24" />
+            <Text className="text-white text-xs font-bold ml-2">Offline -- showing saved data. Entries will upload once you're back online.</Text>
+          </View>
+        )}
+
         <View className="flex-row items-center mb-6">
           <Truck size={24} color="#1e3a8a" />
           <Text className="text-lg font-bold text-[#1e3a8a] ml-2">Equipment Information</Text>

@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, Flat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera, Image as ImageIcon, X, Users } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera, Image as ImageIcon, X, Users, WifiOff } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
@@ -15,6 +15,7 @@ import { resolveSupplierId } from '../../../lib/masterData';
 import { isStoreForeman } from '../../../lib/foremanFlags';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
+import { fetchWithCache } from '../../../lib/dataCache';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
 type Supplier = { id: string; supplier_name: string };
@@ -100,6 +101,13 @@ export default function LabourEntryScreen() {
     }, [id])
   );
 
+  const [isOffline, setIsOffline] = useState(false);
+  useEffect(() => {
+    NetInfo.fetch().then(s => setIsOffline(!s.isConnected));
+    const unsubscribe = NetInfo.addEventListener(s => setIsOffline(!s.isConnected));
+    return unsubscribe;
+  }, []);
+
   useEffect(() => {
     if (selectedJob && errors.job) setErrors(prev => ({ ...prev, job: '' }));
     // Reset dependent fields when job changes
@@ -115,11 +123,13 @@ export default function LabourEntryScreen() {
         setSuppliers([]);
         return;
       }
-      const { data } = await supabase
-        .from('job_suppliers')
-        .select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)')
-        .eq('job_id', selectedJob.id)
-        .eq('suppliers.is_active', true);
+      const { data } = await fetchWithCache(`labour-suppliers-for-job:${selectedJob.id}`, () =>
+        supabase
+          .from('job_suppliers')
+          .select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)')
+          .eq('job_id', selectedJob.id)
+          .eq('suppliers.is_active', true)
+      );
 
       const options = (data || [])
         .filter((row: any) => row.suppliers && row.suppliers.supplier_type !== 'EQUIPMENT')
@@ -143,11 +153,13 @@ export default function LabourEntryScreen() {
         setEmployeeOptions([]);
         return;
       }
-      const { data } = await supabase
-        .from('job_supplier_employees')
-        .select('employee_name')
-        .eq('job_id', selectedJob.id)
-        .eq('supplier_id', selectedSupplier.id);
+      const { data } = await fetchWithCache(`employees-for-job-supplier:${selectedJob.id}:${selectedSupplier.id}`, () =>
+        supabase
+          .from('job_supplier_employees')
+          .select('employee_name')
+          .eq('job_id', selectedJob.id)
+          .eq('supplier_id', selectedSupplier.id)
+      );
 
       const options = Array.from(new Set((data || []).map((row: any) => row.employee_name)))
         .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
@@ -165,9 +177,9 @@ export default function LabourEntryScreen() {
     try {
       setFetching(true);
       const [jobsRes, suppliersRes, designationsRes, { data: { user } }] = await Promise.all([
-        supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number'),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
         supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
-        supabase.from('labour_designations').select('id, designation_name').order('designation_name'),
+        fetchWithCache('labour_designations', () => supabase.from('labour_designations').select('id, designation_name').order('designation_name')),
         supabase.auth.getUser()
       ]);
 
@@ -513,7 +525,14 @@ export default function LabourEntryScreen() {
       </Modal>
 
       <ScrollView className="flex-1 px-6 pt-6" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
-        
+
+        {isOffline && (
+          <View className="bg-slate-800 rounded-lg px-4 py-3 mb-4 flex-row items-center">
+            <WifiOff size={16} color="#fbbf24" />
+            <Text className="text-white text-xs font-bold ml-2">Offline -- showing saved data. Entries will upload once you're back online.</Text>
+          </View>
+        )}
+
         <View className="flex-row items-center mb-6">
           <Users size={24} color="#166534" />
           <Text className="text-lg font-bold text-[#166534] ml-2">Labour Information</Text>
