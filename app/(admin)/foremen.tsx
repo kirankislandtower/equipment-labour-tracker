@@ -67,26 +67,32 @@ export default function ForemanReports() {
       const allEntries = [...equipData, ...labourData];
       const aggregated: Record<string, any> = {};
 
+      // Grouped by the actual logged-in account (created_by), not the free-typed
+      // "Foreman Name" text on each entry -- that field is an editable TextInput, so
+      // the same person typing their name slightly differently across two entries
+      // (extra space, different casing) used to fragment them into separate cards.
+      // Falls back to the typed name only for legacy rows with no created_by.
       allEntries.forEach(entry => {
-        const name = entry.foreman_name || 'Unknown Foreman';
-        if (!aggregated[name]) {
-          aggregated[name] = { total: 0, pending: 0, approved: 0, rejected: 0, equipment: 0, labour: 0 };
-        }
-        
-        aggregated[name].total++;
-        if ((entry as any).equipment_master_id !== undefined || equipData.includes(entry)) {
-          aggregated[name].equipment++;
-        } else {
-          aggregated[name].labour++;
+        const key = entry.created_by || entry.foreman_name || 'unknown';
+        const displayName = entry.foreman_name || 'Unknown Foreman';
+        if (!aggregated[key]) {
+          aggregated[key] = { name: displayName, total: 0, pending: 0, approved: 0, rejected: 0, equipment: 0, labour: 0 };
         }
 
-        if (entry.status === 'SUBMITTED') aggregated[name].pending++;
-        else if (entry.status === 'APPROVED') aggregated[name].approved++;
-        else if (entry.status === 'REJECTED') aggregated[name].rejected++;
+        aggregated[key].total++;
+        if ((entry as any).equipment_master_id !== undefined || equipData.includes(entry)) {
+          aggregated[key].equipment++;
+        } else {
+          aggregated[key].labour++;
+        }
+
+        if (entry.status === 'SUBMITTED') aggregated[key].pending++;
+        else if (entry.status === 'APPROVED') aggregated[key].approved++;
+        else if (entry.status === 'REJECTED') aggregated[key].rejected++;
       });
 
-      const foremenArray = Object.keys(aggregated).map(name => ({
-        name, ...aggregated[name]
+      const foremenArray = Object.keys(aggregated).map(key => ({
+        key, ...aggregated[key]
       })).sort((a, b) => b.total - a.total);
 
       setForemenStats(foremenArray);
@@ -133,7 +139,13 @@ export default function ForemanReports() {
     }
   };
 
-
+  // Mirrors the fetchData aggregation key: match by the real account (created_by)
+  // when the entry has one, falling back to the typed foreman_name for legacy rows
+  // that predate created_by being reliably set.
+  const matchesSelectedForeman = (entry: any) =>
+    selectedForeman && (entry.created_by
+      ? entry.created_by === selectedForeman.key
+      : entry.foreman_name === selectedForeman.name);
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -241,7 +253,7 @@ export default function ForemanReports() {
             <View className="flex-row flex-wrap justify-between">
               {foremenStats.map((foreman) => (
                 <View 
-                  key={foreman.name}
+                  key={foreman.key}
                   className="bg-white p-6 rounded-3xl border border-slate-200 mb-4 shadow-sm"
                   style={{ width: isMobile ? '100%' : '48%' }}
                 >
@@ -323,12 +335,12 @@ export default function ForemanReports() {
               {selectedListType === 'equipment' && (
                 <View className="mb-6">
                   <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Equipment</Text>
-                  {allData.equip.filter(e => e.foreman_name === selectedForeman?.name).length === 0 ? (
+                  {allData.equip.filter(e => matchesSelectedForeman(e)).length === 0 ? (
                     <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
                       <Text className="text-slate-500 font-medium">No equipment entries today.</Text>
                     </View>
                   ) : (
-                    allData.equip.filter(e => e.foreman_name === selectedForeman?.name).map(entry => (
+                    allData.equip.filter(e => matchesSelectedForeman(e)).map(entry => (
                       <TouchableOpacity 
                         key={entry.id} 
                         activeOpacity={0.7}
@@ -366,12 +378,12 @@ export default function ForemanReports() {
               {selectedListType === 'labour' && (
                 <View className="mb-6">
                   <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Labour</Text>
-                  {allData.labour.filter(e => e.foreman_name === selectedForeman?.name).length === 0 ? (
+                  {allData.labour.filter(e => matchesSelectedForeman(e)).length === 0 ? (
                     <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
                       <Text className="text-slate-500 font-medium">No labour entries today.</Text>
                     </View>
                   ) : (
-                    allData.labour.filter(e => e.foreman_name === selectedForeman?.name).map(entry => (
+                    allData.labour.filter(e => matchesSelectedForeman(e)).map(entry => (
                       <TouchableOpacity 
                         key={entry.id} 
                         activeOpacity={0.7}
