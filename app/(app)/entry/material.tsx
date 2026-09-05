@@ -13,6 +13,8 @@ import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cl
 import { compressImageToDataUri } from '../../../lib/imageUtils';
 import { downloadImageToDevice } from '../../../lib/download';
 import WebCamera from '../../../components/WebCamera';
+import NetInfo from '@react-native-community/netinfo';
+import { enqueueEntry } from '../../../lib/offlineQueue';
 
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -244,15 +246,66 @@ export default function MaterialTransferEntryScreen() {
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
+      const selectedJob = jobs.find((j: any) => j.value === formData.from_job_id);
+      const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
+
+      const basePayload = {
+        entry_date: formData.entry_date,
+        time: new Date().toISOString().split('T')[1].split('.')[0], // Added to bypass database constraint
+        from_job_id: formData.from_job_id,
+        to_job_id: formData.to_job_id,
+        material_description: formData.material_description,
+        material_type: formData.material_description, // Added to fix the database NOT NULL constraint
+        quantity: parseFloat(formData.quantity) || 0,
+        unit: formData.unit,
+        vehicle_number: formData.vehicle_number,
+        driver_name: formData.driver_name,
+        foreman_name: formData.foreman_name,
+        remarks: formData.remarks || null,
+        created_by: user?.id || null,
+        status: 'SUBMITTED',
+        rejection_reason: null,
+      };
+
+      // New entries only (not edits) go through the offline queue -- an edit while
+      // offline still fails today, asking the foreman to retry once connected. Photo
+      // is always required for a new material entry, so photoUri is guaranteed here.
+      if (!id) {
+        const netState = await NetInfo.fetch();
+        if (!netState.isConnected) {
+          await enqueueEntry({
+            type: 'material',
+            table: 'material_transfers',
+            photoColumn: 'photo_url',
+            payload: { ...basePayload, photo_url: 'pending' },
+            photoDataUri: photoUri,
+            watermarkJobLabel: `From: ${jobName}`,
+            downloadFilePrefix: 'Material',
+            displayDate: formData.entry_date,
+            display: {
+              material_description: formData.material_description,
+              from_job: { job_name: jobName },
+              to_job: { job_name: jobs.find((j: any) => j.value === formData.to_job_id)?.label || 'Unknown Site' },
+              quantity: basePayload.quantity,
+              unit: formData.unit,
+            },
+          });
+          Alert.alert(
+            'Saved Offline',
+            'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
+            [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
+          );
+          return;
+        }
+      }
+
       let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
         try {
           const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
-          const selectedJob = jobs.find((j: any) => j.value === formData.from_job_id);
-          const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
           uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, `From: ${jobName}`);
           downloadImageToDevice(uploadedPhotoUrl, `Material_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
         } catch (err: any) {
@@ -267,25 +320,11 @@ export default function MaterialTransferEntryScreen() {
          return;
       }
 
-      const payload = {
-        entry_date: formData.entry_date,
-        time: new Date().toISOString().split('T')[1].split('.')[0], // Added to bypass database constraint
-        from_job_id: formData.from_job_id,
-        to_job_id: formData.to_job_id,
-        material_description: formData.material_description,
-        material_type: formData.material_description, // Added to fix the database NOT NULL constraint
-        quantity: parseFloat(formData.quantity) || 0,
-        unit: formData.unit,
-        vehicle_number: formData.vehicle_number,
-        driver_name: formData.driver_name,
-        foreman_name: formData.foreman_name,
+      const payload: any = {
+        ...basePayload,
         photo_url: uploadedPhotoUrl !== 'pending' ? uploadedPhotoUrl : undefined, // Keep existing photo if not updated
-        remarks: formData.remarks || null,
-        created_by: user?.id || null,
-        status: 'SUBMITTED',
-        rejection_reason: null,
       };
-      
+
       if (uploadedPhotoUrl === 'pending' && !id) {
          payload.photo_url = 'pending';
       }

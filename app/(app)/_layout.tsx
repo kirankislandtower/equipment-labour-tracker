@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Home, Truck, Users, User, ArrowRightLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import NetInfo from '@react-native-community/netinfo';
+import { processQueue } from '../../lib/offlineQueue';
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -67,6 +69,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function AppLayout() {
+  // Drains any offline-queued entries as soon as this layout mounts (covers reopening
+  // the app while already back online) and again whenever connectivity is restored,
+  // regardless of which tab the foreman is on.
+  useEffect(() => {
+    processQueue();
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected) processQueue();
+    });
+    return unsubscribe;
+  }, []);
+
   const content = (
     <Tabs 
       tabBar={(props) => <CustomTabBar {...props} />}

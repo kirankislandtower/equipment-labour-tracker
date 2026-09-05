@@ -13,6 +13,8 @@ import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 import { resolveSupplierId } from '../../../lib/masterData';
 import { isStoreForeman } from '../../../lib/foremanFlags';
+import NetInfo from '@react-native-community/netinfo';
+import { enqueueEntry } from '../../../lib/offlineQueue';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
 type Supplier = { id: string; supplier_name: string };
@@ -274,29 +276,14 @@ export default function LabourEntryScreen() {
     setLoading(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
-      
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
-      let photoUploadFailed = false;
 
-      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
-        try {
-          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
-          const jobName = selectedJob ? selectedJob.job_name : 'Unknown Site';
-          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
-          downloadImageToDevice(uploadedPhotoUrl, `Labour_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
-        } catch (err: any) {
-          // Don't let a Cloudinary failure (quota, network) lose the whole entry --
-          // save it with the photo marked pending so it can be attached later on edit.
-          console.error('Cloudinary upload failed, saving entry without photo:', err);
-          photoUploadFailed = true;
-        }
-      }
-
-      // selectedSupplier comes from the mock catalogue (name only), so resolve/create the
-      // matching `suppliers` row before submitting — supplier_id is a UUID column.
+      // selectedSupplier.id already holds the real suppliers table UUID (the picker is
+      // built from that table's rows), so this hits a synchronous fast-path with no
+      // network call -- safe to run even while offline.
       const resolvedSupplierId = await resolveSupplierId(selectedSupplier!.id);
+      const jobName = selectedJob ? selectedJob.job_name : 'Unknown Site';
 
-      const payload = {
+      const basePayload = {
         entry_date: entryDate,
         job_id: selectedJob!.id,
         supplier_id: resolvedSupplierId,
@@ -308,12 +295,59 @@ export default function LabourEntryScreen() {
         total_working_hours: parseFloat(totalWorkingHours),
         foreman_name: foremanName,
         engineer_name: engineerName || null,
-        labour_photo_url: uploadedPhotoUrl,
         remarks: remarks || null,
         created_by: userData?.user?.id || null,
         status: 'SUBMITTED',
         rejection_reason: null
       };
+
+      // New entries only (not edits) go through the offline queue -- an edit while
+      // offline still fails today, asking the foreman to retry once connected.
+      if (!id) {
+        const netState = await NetInfo.fetch();
+        if (!netState.isConnected) {
+          await enqueueEntry({
+            type: 'labour',
+            table: 'labour_entries',
+            photoColumn: 'labour_photo_url',
+            payload: { ...basePayload, labour_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
+            photoDataUri: photoUri,
+            watermarkJobLabel: jobName,
+            downloadFilePrefix: 'Labour',
+            displayDate: entryDate,
+            display: {
+              employee_name: employeeName,
+              jobs: { job_name: jobName },
+              labour_designations: { designation_name: selectedDesignation?.designation_name },
+              total_working_hours: basePayload.total_working_hours,
+            },
+          });
+          Alert.alert(
+            'Saved Offline',
+            'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
+            [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
+          );
+          return;
+        }
+      }
+
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
+      let photoUploadFailed = false;
+
+      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
+        try {
+          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
+          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
+          downloadImageToDevice(uploadedPhotoUrl, `Labour_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
+        } catch (err: any) {
+          // Don't let a Cloudinary failure (quota, network) lose the whole entry --
+          // save it with the photo marked pending so it can be attached later on edit.
+          console.error('Cloudinary upload failed, saving entry without photo:', err);
+          photoUploadFailed = true;
+        }
+      }
+
+      const payload = { ...basePayload, labour_photo_url: uploadedPhotoUrl };
 
       let error;
       if (id) {

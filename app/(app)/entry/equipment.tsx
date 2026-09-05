@@ -16,6 +16,8 @@ import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
 import { resolveSupplierId, resolveEquipmentId } from '../../../lib/masterData';
 import { isStoreForeman } from '../../../lib/foremanFlags';
+import NetInfo from '@react-native-community/netinfo';
+import { enqueueEntry } from '../../../lib/offlineQueue';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -406,24 +408,6 @@ export default function EquipmentEntryScreen() {
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
-      let photoUploadFailed = false;
-
-      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
-        try {
-          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
-          const selectedJob = jobs.find((j: any) => j.value === formData.job_id);
-          const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
-          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
-          downloadImageToDevice(uploadedPhotoUrl, `Equipment_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
-        } catch (err: any) {
-          // Don't let a Cloudinary failure (quota, network) lose the whole entry --
-          // save it with the photo marked pending so it can be attached later on edit.
-          console.error('Cloudinary upload failed, saving entry without photo:', err);
-          photoUploadFailed = true;
-        }
-      }
 
       const convertTo24h = (time12: string, ampm: string) => {
         if (!time12) return null;
@@ -434,14 +418,18 @@ export default function EquipmentEntryScreen() {
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
       };
 
-      // formData.supplier_id / equipment_id hold the mock catalogue's names, not real
-      // suppliers/equipment_master UUIDs, so resolve them to the matching database row.
+      // formData.supplier_id / equipment_id already hold the real suppliers/equipment_master
+      // UUIDs (the pickers are built from those tables' .id fields), so this hits a
+      // synchronous fast-path with no network call -- safe to run even while offline.
       const [resolvedSupplierId, resolvedEquipmentId] = await Promise.all([
         resolveSupplierId(formData.supplier_id),
         resolveEquipmentId(formData.equipment_id),
       ]);
 
-      const payload = {
+      const selectedJob = jobs.find((j: any) => j.value === formData.job_id);
+      const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
+
+      const basePayload = {
         entry_date: formData.entry_date,
         job_id: formData.job_id,
         supplier_id: resolvedSupplierId,
@@ -455,7 +443,6 @@ export default function EquipmentEntryScreen() {
         vehicle_number: formData.vehicle_number,
         foreman_name: formData.foreman_name,
         engineer_name: formData.engineer_name || '',
-        equipment_photo_url: uploadedPhotoUrl,
         remarks: formData.remarks || null,
         created_by: user?.id || null,
         status: 'SUBMITTED',
@@ -465,6 +452,53 @@ export default function EquipmentEntryScreen() {
         fuel_unit: formData.fuel_provided ? formData.fuel_unit : null
       };
 
+      // New entries only (not edits) go through the offline queue -- an edit while
+      // offline still fails today, asking the foreman to retry once connected.
+      if (!id) {
+        const netState = await NetInfo.fetch();
+        if (!netState.isConnected) {
+          await enqueueEntry({
+            type: 'equipment',
+            table: 'equipment_entries',
+            photoColumn: 'equipment_photo_url',
+            payload: { ...basePayload, equipment_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
+            photoDataUri: photoUri,
+            watermarkJobLabel: jobName,
+            downloadFilePrefix: 'Equipment',
+            displayDate: formData.entry_date,
+            display: {
+              equipment_master: { equipment_name: allEquipmentList.find((e: any) => e.id === resolvedEquipmentId)?.equipment_name || 'Equipment' },
+              jobs: { job_name: jobName },
+              working_hours: basePayload.working_hours,
+            },
+          });
+          Alert.alert(
+            'Saved Offline',
+            'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
+            [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
+          );
+          return;
+        }
+      }
+
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
+      let photoUploadFailed = false;
+
+      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
+        try {
+          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
+          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName);
+          downloadImageToDevice(uploadedPhotoUrl, `Equipment_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
+        } catch (err: any) {
+          // Don't let a Cloudinary failure (quota, network) lose the whole entry --
+          // save it with the photo marked pending so it can be attached later on edit.
+          console.error('Cloudinary upload failed, saving entry without photo:', err);
+          photoUploadFailed = true;
+        }
+      }
+
+      const payload = { ...basePayload, equipment_photo_url: uploadedPhotoUrl };
+
       let error;
       if (id) {
         const { error: updateError } = await supabase.from('equipment_entries').update(payload).eq('id', id).eq('created_by', user?.id);
@@ -473,7 +507,7 @@ export default function EquipmentEntryScreen() {
         const { error: insertError } = await supabase.from('equipment_entries').insert(payload);
         error = insertError;
       }
-      
+
       if (error) {
         if (error.code === '23503' && error.message?.includes('created_by')) {
           throw new Error('Your account profile is not fully set up. Please log out completely and log back in to fix this automatically.');

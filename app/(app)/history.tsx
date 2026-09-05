@@ -6,6 +6,7 @@ import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRi
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
+import { getQueuedEntries, QueuedEntryType } from '../../lib/offlineQueue';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -28,8 +29,10 @@ export default function HistoryScreen() {
   const fetchHistory = async () => {
     setLoading(true);
     const dateStr = getLocalDateString(selectedDate);
-    
+
     try {
+      let serverEntries: any[] = [];
+
       if (activeTab === 'EQUIPMENT') {
         const { data, error } = await supabase
           .from('equipment_entries')
@@ -46,9 +49,9 @@ export default function HistoryScreen() {
           .eq('entry_date', dateStr)
           .eq('created_by', user?.id)
           .order('created_at', { ascending: false });
-          
+
         if (error) throw error;
-        setEntries(data || []);
+        serverEntries = data || [];
       } else if (activeTab === 'LABOUR') {
         const { data, error } = await supabase
           .from('labour_entries')
@@ -66,9 +69,9 @@ export default function HistoryScreen() {
           .eq('entry_date', dateStr)
           .eq('created_by', user?.id)
           .order('created_at', { ascending: false });
-          
+
         if (error) throw error;
-        setEntries(data || []);
+        serverEntries = data || [];
       } else if (activeTab === 'MATERIAL') {
         const { data, error } = await supabase
           .from('material_transfers')
@@ -87,10 +90,29 @@ export default function HistoryScreen() {
           .eq('entry_date', dateStr)
           .eq('created_by', user?.id)
           .order('created_at', { ascending: false });
-          
+
         if (error) throw error;
-        setEntries(data || []);
+        serverEntries = data || [];
       }
+
+      // Entries saved locally while offline haven't reached Supabase yet, so they
+      // can't come back from the queries above -- merge them in from the on-device
+      // queue instead, using their pre-resolved `display` fields (built at submit
+      // time) so they render with the same shape as a real row, fully offline.
+      const queueTypeByTab: Record<string, QueuedEntryType> = { EQUIPMENT: 'equipment', LABOUR: 'labour', MATERIAL: 'material' };
+      const queued = await getQueuedEntries();
+      const queuedForTab = queued
+        .filter(q => q.type === queueTypeByTab[activeTab] && q.displayDate === dateStr)
+        .map(q => ({
+          id: q.id,
+          entry_date: q.displayDate,
+          status: 'QUEUED',
+          rejection_reason: null,
+          remarks: null,
+          ...q.display,
+        }));
+
+      setEntries([...queuedForTab, ...serverEntries]);
     } catch (error) {
       console.error('Error fetching history:', error);
     } finally {
@@ -127,6 +149,7 @@ export default function HistoryScreen() {
     switch(status) {
       case 'APPROVED': return 'text-green-500';
       case 'REJECTED': return 'text-red-500';
+      case 'QUEUED': return 'text-orange-500';
       default: return 'text-amber-500';
     }
   };
@@ -135,9 +158,12 @@ export default function HistoryScreen() {
     switch(status) {
       case 'APPROVED': return 'bg-green-50 border-green-200';
       case 'REJECTED': return 'bg-red-50 border-red-200';
+      case 'QUEUED': return 'bg-orange-50 border-orange-200';
       default: return 'bg-yellow-50 border-yellow-200';
     }
   };
+
+  const getStatusLabel = (status) => status === 'QUEUED' ? 'Pending Upload' : (status || 'SUBMITTED');
 
   const counts = {
     ALL: entries.length,
@@ -308,7 +334,7 @@ export default function HistoryScreen() {
                         : entry.material_description || 'Unknown Material'}
                   </Text>
                   <Text className={`font-bold tracking-wide text-[10px] px-2 py-1 border rounded uppercase ${getStatusColor(entry.status)} ${getStatusBg(entry.status)}`}>
-                    {entry.status || 'SUBMITTED'}
+                    {getStatusLabel(entry.status)}
                   </Text>
                 </View>
 
