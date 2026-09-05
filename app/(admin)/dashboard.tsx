@@ -92,7 +92,7 @@ export default function AdminDashboard() {
           entry_date, rental_type, start_time, end_time, break_hours, working_hours, number_of_trips,
           vehicle_number, foreman_name, engineer_name, fuel_provided, fuel_quantity, fuel_unit,
           remarks, status, rejection_reason, equipment_photo_url,
-          jobs(job_number, job_name, location),
+          jobs:job_id(job_number, job_name, location),
           suppliers(supplier_name),
           equipment_master(equipment_name)
         `);
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
         .select(`
           entry_date, employee_name, start_time, end_time, break_hours, total_working_hours,
           foreman_name, engineer_name, remarks, status, rejection_reason, labour_photo_url,
-          jobs(job_number, job_name, location),
+          jobs:job_id(job_number, job_name, location),
           suppliers(supplier_name),
           labour_designations(designation_name)
         `);

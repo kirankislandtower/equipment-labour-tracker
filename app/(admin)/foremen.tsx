@@ -52,10 +52,13 @@ export default function ForemanReports() {
     setLoading(true);
     try {
       const [equipRes, labourRes] = await Promise.all([
-        supabase.from('equipment_entries').select('*, jobs(job_number, job_name), equipment_master(equipment_name), suppliers(supplier_name)').gte('entry_date', fromDate).lte('entry_date', toDate),
-        supabase.from('labour_entries').select('*, jobs(job_number, job_name), labour_designations(designation_name), suppliers(supplier_name)').gte('entry_date', fromDate).lte('entry_date', toDate),
+        supabase.from('equipment_entries').select('*, jobs:job_id(job_number, job_name), equipment_master(equipment_name), suppliers(supplier_name)').gte('entry_date', fromDate).lte('entry_date', toDate),
+        supabase.from('labour_entries').select('*, jobs:job_id(job_number, job_name), labour_designations(designation_name), suppliers(supplier_name)').gte('entry_date', fromDate).lte('entry_date', toDate),
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
+
+      if (equipRes.error) console.error('Error fetching equipment entries for foreman reports:', equipRes.error);
+      if (labourRes.error) console.error('Error fetching labour entries for foreman reports:', labourRes.error);
 
       const equipData = equipRes.data || [];
       const labourData = labourRes.data || [];
