@@ -145,8 +145,7 @@ export default function EmployeesScreen() {
       if (error) throw error;
 
       setUsersList(prev => prev.map(u => u.id === selectedUser.id ? { ...u, phone_number: trimmed || null } : u));
-      setSelectedUser((prev: any) => prev ? { ...prev, phone_number: trimmed || null } : prev);
-      Alert.alert('Saved', 'Phone number updated.');
+      setSelectedUser(null);
     } catch (error: any) {
       console.error(error);
       Alert.alert('Error', 'Failed to save phone number');
@@ -397,17 +396,19 @@ export default function EmployeesScreen() {
       <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
         <View className="flex-1 bg-black/50 justify-center items-center p-8">
           <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
-            <View className="flex-row justify-between items-center mb-6">
-              <View className="flex-row items-center">
+            <View className="flex-row items-start justify-between mb-6">
+              <View className="flex-row items-start flex-1 mr-3">
                 <View className={`p-2 rounded-lg mr-3 ${selectedUser?.role === 'ADMIN' ? 'bg-blue-100' : 'bg-slate-100'}`}>
                   <User size={20} color={selectedUser?.role === 'ADMIN' ? '#2563eb' : '#64748b'} />
                 </View>
-                <View>
-                  <Text className="text-xl font-black text-slate-900">{selectedUser?.full_name}</Text>
-                  <Text className="text-slate-400 text-xs font-mono">{selectedUser?.email?.split('@')[0]}</Text>
+                <View className="flex-1">
+                  <Text className="text-xl font-black text-slate-900 leading-tight">{selectedUser?.full_name}</Text>
+                  <Text className="text-slate-400 text-xs font-mono mt-1">{selectedUser?.email?.split('@')[0]}</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setSelectedUser(null)}><X size={24} color="#94a3b8" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedUser(null)} className="p-1 -mt-1 -mr-1">
+                <X size={24} color="#94a3b8" />
+              </TouchableOpacity>
             </View>
 
             <View className="flex-row mb-4">
