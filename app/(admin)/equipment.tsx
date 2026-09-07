@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Check, X, Download, Filter, Image as ImageIcon, Calendar } from 'lucide-react-native';
+import { Check, X, Download, Filter, Image as ImageIcon, Calendar, AlertTriangle } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -442,7 +442,7 @@ export default function AdminEquipment() {
                         
                         <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
                           {entry.equipment_photo_url && entry.equipment_photo_url !== 'pending' && entry.equipment_photo_url !== 'NOT_REQUIRED' && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => {
                                 setSelectedPhoto(entry.equipment_photo_url);
                                 setPhotoModalVisible(true);
@@ -452,8 +452,14 @@ export default function AdminEquipment() {
                               <ImageIcon size={18} color="#1e3a8a" />
                             </TouchableOpacity>
                           )}
+                          {entry.equipment_photo_url === 'pending' && (
+                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200 flex-row items-center px-3">
+                              <AlertTriangle size={16} color="#d97706" />
+                              <Text className="text-amber-700 font-bold ml-1 text-xs">Photo Pending</Text>
+                            </View>
+                          )}
                           {entry.status === 'SUBMITTED' && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => confirmApprove(entry.id)}
                               className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200 flex-row items-center px-3"
                             >
@@ -493,7 +499,7 @@ export default function AdminEquipment() {
                         </View>
                         <View className="flex-1 flex-row justify-end space-x-2">
                           {entry.equipment_photo_url && entry.equipment_photo_url !== 'pending' && entry.equipment_photo_url !== 'NOT_REQUIRED' && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => {
                                 setSelectedPhoto(entry.equipment_photo_url);
                                 setPhotoModalVisible(true);
@@ -502,6 +508,11 @@ export default function AdminEquipment() {
                             >
                               <ImageIcon size={18} color="#1e3a8a" />
                             </TouchableOpacity>
+                          )}
+                          {entry.equipment_photo_url === 'pending' && (
+                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200">
+                              <AlertTriangle size={18} color="#d97706" />
+                            </View>
                           )}
                           {entry.status === 'SUBMITTED' && (
                             <TouchableOpacity 
@@ -592,6 +603,15 @@ export default function AdminEquipment() {
                       </View>
                     </View>
                   </>
+                )}
+
+                {selectedEntry.equipment_photo_url === 'pending' && (
+                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row items-center">
+                    <AlertTriangle size={18} color="#d97706" />
+                    <Text className="text-amber-800 font-medium ml-2 flex-1 text-sm">
+                      Photo upload didn't finish when this was submitted (likely a weak connection). The foreman needs to edit this entry to attach it.
+                    </Text>
+                  </View>
                 )}
 
                 {!!selectedEntry.requested_by && (

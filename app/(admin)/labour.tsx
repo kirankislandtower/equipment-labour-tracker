@@ -443,7 +443,7 @@ export default function AdminLabour() {
                         
                         <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
                           {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && entry.labour_photo_url !== 'NOT_REQUIRED' && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => {
                                 setSelectedPhoto(entry.labour_photo_url);
                                 setPhotoModalVisible(true);
@@ -453,8 +453,14 @@ export default function AdminLabour() {
                               <ImageIcon size={18} color="#1e3a8a" />
                             </TouchableOpacity>
                           )}
+                          {entry.labour_photo_url === 'pending' && (
+                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200 flex-row items-center px-3">
+                              <AlertCircle size={16} color="#d97706" />
+                              <Text className="text-amber-700 font-bold ml-1 text-xs">Photo Pending</Text>
+                            </View>
+                          )}
                           {entry.status === 'SUBMITTED' && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => confirmApprove(entry.id)}
                               className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200 flex-row items-center px-3"
                             >
@@ -494,7 +500,7 @@ export default function AdminLabour() {
                         </View>
                         <View className="flex-1 flex-row justify-end space-x-2">
                           {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && entry.labour_photo_url !== 'NOT_REQUIRED' && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => {
                                 setSelectedPhoto(entry.labour_photo_url);
                                 setPhotoModalVisible(true);
@@ -503,6 +509,11 @@ export default function AdminLabour() {
                             >
                               <ImageIcon size={18} color="#1e3a8a" />
                             </TouchableOpacity>
+                          )}
+                          {entry.labour_photo_url === 'pending' && (
+                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200">
+                              <AlertCircle size={18} color="#d97706" />
+                            </View>
                           )}
                           {entry.status === 'SUBMITTED' && (
                             <TouchableOpacity 
@@ -593,6 +604,15 @@ export default function AdminLabour() {
                       </View>
                     </View>
                   </>
+                )}
+
+                {selectedEntry.labour_photo_url === 'pending' && (
+                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row items-center">
+                    <AlertCircle size={18} color="#d97706" />
+                    <Text className="text-amber-800 font-medium ml-2 flex-1 text-sm">
+                      Photo upload didn't finish when this was submitted (likely a weak connection). The foreman needs to edit this entry to attach it.
+                    </Text>
+                  </View>
                 )}
 
                 {!!selectedEntry.requested_by && (
