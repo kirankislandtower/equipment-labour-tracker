@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions, Linking } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check } from 'lucide-react-native';
+import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle } from 'lucide-react-native';
 
 export default function EmployeesScreen() {
   const { width } = useWindowDimensions();
@@ -125,6 +125,14 @@ export default function EmployeesScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // wa.me needs just digits with country code -- no +, spaces, or dashes -- so this
+  // strips whatever formatting the number was saved with before building the link.
+  const openWhatsApp = (phone: string) => {
+    const digitsOnly = phone.replace(/[^0-9]/g, '');
+    if (!digitsOnly) return;
+    Linking.openURL(`https://wa.me/${digitsOnly}`);
   };
 
   const openUserDetails = (u: any) => {
@@ -435,6 +443,15 @@ export default function EmployeesScreen() {
                   className="flex-1 p-4 ml-2 text-slate-900"
                 />
               </View>
+              {!!selectedUser?.phone_number && (
+                <TouchableOpacity
+                  onPress={() => openWhatsApp(selectedUser.phone_number)}
+                  className="flex-row items-center justify-center mt-3 py-3 rounded-lg border border-green-200 bg-green-50 active:bg-green-100"
+                >
+                  <MessageCircle size={18} color="#16a34a" />
+                  <Text className="text-green-700 font-bold ml-2">Message on WhatsApp</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <TouchableOpacity
