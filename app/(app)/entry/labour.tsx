@@ -21,6 +21,10 @@ type Job = { id: string; job_number: string; job_name: string; location?: string
 type Supplier = { id: string; supplier_name: string };
 type Designation = { id: string; designation_name: string };
 
+// These two always show up as employee options no matter which labour supplier is
+// picked, on top of whatever job-specific roster that supplier has.
+const UNIVERSAL_EMPLOYEES = ['Mozibur', 'Habibur'];
+
 export default function LabourEntryScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -164,7 +168,7 @@ export default function LabourEntryScreen() {
           .eq('supplier_id', selectedSupplier.id)
       );
 
-      const options = Array.from(new Set((data || []).map((row: any) => row.employee_name)))
+      const options = Array.from(new Set([...UNIVERSAL_EMPLOYEES, ...(data || []).map((row: any) => row.employee_name)]))
         .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
       setEmployeeOptions(options);
     };
