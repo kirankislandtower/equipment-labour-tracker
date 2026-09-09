@@ -213,9 +213,11 @@ export default function AdminLayout() {
         <Modal visible={menuOpen} animationType="slide" transparent={false}>
           <View 
             className="flex-1 bg-slate-950" 
-            style={{ 
-              height: Platform.OS === 'web' ? '100dvh' : '100%', 
-              paddingTop: Platform.OS === 'web' ? 0 : 40 
+            style={{
+              // "100dvh" is a valid CSS value react-native-web passes straight through,
+              // but RN's DimensionValue type doesn't know about it -- web-only escape hatch.
+              height: (Platform.OS === 'web' ? '100dvh' : '100%') as any,
+              paddingTop: Platform.OS === 'web' ? 0 : 40
             }}
           >
             <SidebarContent />

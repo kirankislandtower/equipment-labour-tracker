@@ -16,7 +16,7 @@ export default function HistoryScreen() {
   const [activeTab, setActiveTab] = useState(type || 'EQUIPMENT');
   const [statusFilter, setStatusFilter] = useState(status || 'ALL');
   const [loading, setLoading] = useState(true);
-  const [entries, setEntries] = useState([]);
+  const [entries, setEntries] = useState<any[]>([]);
   
   // Initialize date from URL param if available, otherwise today
   const initialDate = date ? new Date(date) : new Date();
@@ -145,7 +145,7 @@ export default function HistoryScreen() {
     return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch(status) {
       case 'APPROVED': return 'text-green-500';
       case 'REJECTED': return 'text-red-500';
@@ -154,7 +154,7 @@ export default function HistoryScreen() {
     }
   };
 
-  const getStatusBg = (status) => {
+  const getStatusBg = (status: string) => {
     switch(status) {
       case 'APPROVED': return 'bg-green-50 border-green-200';
       case 'REJECTED': return 'bg-red-50 border-red-200';
@@ -163,7 +163,7 @@ export default function HistoryScreen() {
     }
   };
 
-  const getStatusLabel = (status) => status === 'QUEUED' ? 'Pending Upload' : (status || 'SUBMITTED');
+  const getStatusLabel = (status: string) => status === 'QUEUED' ? 'Pending Upload' : (status || 'SUBMITTED');
 
   const counts = {
     ALL: entries.length,

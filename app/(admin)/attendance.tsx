@@ -282,16 +282,16 @@ export default function AdminAttendance() {
             {/* Modal Body */}
             <ScrollView className="flex-1 bg-slate-50 p-6">
               {(() => {
-                const filteredLogs = modalFilterDate 
-                  ? selectedUser?.logs.filter(log => getLocalDateString(new Date(log.created_at)) === modalFilterDate)
-                  : selectedUser?.logs;
+                const filteredLogs: any[] = modalFilterDate
+                  ? (selectedUser?.logs || []).filter((log: any) => getLocalDateString(new Date(log.created_at)) === modalFilterDate)
+                  : (selectedUser?.logs || []);
 
-                const groupedByDate = filteredLogs?.reduce((acc, log) => {
+                const groupedByDate: Record<string, any[]> = filteredLogs.reduce((acc: Record<string, any[]>, log: any) => {
                   const dateObj = new Date(log.created_at);
                   const today = new Date();
                   const yesterday = new Date(today);
                   yesterday.setDate(yesterday.getDate() - 1);
-                  
+
                   let dateLabel = '';
                   if (dateObj.toDateString() === today.toDateString()) {
                     dateLabel = 'Today';
@@ -304,9 +304,9 @@ export default function AdminAttendance() {
                   if (!acc[dateLabel]) acc[dateLabel] = [];
                   acc[dateLabel].push(log);
                   return acc;
-                }, {} as Record<string, any[]>);
+                }, {});
 
-                return Object.entries(groupedByDate || {}).map(([dateLabel, logsForDate]) => (
+                return Object.entries(groupedByDate).map(([dateLabel, logsForDate]) => (
                   <View key={dateLabel} className="mb-6">
                     <Text className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-3 ml-2">{dateLabel}</Text>
                     <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">

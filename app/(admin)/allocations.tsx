@@ -481,7 +481,7 @@ export default function SiteAllocationsScreen() {
                   <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 py-2 px-3 rounded-lg border border-slate-100">
                     {category}
                   </Text>
-                  {groupedEquipment[category].map(equip => {
+                  {groupedEquipment[category].map((equip: any) => {
                     const isSelected = allocatedEquipmentByScope[equipmentScope]?.has(equip.id) || false;
                     return (
                       <TouchableOpacity

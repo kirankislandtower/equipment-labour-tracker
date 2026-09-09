@@ -12,7 +12,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   return (
     <View 
       className="absolute left-4 right-4 bg-white/95 shadow-sm border border-slate-200 rounded-3xl flex-row justify-between items-center px-2 py-2"
-      style={{ bottom: Platform.OS === 'web' ? 24 : Math.max(insets.bottom, 16), elevation: 5, backdropFilter: 'blur(10px)' }}
+      style={{ bottom: Platform.OS === 'web' ? 24 : Math.max(insets.bottom, 16), elevation: 5, backdropFilter: 'blur(10px)' } as any}
     >
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
