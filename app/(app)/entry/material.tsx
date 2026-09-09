@@ -16,6 +16,7 @@ import WebCamera from '../../../components/WebCamera';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
 import { fetchWithCache } from '../../../lib/dataCache';
+import { isStoreForeman } from '../../../lib/foremanFlags';
 
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -87,6 +88,7 @@ export default function MaterialTransferEntryScreen() {
   // whenever the upload happens to complete, since those can differ by hours when an
   // entry sits in the offline queue.
   const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
+  const [isStoreUser, setIsStoreUser] = useState(false);
 
   // viewShotRef removed
 
@@ -176,9 +178,10 @@ export default function MaterialTransferEntryScreen() {
             name = userData.email.split('@')[0];
           }
           setFormData(prev => ({ ...prev, foreman_name: name }));
+          setIsStoreUser(isStoreForeman(userData.email));
         }
       }
-      
+
       if (id) {
         const { data: entryData } = await supabase.from('material_transfers').select('*').eq('id', id).eq('created_by', user?.id).single();
         if (entryData) {
@@ -252,7 +255,7 @@ export default function MaterialTransferEntryScreen() {
     if (formData.from_job_id && formData.to_job_id && formData.from_job_id === formData.to_job_id) {
       newErrors.to_job_id = 'Destination cannot be same as source';
     }
-    if (!photoUri && !id) newErrors.photo = 'Live photo is required';
+    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -286,7 +289,8 @@ export default function MaterialTransferEntryScreen() {
 
       // New entries only (not edits) go through the offline queue -- an edit while
       // offline still fails today, asking the foreman to retry once connected. Photo
-      // is always required for a new material entry, so photoUri is guaranteed here.
+      // is required for everyone except the Store account, so photoUri may be null
+      // here for Store.
       if (!id) {
         const netState = await NetInfo.fetch();
         if (!netState.isConnected) {
@@ -294,7 +298,7 @@ export default function MaterialTransferEntryScreen() {
             type: 'material',
             table: 'material_transfers',
             photoColumn: 'photo_url',
-            payload: { ...basePayload, photo_url: 'pending' },
+            payload: { ...basePayload, photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
             photoDataUri: photoUri,
             photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
             watermarkJobLabel: `From: ${jobName}`,
@@ -317,7 +321,7 @@ export default function MaterialTransferEntryScreen() {
         }
       }
 
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : 'pending';
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
@@ -331,20 +335,9 @@ export default function MaterialTransferEntryScreen() {
           console.error('Cloudinary upload failed, saving entry without photo:', err);
           photoUploadFailed = true;
         }
-      } else if (!id) {
-         setErrors(prev => ({ ...prev, photo: 'Live photo is required' }));
-         setSubmitting(false);
-         return;
       }
 
-      const payload: any = {
-        ...basePayload,
-        photo_url: uploadedPhotoUrl !== 'pending' ? uploadedPhotoUrl : undefined, // Keep existing photo if not updated
-      };
-
-      if (uploadedPhotoUrl === 'pending' && !id) {
-         payload.photo_url = 'pending';
-      }
+      const payload = { ...basePayload, photo_url: uploadedPhotoUrl };
 
       let error;
       if (id) {
@@ -589,7 +582,7 @@ export default function MaterialTransferEntryScreen() {
 
         <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
           <Text className="text-slate-700 text-sm font-medium mb-3">
-            Material Photo (Live Camera Only) <Text className="text-red-500">*</Text>
+            Material Photo (Live Camera Only) {!isStoreUser && <Text className="text-red-500">*</Text>}
           </Text>
           {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
           

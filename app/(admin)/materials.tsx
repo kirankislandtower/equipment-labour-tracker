@@ -362,7 +362,16 @@ export default function AdminMaterials() {
                   </View>
                 )}
 
-                {!!selectedEntry.photo_url && selectedEntry.photo_url !== 'pending' && (
+                {selectedEntry.photo_url === 'pending' && (
+                  <View className="mb-6 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row items-center">
+                    <AlertCircle size={18} color="#d97706" />
+                    <Text className="text-amber-800 font-medium ml-2 flex-1 text-sm">
+                      Photo upload didn't finish when this was submitted (likely a weak connection). The foreman needs to edit this entry to attach it.
+                    </Text>
+                  </View>
+                )}
+
+                {!!selectedEntry.photo_url && selectedEntry.photo_url !== 'pending' && selectedEntry.photo_url !== 'NOT_REQUIRED' && (
                   <View className="mb-6">
                     <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 ml-1">Live Photo Evidence</Text>
                     <TouchableOpacity 
@@ -592,8 +601,8 @@ export default function AdminMaterials() {
                 </View>
                 
                 <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
-                  {entry.photo_url && entry.photo_url !== 'pending' && (
-                    <TouchableOpacity 
+                  {entry.photo_url && entry.photo_url !== 'pending' && entry.photo_url !== 'NOT_REQUIRED' && (
+                    <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
                         setSelectedPhoto(entry.photo_url);
@@ -604,8 +613,14 @@ export default function AdminMaterials() {
                       <ImageIcon size={18} color="#4f46e5" />
                     </TouchableOpacity>
                   )}
+                  {entry.photo_url === 'pending' && (
+                    <View className="bg-amber-100 p-2 rounded-lg border border-amber-200 flex-row items-center px-3 mr-2">
+                      <AlertCircle size={16} color="#d97706" />
+                      <Text className="text-amber-700 font-bold ml-1 text-xs">Photo Pending</Text>
+                    </View>
+                  )}
                   {entry.status === 'SUBMITTED' && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       onPress={() => confirmApprove(entry.id)}
                       className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200 flex-row items-center px-3"
                     >
@@ -672,8 +687,8 @@ export default function AdminMaterials() {
                       <Text className="w-32 text-sm font-medium text-slate-600">{entry.vehicle_number}</Text>
                       <Text className="w-40 text-sm font-medium text-slate-900">{entry.foreman_name}</Text>
                       <View className="w-40 flex-row items-center justify-center space-x-2">
-                        {entry.photo_url && entry.photo_url !== 'pending' && (
-                          <TouchableOpacity 
+                        {entry.photo_url && entry.photo_url !== 'pending' && entry.photo_url !== 'NOT_REQUIRED' && (
+                          <TouchableOpacity
                             onPress={(e) => {
                               e.stopPropagation();
                               setSelectedPhoto(entry.photo_url);
@@ -683,6 +698,11 @@ export default function AdminMaterials() {
                           >
                             <ImageIcon size={18} color="#4f46e5" />
                           </TouchableOpacity>
+                        )}
+                        {entry.photo_url === 'pending' && (
+                          <View className="bg-amber-100 p-2 rounded-lg border border-amber-200 mr-2">
+                            <AlertCircle size={18} color="#d97706" />
+                          </View>
                         )}
                         {entry.status === 'SUBMITTED' && (
                           <TouchableOpacity 

@@ -853,9 +853,8 @@ export default function LabourEntryScreen() {
           </View>
         </View>
 
-        {!isStoreUser && (
-          <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-            <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo (Live Camera Only) <Text className="text-red-500">*</Text></Text>
+        <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
+            <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo (Live Camera Only) {!isStoreUser && <Text className="text-red-500">*</Text>}</Text>
             {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
 
             {photoUri ? (
@@ -897,7 +896,6 @@ export default function LabourEntryScreen() {
               </TouchableOpacity>
             )}
           </View>
-        )}
 
         <View className="mb-8">
           <Text className="text-sm font-medium text-slate-700 mb-1">Remarks (Optional)</Text>
