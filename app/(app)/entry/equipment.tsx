@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, Truck, Calendar, Clock, Fuel, WifiOff } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, Truck, Calendar, Clock, Fuel, WifiOff, Search } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
@@ -24,6 +24,11 @@ import { NO_PHOTO_REASONS } from '../../../lib/noPhotoReasons';
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredOptions = searchQuery.trim()
+    ? options.filter((o: any) => o.label.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : options;
 
   return (
     <View className="mb-4">
@@ -41,17 +46,39 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder, required =
       </TouchableOpacity>
       {error ? <Text className="text-red-500 text-xs mt-1 ml-1">{error}</Text> : null}
 
-      <Modal visible={modalVisible} transparent animationType="slide">
+      <Modal visible={modalVisible} transparent animationType="slide" onShow={() => setSearchQuery('')} onRequestClose={() => setModalVisible(false)}>
         <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl h-[60%] border-t border-slate-200 shadow-2xl">
+          <View className="bg-white rounded-t-3xl h-[75%] border-t border-slate-200 shadow-2xl">
             <View className="flex-row items-center justify-between p-5 border-b border-slate-100">
               <Text className="text-slate-900 text-lg font-black tracking-tight">Select {label}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} className="p-2 bg-slate-100 rounded-full active:opacity-60">
                 <X size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
+            <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl mx-5 mt-4 mb-2 px-4 h-12">
+              <Search size={18} color="#94a3b8" />
+              <TextInput
+                placeholder={`Search ${label.toLowerCase()}...`}
+                placeholderTextColor="#94a3b8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                className="flex-1 ml-3 text-slate-900"
+                style={{ outlineStyle: 'none' } as any}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
+                  <X size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {filteredOptions.length === 0 && (
+              <View className="py-10 items-center">
+                <Text className="text-slate-400 font-medium">No matches for "{searchQuery}"</Text>
+              </View>
+            )}
             <FlatList
-              data={options}
+              data={filteredOptions}
               keyExtractor={(item) => item.value}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -67,6 +94,7 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder, required =
                   {value === item.value && <Check size={20} color="#1e3a8a" />}
                 </TouchableOpacity>
               )}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingBottom: 40 }}
             />
           </View>

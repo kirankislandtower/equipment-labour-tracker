@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, Flat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera, Image as ImageIcon, X, Users, WifiOff } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera, Image as ImageIcon, X, Users, WifiOff, Search } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
@@ -25,6 +25,76 @@ type Designation = { id: string; designation_name: string };
 // These two always show up as employee options no matter which labour supplier is
 // picked, on top of whatever job-specific roster that supplier has.
 const UNIVERSAL_EMPLOYEES = ['Mozibur', 'Habibur'];
+
+const defaultGetLabel = (item: any) =>
+  item.supplier_name || item.designation_name || item.location_name || item.job_number || item.employee_name || '';
+
+// A real component (not a plain function) so each modal instance gets its own
+// independent search state -- this used to be a function called inline during
+// render, which can't safely hold its own useState across multiple call sites.
+const SelectModal = ({ visible, setVisible, data, keyExtractor, onSelect, title, getLabel = defaultGetLabel }: any) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredData = searchQuery.trim()
+    ? data.filter((item: any) => getLabel(item).toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : data;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={true} onShow={() => setSearchQuery('')} onRequestClose={() => setVisible(false)}>
+      <View className="flex-1 justify-end bg-black/60">
+        <View className="bg-white rounded-t-3xl h-[75%] border-t border-slate-200 shadow-2xl">
+          <View className="flex-row items-center justify-between p-5 border-b border-slate-100">
+            <Text className="text-slate-900 text-lg font-black tracking-tight">{title}</Text>
+            <TouchableOpacity onPress={() => setVisible(false)} className="p-2 bg-slate-100 rounded-full active:opacity-60">
+              <X size={20} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl mx-5 mt-4 mb-2 px-4 h-12">
+            <Search size={18} color="#94a3b8" />
+            <TextInput
+              placeholder={`Search ${title.replace(/^(Select|Assign to)\s*/i, '').toLowerCase()}...`}
+              placeholderTextColor="#94a3b8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              className="flex-1 ml-3 text-slate-900"
+              style={{ outlineStyle: 'none' } as any}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
+                <X size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+          {filteredData.length === 0 && (
+            <View className="py-10 items-center">
+              <Text className="text-slate-400 font-medium">No matches for "{searchQuery}"</Text>
+            </View>
+          )}
+          <FlatList
+            data={filteredData}
+            keyExtractor={keyExtractor}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                className="flex-row items-center justify-between p-4 border-b border-slate-100 active:bg-slate-50"
+                onPress={() => {
+                  onSelect(item);
+                  setVisible(false);
+                }}
+              >
+                <Text className="text-slate-700 text-lg font-medium">
+                  {getLabel(item)}
+                </Text>
+              </TouchableOpacity>
+            )}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 40 }}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 export default function LabourEntryScreen() {
   const router = useRouter();
@@ -435,46 +505,6 @@ export default function LabourEntryScreen() {
     }
   };
 
-
-  const renderModal = (
-    visible: boolean, 
-    setVisible: (v: boolean) => void, 
-    data: any[], 
-    keyExtractor: (item: any) => string, 
-    onSelect: (item: any) => void, 
-    title: string
-  ) => (
-    <Modal visible={visible} animationType="slide" transparent={true}>
-      <View className="flex-1 justify-end bg-black/60">
-        <View className="bg-white rounded-t-3xl h-[60%] border-t border-slate-200 shadow-2xl">
-          <View className="flex-row items-center justify-between p-5 border-b border-slate-100">
-            <Text className="text-slate-900 text-lg font-black tracking-tight">{title}</Text>
-            <TouchableOpacity onPress={() => setVisible(false)} className="p-2 bg-slate-100 rounded-full active:opacity-60">
-              <X size={20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={data}
-            keyExtractor={keyExtractor}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                className="flex-row items-center justify-between p-4 border-b border-slate-100 active:bg-slate-50"
-                onPress={() => {
-                  onSelect(item);
-                  setVisible(false);
-                }}
-              >
-                <Text className="text-slate-700 text-lg font-medium">
-                  {item.supplier_name || item.designation_name || item.location_name || item.job_number || item.employee_name || ''}
-                </Text>
-              </TouchableOpacity>
-            )}
-            contentContainerStyle={{ paddingBottom: 40 }}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
 
   if (fetching) {
     return (
@@ -970,38 +1000,47 @@ export default function LabourEntryScreen() {
 
       </ScrollView>
 
-      {renderModal(jobModalVisible, setJobModalVisible, jobs, (item) => item.id, setSelectedJob, 'Select Job')}
-      
-      {selectedJob && renderModal(
-        locationModalVisible, 
-        setLocationModalVisible, 
-        (selectedJob.location && selectedJob.location !== 'N/A' ? selectedJob.location.split(',').map(l => ({ id: l.trim(), location_name: l.trim() })).filter(l => l.id) : []), 
-        (item) => item.id, 
-        (item) => setSelectedLocation(item.location_name), 
-        'Select Location'
+      <SelectModal visible={jobModalVisible} setVisible={setJobModalVisible} data={jobs} keyExtractor={(item: any) => item.id} onSelect={setSelectedJob} title="Select Job" />
+
+      {selectedJob && (
+        <SelectModal
+          visible={locationModalVisible}
+          setVisible={setLocationModalVisible}
+          data={selectedJob.location && selectedJob.location !== 'N/A' ? selectedJob.location.split(',').map(l => ({ id: l.trim(), location_name: l.trim() })).filter(l => l.id) : []}
+          keyExtractor={(item: any) => item.id}
+          onSelect={(item: any) => setSelectedLocation(item.location_name)}
+          title="Select Location"
+        />
       )}
 
-      {renderModal(supplierModalVisible, setSupplierModalVisible, suppliers, (item) => item.id, setSelectedSupplier, 'Select Supplier')}
-      {renderModal(
-        employeeModalVisible,
-        setEmployeeModalVisible,
-        [...employeeOptions.map(e => ({ id: e, employee_name: e })), { id: '__manual__', employee_name: 'Other (enter manually)' }],
-        (item) => item.id,
-        (item) => {
+      <SelectModal visible={supplierModalVisible} setVisible={setSupplierModalVisible} data={suppliers} keyExtractor={(item: any) => item.id} onSelect={setSelectedSupplier} title="Select Supplier" />
+      <SelectModal
+        visible={employeeModalVisible}
+        setVisible={setEmployeeModalVisible}
+        data={[...employeeOptions.map(e => ({ id: e, employee_name: e })), { id: '__manual__', employee_name: 'Other (enter manually)' }]}
+        keyExtractor={(item: any) => item.id}
+        onSelect={(item: any) => {
           if (item.id === '__manual__') {
             setEmployeeManualEntry(true);
           } else {
             setEmployeeName(item.employee_name);
             if (errors.employee_name) setErrors(prev => ({ ...prev, employee_name: '' }));
           }
-        },
-        'Select Employee'
-      )}
-      {renderModal(designationModalVisible, setDesignationModalVisible, designations, (item) => item.id, setSelectedDesignation, 'Select Designation')}
-      {renderModal(assignedJobModalVisible, setAssignedJobModalVisible, jobs, (item) => item.id, (item) => {
-        setAssignedJob(item);
-        if (errors.assigned_job) setErrors(prev => ({ ...prev, assigned_job: '' }));
-      }, 'Assign to Job')}
+        }}
+        title="Select Employee"
+      />
+      <SelectModal visible={designationModalVisible} setVisible={setDesignationModalVisible} data={designations} keyExtractor={(item: any) => item.id} onSelect={setSelectedDesignation} title="Select Designation" />
+      <SelectModal
+        visible={assignedJobModalVisible}
+        setVisible={setAssignedJobModalVisible}
+        data={jobs}
+        keyExtractor={(item: any) => item.id}
+        onSelect={(item: any) => {
+          setAssignedJob(item);
+          if (errors.assigned_job) setErrors(prev => ({ ...prev, assigned_job: '' }));
+        }}
+        title="Assign to Job"
+      />
     </SafeAreaView>
   );
 }
