@@ -154,7 +154,7 @@ export default function EmployeesScreen() {
   const sendLoginReminder = (u: any) => {
     if (!u.phone_number) return;
     const firstName = (u.full_name || '').split(' ')[0] || 'Sir';
-    const message = `नमस्ते ${firstName} जी, ये Island Tower app में लॉगिन करने का रिमाइंडर है। सिर्फ 2 मिनट लगेंगे। कोई दिक्कत हो तो यहीं बता देना।`;
+    const message = `Hi ${firstName}, this is a reminder to log in to the Island Tower app. It only takes 2 minutes. Message me here if you get stuck.`;
     openWhatsApp(u.phone_number, message);
   };
 
