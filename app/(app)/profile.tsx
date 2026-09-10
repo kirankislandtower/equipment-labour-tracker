@@ -4,7 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { User, Mail, LogOut, Shield } from 'lucide-react-native';
+import { User, Mail, LogOut, Shield, Download, CheckCircle, Share, X } from 'lucide-react-native';
+import {
+  canPromptInstall,
+  promptInstall,
+  isStandalone,
+  isIOS,
+  subscribePwaInstallChanges,
+} from '../../lib/pwaInstall';
 
 export default function ProfileScreen() {
   const { user } = useAuth();
@@ -13,6 +20,25 @@ export default function ProfileScreen() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Re-rendered whenever the browser's install-availability changes (the event
+  // that makes canPromptInstall() true can fire after this screen has already
+  // mounted, and installing the app flips isStandalone() true without a reload).
+  const [, forceInstallRerender] = useState(0);
+  const [showIosInstructions, setShowIosInstructions] = useState(false);
+
+  React.useEffect(() => {
+    const unsubscribe = subscribePwaInstallChanges(() => forceInstallRerender((n) => n + 1));
+    return unsubscribe;
+  }, []);
+
+  const handleInstallPress = async () => {
+    if (canPromptInstall()) {
+      await promptInstall();
+    } else {
+      setShowIosInstructions(true);
+    }
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -103,6 +129,42 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          {/* Install App */}
+          {Platform.OS === 'web' && (
+            <View className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-8">
+              {isStandalone() ? (
+                <View className="flex-row items-center">
+                  <View className="bg-green-50 p-3 rounded-full border border-green-100 mr-4">
+                    <CheckCircle size={20} color="#16a34a" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">App Status</Text>
+                    <Text className="text-base font-bold text-slate-900">Installed on this device</Text>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <View className="flex-row items-center mb-4">
+                    <View className="bg-blue-50 p-3 rounded-full border border-blue-100 mr-4">
+                      <Download size={20} color="#1e3a8a" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Get the App</Text>
+                      <Text className="text-base font-bold text-slate-900">Install for quick, one-tap access</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleInstallPress}
+                    className="flex-row items-center justify-center bg-[#1e3a8a] py-4 rounded-2xl active:opacity-90"
+                  >
+                    <Download size={20} color="#fff" />
+                    <Text className="text-white font-bold text-lg ml-2">Download App</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+
           {/* Logout Button */}
           <TouchableOpacity 
             onPress={() => setShowLogoutModal(true)}
@@ -150,6 +212,71 @@ export default function ProfileScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Manual Install Instructions -- shown when there's no programmatic install
+            prompt available (always true on iOS Safari; also a fallback for any
+            browser that hasn't fired beforeinstallprompt for whatever reason). */}
+        <Modal
+          visible={showIosInstructions}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowIosInstructions(false)}
+        >
+          <View className="flex-1 bg-slate-900/40 justify-center items-center px-6">
+            <View className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-2xl font-black text-slate-900 tracking-tight">Install App</Text>
+                <TouchableOpacity onPress={() => setShowIosInstructions(false)} className="bg-slate-100 p-2 rounded-full active:bg-slate-200">
+                  <X size={20} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              {isIOS() ? (
+                <View>
+                  <View className="flex-row items-start mb-4">
+                    <View className="bg-blue-50 w-8 h-8 rounded-full items-center justify-center mr-3 mt-0.5">
+                      <Text className="text-blue-900 font-black text-sm">1</Text>
+                    </View>
+                    <View className="flex-1 flex-row items-center flex-wrap">
+                      <Text className="text-slate-700 font-medium leading-relaxed">Tap the </Text>
+                      <Share size={15} color="#1e3a8a" />
+                      <Text className="text-slate-700 font-medium leading-relaxed"> Share icon at the bottom of Safari</Text>
+                    </View>
+                  </View>
+                  <View className="flex-row items-start mb-4">
+                    <View className="bg-blue-50 w-8 h-8 rounded-full items-center justify-center mr-3 mt-0.5">
+                      <Text className="text-blue-900 font-black text-sm">2</Text>
+                    </View>
+                    <Text className="flex-1 text-slate-700 font-medium leading-relaxed">
+                      Scroll down and tap <Text className="font-bold text-slate-900">"Add to Home Screen"</Text>
+                    </Text>
+                  </View>
+                  <View className="flex-row items-start">
+                    <View className="bg-blue-50 w-8 h-8 rounded-full items-center justify-center mr-3 mt-0.5">
+                      <Text className="text-blue-900 font-black text-sm">3</Text>
+                    </View>
+                    <Text className="flex-1 text-slate-700 font-medium leading-relaxed">
+                      Tap <Text className="font-bold text-slate-900">"Add"</Text> in the top right corner
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <Text className="text-slate-700 font-medium leading-relaxed">
+                  Open your browser's menu (usually a ⋮ or ••• icon) and look for{' '}
+                  <Text className="font-bold text-slate-900">"Install app"</Text> or{' '}
+                  <Text className="font-bold text-slate-900">"Add to Home Screen"</Text>.
+                </Text>
+              )}
+
+              <TouchableOpacity
+                onPress={() => setShowIosInstructions(false)}
+                className="bg-[#1e3a8a] py-4 rounded-2xl items-center mt-6"
+              >
+                <Text className="text-white font-bold text-lg">Got It</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>

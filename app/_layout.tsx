@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { injectPwaMetaTags } from '../lib/pwaMeta';
+import { initPwaInstallListener } from '../lib/pwaInstall';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -50,6 +51,7 @@ export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
     injectPwaMetaTags();
+    initPwaInstallListener();
   }, []);
 
   return (
