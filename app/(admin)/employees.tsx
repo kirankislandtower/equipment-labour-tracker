@@ -9,11 +9,15 @@ export default function EmployeesScreen() {
   const [loading, setLoading] = useState(true);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'loggedin'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'loggedin' | 'notloggedin'>('all');
   // A foreman is "currently logged in" when their single most recent
   // attendance_logs row is a LOGIN with no LOGOUT after it -- the same signal the
   // Attendance screen shows per-day, just taken across all time and per account.
   const [loggedInIds, setLoggedInIds] = useState<Set<string>>(new Set());
+  // Anyone who has EVER logged in, regardless of whether they're signed in right
+  // now -- used for "Not Logged In", which should mean "has never used the app",
+  // not "isn't signed in at this exact moment".
+  const [everLoggedInIds, setEverLoggedInIds] = useState<Set<string>>(new Set());
 
   // Modal state
   const [addModal, setAddModal] = useState(false);
@@ -62,12 +66,20 @@ export default function EmployeesScreen() {
 
       const seen = new Set<string>();
       const loggedIn = new Set<string>();
+      const everLoggedIn = new Set<string>();
       (data || []).forEach((log: any) => {
+        // Every real login inserts a LOGIN row (see app/index.tsx), so appearing here
+        // at all -- regardless of current state -- means this account has actually
+        // been used at least once. That's a different question from "signed in right
+        // now": someone who logged in yesterday and later logged out has still used
+        // the app, so they shouldn't show up as "Not Logged In".
+        everLoggedIn.add(log.user_id);
         if (seen.has(log.user_id)) return;
         seen.add(log.user_id);
         if (log.action === 'LOGIN') loggedIn.add(log.user_id);
       });
       setLoggedInIds(loggedIn);
+      setEverLoggedInIds(everLoggedIn);
     } catch (error) {
       console.error('Error fetching login status:', error);
     }
@@ -163,9 +175,11 @@ export default function EmployeesScreen() {
   };
 
   const loggedInCount = usersList.filter((u) => loggedInIds.has(u.id)).length;
+  const notLoggedInCount = usersList.filter((u) => !everLoggedInIds.has(u.id)).length;
 
   const filteredUsers = usersList.filter((u) => {
     if (activeTab === 'loggedin' && !loggedInIds.has(u.id)) return false;
+    if (activeTab === 'notloggedin' && everLoggedInIds.has(u.id)) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.trim().toLowerCase();
     const username = u.email ? u.email.split('@')[0] : '';
@@ -213,6 +227,16 @@ export default function EmployeesScreen() {
             <Text className={`text-xs font-bold ${activeTab === 'loggedin' ? 'text-white' : 'text-green-700'}`}>{loggedInCount}</Text>
           </View>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('notloggedin')}
+          className={`px-4 py-2 rounded-full border flex-row items-center ${activeTab === 'notloggedin' ? 'bg-amber-600 border-amber-600' : 'bg-white border-slate-200'}`}
+        >
+          <View className={`w-2 h-2 rounded-full mr-2 ${activeTab === 'notloggedin' ? 'bg-white' : 'bg-amber-500'}`} />
+          <Text className={`font-bold text-sm ${activeTab === 'notloggedin' ? 'text-white' : 'text-slate-600'}`}>Not Logged In</Text>
+          <View className={`ml-2 px-2 py-0.5 rounded-full ${activeTab === 'notloggedin' ? 'bg-white/20' : 'bg-amber-50'}`}>
+            <Text className={`text-xs font-bold ${activeTab === 'notloggedin' ? 'text-white' : 'text-amber-700'}`}>{notLoggedInCount}</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       <View className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 h-12 mb-6">
@@ -257,6 +281,8 @@ export default function EmployeesScreen() {
                       ? `No foremen match "${searchQuery}".`
                       : activeTab === 'loggedin'
                       ? 'No foremen are currently logged in.'
+                      : activeTab === 'notloggedin'
+                      ? 'Everyone has logged in at least once.'
                       : 'No foremen found.'}
                   </Text>
                 </View>
