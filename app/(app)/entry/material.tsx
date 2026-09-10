@@ -17,6 +17,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
 import { fetchWithCache } from '../../../lib/dataCache';
 import { isStoreForeman } from '../../../lib/foremanFlags';
+import { NO_PHOTO_REASONS } from '../../../lib/noPhotoReasons';
 
 
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -89,6 +90,8 @@ export default function MaterialTransferEntryScreen() {
   // entry sits in the offline queue.
   const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
   const [isStoreUser, setIsStoreUser] = useState(false);
+  const [noPhotoReason, setNoPhotoReason] = useState<string | null>(null);
+  const [showNoPhotoReasonModal, setShowNoPhotoReasonModal] = useState(false);
 
   // viewShotRef removed
 
@@ -149,6 +152,7 @@ export default function MaterialTransferEntryScreen() {
         const compressedUri = await compressImageToDataUri(asset.uri, asset.width, asset.height);
         setPhotoUri(compressedUri);
         setPhotoCapturedAt(new Date());
+        setNoPhotoReason(null);
         if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
       }
     } catch (error) {
@@ -219,6 +223,7 @@ export default function MaterialTransferEntryScreen() {
         setPhotoUri(null);
         setPhotoCapturedAt(null);
         setInitialPhotoUri(null);
+        setNoPhotoReason(null);
         setErrors({});
       }
       
@@ -243,7 +248,9 @@ export default function MaterialTransferEntryScreen() {
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (photoReasonOverride?: string) => {
+    const effectiveNoPhotoReason = photoReasonOverride || noPhotoReason;
+
     const newErrors: Record<string, string> = {};
     if (!formData.from_job_id) newErrors.from_job_id = 'Source job is required';
     if (!formData.to_job_id) newErrors.to_job_id = 'Destination job is required';
@@ -251,11 +258,19 @@ export default function MaterialTransferEntryScreen() {
     if (!formData.quantity) newErrors.quantity = 'Quantity is required';
     if (!formData.vehicle_number) newErrors.vehicle_number = 'Vehicle number is required';
     if (!formData.foreman_name) newErrors.foreman_name = 'Foreman name is required';
-    
+
     if (formData.from_job_id && formData.to_job_id && formData.from_job_id === formData.to_job_id) {
       newErrors.to_job_id = 'Destination cannot be same as source';
     }
-    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
+
+    const missingPhoto = !isStoreUser && !photoUri && !id && !effectiveNoPhotoReason;
+    if (missingPhoto) newErrors.photo = 'Live photo is required';
+
+    if (missingPhoto && Object.keys(newErrors).length === 1) {
+      setErrors(newErrors);
+      setShowNoPhotoReasonModal(true);
+      return;
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -285,6 +300,7 @@ export default function MaterialTransferEntryScreen() {
         created_by: user?.id || null,
         status: 'SUBMITTED',
         rejection_reason: null,
+        no_photo_reason: (!photoUri && effectiveNoPhotoReason) ? effectiveNoPhotoReason : null,
       };
 
       // New entries only (not edits) go through the offline queue -- an edit while
@@ -298,7 +314,7 @@ export default function MaterialTransferEntryScreen() {
             type: 'material',
             table: 'material_transfers',
             photoColumn: 'photo_url',
-            payload: { ...basePayload, photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
+            payload: { ...basePayload, photo_url: (isStoreUser || effectiveNoPhotoReason) && !photoUri ? 'NOT_REQUIRED' : 'pending' },
             photoDataUri: photoUri,
             photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
             watermarkJobLabel: `From: ${jobName}`,
@@ -321,7 +337,7 @@ export default function MaterialTransferEntryScreen() {
         }
       }
 
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : ((isStoreUser || effectiveNoPhotoReason) && !photoUri ? 'NOT_REQUIRED' : 'pending');
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
@@ -400,13 +416,40 @@ export default function MaterialTransferEntryScreen() {
           <Text className="text-white text-xl font-bold ml-2">Material Transfer</Text>
         </View>
         <TouchableOpacity 
-          onPress={handleSubmit}
+          onPress={() => handleSubmit()}
           className="flex-row items-center active:opacity-70"
         >
           <Check size={20} color="#ffffff" />
           <Text className="text-white font-semibold ml-1">Save</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal visible={showNoPhotoReasonModal} transparent animationType="fade" onRequestClose={() => setShowNoPhotoReasonModal(false)}>
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <View className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <Text className="text-xl font-black text-slate-900 mb-2">No Live Photo?</Text>
+            <Text className="text-slate-500 mb-5 text-sm leading-relaxed">
+              A photo is normally required. Tell us why so we can still accept this entry.
+            </Text>
+            {NO_PHOTO_REASONS.map((reason) => (
+              <TouchableOpacity
+                key={reason}
+                onPress={() => {
+                  setShowNoPhotoReasonModal(false);
+                  setNoPhotoReason(reason);
+                  handleSubmit(reason);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 mb-2.5 active:bg-slate-100"
+              >
+                <Text className="text-slate-800 font-semibold">{reason}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => setShowNoPhotoReasonModal(false)} className="mt-2 py-3 items-center">
+              <Text className="text-slate-400 font-bold">Cancel -- I'll take a photo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
@@ -614,7 +657,7 @@ export default function MaterialTransferEntryScreen() {
               </View>
             </View>
       ) : Platform.OS === 'web' ? (
-        <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); }} colorTheme="amber" />
+        <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); setNoPhotoReason(null); }} colorTheme="amber" />
       ) : (
         <TouchableOpacity 
           onPress={pickImage}
@@ -643,7 +686,7 @@ export default function MaterialTransferEntryScreen() {
         </View>
 
         <TouchableOpacity 
-          onPress={handleSubmit}
+          onPress={() => handleSubmit()}
           disabled={submitting}
           className={`w-full py-4 rounded-xl flex-row justify-center items-center ${submitting ? 'bg-slate-400' : 'bg-[#d97706]'}`}
         >
