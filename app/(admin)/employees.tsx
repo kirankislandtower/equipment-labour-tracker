@@ -141,10 +141,21 @@ export default function EmployeesScreen() {
 
   // wa.me needs just digits with country code -- no +, spaces, or dashes -- so this
   // strips whatever formatting the number was saved with before building the link.
-  const openWhatsApp = (phone: string) => {
+  // WhatsApp has no free bulk-send API -- wa.me only ever opens one chat, pre-filled
+  // and ready, but still needs a human tap on Send. This is the fastest that's
+  // actually possible without the paid WhatsApp Business API.
+  const openWhatsApp = (phone: string, message?: string) => {
     const digitsOnly = phone.replace(/[^0-9]/g, '');
     if (!digitsOnly) return;
-    Linking.openURL(`https://wa.me/${digitsOnly}`);
+    const query = message ? `?text=${encodeURIComponent(message)}` : '';
+    Linking.openURL(`https://wa.me/${digitsOnly}${query}`);
+  };
+
+  const sendLoginReminder = (u: any) => {
+    if (!u.phone_number) return;
+    const firstName = (u.full_name || '').split(' ')[0] || 'Sir';
+    const message = `नमस्ते ${firstName} जी, ये Island Tower app में लॉगिन करने का रिमाइंडर है। सिर्फ 2 मिनट लगेंगे। कोई दिक्कत हो तो यहीं बता देना।`;
+    openWhatsApp(u.phone_number, message);
   };
 
   const openUserDetails = (u: any) => {
@@ -276,6 +287,9 @@ export default function EmployeesScreen() {
                   <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Username</Text>
                   <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">User ID</Text>
                   <Text className="w-24 font-bold text-slate-500 text-xs uppercase text-center">Role</Text>
+                  {activeTab === 'notloggedin' && (
+                    <Text className="w-40 font-bold text-slate-500 text-xs uppercase text-right">Reminder</Text>
+                  )}
                 </View>
               )}
               
@@ -340,6 +354,16 @@ export default function EmployeesScreen() {
                       </View>
                     )}
 
+                    {isMobile && activeTab === 'notloggedin' && !!u.phone_number && (
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation(); sendLoginReminder(u); }}
+                        className="flex-row items-center justify-center mt-3 py-2.5 rounded-lg border border-green-200 bg-green-50 active:bg-green-100"
+                      >
+                        <MessageCircle size={16} color="#16a34a" />
+                        <Text className="text-green-700 font-bold ml-2 text-sm">Send Login Reminder</Text>
+                      </TouchableOpacity>
+                    )}
+
                     {!isMobile && (
                       <View className="w-24 items-center">
                         <View className={`px-2 py-1 rounded ${u.role === 'ADMIN' ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50 border border-slate-200'}`}>
@@ -347,6 +371,20 @@ export default function EmployeesScreen() {
                             {u.role}
                           </Text>
                         </View>
+                      </View>
+                    )}
+
+                    {!isMobile && activeTab === 'notloggedin' && (
+                      <View className="w-40 items-end">
+                        {!!u.phone_number && (
+                          <TouchableOpacity
+                            onPress={(e) => { e.stopPropagation(); sendLoginReminder(u); }}
+                            className="flex-row items-center px-3 py-2 rounded-lg border border-green-200 bg-green-50 active:bg-green-100"
+                          >
+                            <MessageCircle size={14} color="#16a34a" />
+                            <Text className="text-green-700 font-bold ml-1.5 text-xs">Remind</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     )}
                   </TouchableOpacity>
