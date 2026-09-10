@@ -188,10 +188,10 @@ export default function EmployeesScreen() {
 
   return (
     <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
-      <View className={`flex-row justify-between items-center mb-6 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
+      <View className={`justify-between items-center mb-6 ${isMobile ? 'flex-col items-stretch gap-y-4' : 'flex-row'}`}>
         <View>
-          <View className="flex-row items-center">
-            <Text className="text-slate-900 text-3xl font-black tracking-tight mr-3">Foreman</Text>
+          <View className="flex-row items-center flex-wrap">
+            <Text className={`text-slate-900 font-black tracking-tight mr-3 ${isMobile ? 'text-2xl' : 'text-3xl'}`}>Foreman</Text>
             <View className="bg-blue-100 px-3 py-1 rounded-full border border-blue-200">
               <Text className="text-blue-700 font-bold text-xs">{usersList.length} Total</Text>
             </View>
@@ -200,14 +200,19 @@ export default function EmployeesScreen() {
         </View>
         <TouchableOpacity
           onPress={() => setAddModal(true)}
-          className="bg-[#1e3a8a] px-5 py-3 rounded-xl flex-row items-center active:opacity-80"
+          className={`bg-[#1e3a8a] px-5 py-3 rounded-xl flex-row items-center active:opacity-80 ${isMobile ? 'justify-center' : ''}`}
         >
           <Plus size={20} color="#fff" />
           <Text className="text-white font-bold ml-2">New Foreman</Text>
         </TouchableOpacity>
       </View>
 
-      <View className="flex-row items-center gap-2 mb-4">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8, paddingRight: isMobile ? 16 : 0 }}
+        style={{ flexGrow: 0, marginBottom: 16 }}
+      >
         <TouchableOpacity
           onPress={() => setActiveTab('all')}
           className={`px-4 py-2 rounded-full border flex-row items-center ${activeTab === 'all' ? 'bg-[#1e3a8a] border-[#1e3a8a]' : 'bg-white border-slate-200'}`}
@@ -237,7 +242,7 @@ export default function EmployeesScreen() {
             <Text className={`text-xs font-bold ${activeTab === 'notloggedin' ? 'text-white' : 'text-amber-700'}`}>{notLoggedInCount}</Text>
           </View>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       <View className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 h-12 mb-6">
         <Search size={18} color="#94a3b8" />
@@ -354,7 +359,7 @@ export default function EmployeesScreen() {
 
       {/* Create User Modal */}
       <Modal visible={addModal} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center p-8">
+        <View className={`flex-1 bg-black/50 justify-center items-center ${isMobile ? "p-4" : "p-8"}`}>
           <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
             <View className="flex-row justify-between items-center mb-6">
               <View className="flex-row items-center">
@@ -428,7 +433,7 @@ export default function EmployeesScreen() {
 
       {/* Foreman Details / Edit Modal */}
       <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
-        <View className="flex-1 bg-black/50 justify-center items-center p-8">
+        <View className={`flex-1 bg-black/50 justify-center items-center ${isMobile ? "p-4" : "p-8"}`}>
           <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
             <View className="flex-row items-start justify-between mb-6">
               <View className="flex-row items-start flex-1 mr-3">
