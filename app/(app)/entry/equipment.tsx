@@ -515,6 +515,28 @@ export default function EquipmentEntryScreen() {
           );
           return;
         }
+
+        // A vehicle can only be logged once per day, regardless of which job it's
+        // under -- catches the same vehicle getting double-billed across different
+        // foremen or jobs, not just accidental resubmits by the same person.
+        const normalizedVehicle = formData.vehicle_number.trim().toUpperCase().replace(/\s+/g, '');
+        const { data: sameDayEntries } = await supabase
+          .from('equipment_entries')
+          .select('vehicle_number')
+          .eq('entry_date', formData.entry_date);
+
+        const isDuplicateVehicle = (sameDayEntries || []).some((e: any) =>
+          (e.vehicle_number || '').trim().toUpperCase().replace(/\s+/g, '') === normalizedVehicle
+        );
+
+        if (isDuplicateVehicle) {
+          setErrors(prev => ({ ...prev, vehicle_number: 'This vehicle already has an entry for this date' }));
+          Alert.alert(
+            'Duplicate Entry',
+            `Vehicle ${formData.vehicle_number} already has an equipment entry logged for ${formData.entry_date}. Check with the foreman/admin before submitting it again.`
+          );
+          return;
+        }
       }
 
       let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
