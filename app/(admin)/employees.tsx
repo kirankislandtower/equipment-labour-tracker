@@ -154,7 +154,7 @@ export default function EmployeesScreen() {
   const sendLoginReminder = (u: any) => {
     if (!u.phone_number) return;
     const firstName = (u.full_name || '').split(' ')[0] || 'Sir';
-    const message = `Hi ${firstName}, this is a reminder to log in to the Island Tower app. It only takes 2 minutes. Message me here if you get stuck.`;
+    const message = `Hi ${firstName}, this is a reminder to log in to the Island Tower app. It only takes 2 minutes. Need help? Call or WhatsApp +971 52 660 5909 or +971 54 771 4315.`;
     openWhatsApp(u.phone_number, message);
   };
 
