@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal, Platform, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard, Modal, Platform, ActivityIndicator, Image, ScrollView, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { User, Mail, LogOut, Shield, Download, CheckCircle, Share, X } from 'lucide-react-native';
+import { User, Mail, LogOut, Shield, Download, CheckCircle, Share, X, PhoneCall } from 'lucide-react-native';
 import {
   canPromptInstall,
   promptInstall,
@@ -164,6 +164,33 @@ export default function ProfileScreen() {
               )}
             </View>
           )}
+
+          {/* Need Help */}
+          <View className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-8">
+            <View className="flex-row items-center mb-4">
+              <View className="bg-amber-50 p-3 rounded-full border border-amber-100 mr-4">
+                <PhoneCall size={20} color="#d97706" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Need Help?</Text>
+                <Text className="text-base font-bold text-slate-900">Call or WhatsApp us anytime</Text>
+              </View>
+            </View>
+            <View className="flex-row gap-x-3">
+              <TouchableOpacity
+                onPress={() => Linking.openURL('tel:+971526605909')}
+                className="flex-1 flex-row items-center justify-center bg-slate-50 border border-slate-200 py-3.5 rounded-2xl active:bg-slate-100"
+              >
+                <Text className="text-slate-900 font-bold">052 660 5909</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('tel:+971547714315')}
+                className="flex-1 flex-row items-center justify-center bg-slate-50 border border-slate-200 py-3.5 rounded-2xl active:bg-slate-100"
+              >
+                <Text className="text-slate-900 font-bold">054 771 4315</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* Logout Button */}
           <TouchableOpacity 

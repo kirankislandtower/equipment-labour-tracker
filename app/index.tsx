@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Building2, Eye, EyeOff } from 'lucide-react-native';
@@ -204,6 +204,19 @@ export default function LoginScreen() {
             ) : (
               <Text className="text-white font-bold text-lg">Sign In</Text>
             )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View className="items-center mt-6">
+        <Text className="text-slate-400 text-xs font-medium">Need help logging in?</Text>
+        <View className="flex-row items-center mt-1.5">
+          <TouchableOpacity onPress={() => Linking.openURL('tel:+971526605909')}>
+            <Text className="text-[#1e3a8a] font-bold text-xs">+971 52 660 5909</Text>
+          </TouchableOpacity>
+          <Text className="text-slate-300 mx-2">|</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('tel:+971547714315')}>
+            <Text className="text-[#1e3a8a] font-bold text-xs">+971 54 771 4315</Text>
           </TouchableOpacity>
         </View>
       </View>
