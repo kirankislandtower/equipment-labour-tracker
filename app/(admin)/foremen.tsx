@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, useWindowDimensions, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Calendar, User, Users, Clock, CheckCircle, XCircle, ChevronRight, Activity, X, Check } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString } from '../../lib/dateUtils';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const StatusPill = ({ status }: { status: string }) => {
   if (status === 'APPROVED') return <View className="bg-green-100 px-3 py-1 rounded-full"><Text className="text-green-700 font-bold text-[10px] uppercase">Approved</Text></View>;
@@ -14,26 +14,34 @@ const StatusPill = ({ status }: { status: string }) => {
 
 export default function ForemanReports() {
   const router = useRouter();
+  const { userId: deepLinkUserId, name: deepLinkName } = useLocalSearchParams<{ userId?: string; name?: string }>();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   const todayStr = getLocalDateString();
-  const [fromDate, setFromDate] = useState(todayStr);
+  // Arriving from a specific foreman's profile ("is this person submitting or
+  // not?") needs a real window to look back over, not just today.
+  const thirtyDaysAgoStr = getLocalDateString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const [fromDate, setFromDate] = useState(deepLinkUserId ? thirtyDaysAgoStr : todayStr);
   const [toDate, setToDate] = useState(todayStr);
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
-  
+
   const [loading, setLoading] = useState(true);
   const [foremenStats, setForemenStats] = useState<any[]>([]);
-  const [allData, setAllData] = useState<{equip: any[], labour: any[]}>({ equip: [], labour: [] });
+  const [allData, setAllData] = useState<{equip: any[], labour: any[], material: any[]}>({ equip: [], labour: [], material: [] });
   const [selectedForeman, setSelectedForeman] = useState<any>(null);
-  const [selectedListType, setSelectedListType] = useState<'equipment' | 'labour' | null>(null);
+  const [selectedListType, setSelectedListType] = useState<'equipment' | 'labour' | 'material' | null>(null);
+  // Auto-select the deep-linked foreman only once -- fetchData also re-runs after
+  // approving/rejecting an entry, and we don't want that to keep forcing the modal
+  // back open if the admin has since closed it.
+  const autoSelectedRef = useRef(false);
 
   // Detail & Action States
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [entryType, setEntryType] = useState<'equipment' | 'labour' | null>(null);
+  const [entryType, setEntryType] = useState<'equipment' | 'labour' | 'material' | null>(null);
 
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -51,20 +59,22 @@ export default function ForemanReports() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [equipRes, labourRes] = await Promise.all([
+      const [equipRes, labourRes, materialRes] = await Promise.all([
         supabase.from('equipment_entries').select('*, jobs:job_id(job_number, job_name), equipment_master(equipment_name), suppliers(supplier_name)').gte('entry_date', fromDate).lte('entry_date', toDate),
         supabase.from('labour_entries').select('*, jobs:job_id(job_number, job_name), labour_designations(designation_name), suppliers(supplier_name)').gte('entry_date', fromDate).lte('entry_date', toDate),
+        supabase.from('material_transfers').select('*, from_job:from_job_id(job_number, job_name), to_job:to_job_id(job_number, job_name)').gte('entry_date', fromDate).lte('entry_date', toDate),
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
 
       if (equipRes.error) console.error('Error fetching equipment entries for foreman reports:', equipRes.error);
       if (labourRes.error) console.error('Error fetching labour entries for foreman reports:', labourRes.error);
+      if (materialRes.error) console.error('Error fetching material transfers for foreman reports:', materialRes.error);
 
       const equipData = equipRes.data || [];
       const labourData = labourRes.data || [];
-      setAllData({ equip: equipData, labour: labourData });
-      
-      const allEntries = [...equipData, ...labourData];
+      const materialData = materialRes.data || [];
+      setAllData({ equip: equipData, labour: labourData, material: materialData });
+
       const aggregated: Record<string, any> = {};
 
       // Grouped by the actual logged-in account (created_by), not the free-typed
@@ -72,30 +82,39 @@ export default function ForemanReports() {
       // the same person typing their name slightly differently across two entries
       // (extra space, different casing) used to fragment them into separate cards.
       // Falls back to the typed name only for legacy rows with no created_by.
-      allEntries.forEach(entry => {
-        const key = entry.created_by || entry.foreman_name || 'unknown';
-        const displayName = entry.foreman_name || 'Unknown Foreman';
-        if (!aggregated[key]) {
-          aggregated[key] = { name: displayName, total: 0, pending: 0, approved: 0, rejected: 0, equipment: 0, labour: 0 };
-        }
+      const tally = (entries: any[], typeKey: 'equipment' | 'labour' | 'material') => {
+        entries.forEach(entry => {
+          const key = entry.created_by || entry.foreman_name || 'unknown';
+          const displayName = entry.foreman_name || 'Unknown Foreman';
+          if (!aggregated[key]) {
+            aggregated[key] = { name: displayName, total: 0, pending: 0, approved: 0, rejected: 0, equipment: 0, labour: 0, material: 0 };
+          }
+          aggregated[key].total++;
+          aggregated[key][typeKey]++;
+          if (entry.status === 'SUBMITTED') aggregated[key].pending++;
+          else if (entry.status === 'APPROVED') aggregated[key].approved++;
+          else if (entry.status === 'REJECTED') aggregated[key].rejected++;
+        });
+      };
 
-        aggregated[key].total++;
-        if ((entry as any).equipment_master_id !== undefined || equipData.includes(entry)) {
-          aggregated[key].equipment++;
-        } else {
-          aggregated[key].labour++;
-        }
-
-        if (entry.status === 'SUBMITTED') aggregated[key].pending++;
-        else if (entry.status === 'APPROVED') aggregated[key].approved++;
-        else if (entry.status === 'REJECTED') aggregated[key].rejected++;
-      });
+      tally(equipData, 'equipment');
+      tally(labourData, 'labour');
+      tally(materialData, 'material');
 
       const foremenArray = Object.keys(aggregated).map(key => ({
         key, ...aggregated[key]
       })).sort((a, b) => b.total - a.total);
 
       setForemenStats(foremenArray);
+
+      if (deepLinkUserId && !autoSelectedRef.current) {
+        const match = foremenArray.find(f => f.key === deepLinkUserId);
+        if (match) {
+          autoSelectedRef.current = true;
+          setSelectedForeman(match);
+          setSelectedListType('equipment');
+        }
+      }
     } catch (error) {
       console.error('Error fetching foremen stats:', error);
     } finally {
@@ -106,14 +125,14 @@ export default function ForemanReports() {
   const handleUpdateStatus = async (id: string, newStatus: string, reason: string = '') => {
     setIsUpdating(true);
     try {
-      const table = entryType === 'equipment' ? 'equipment_entries' : 'labour_entries';
+      const table = entryType === 'equipment' ? 'equipment_entries' : entryType === 'labour' ? 'labour_entries' : 'material_transfers';
       const { error } = await supabase.from(table).update({ status: newStatus, rejection_reason: reason }).eq('id', id);
 
       if (error) throw error;
-      
+
       setAllData(prev => {
         const newData = { ...prev };
-        const list = entryType === 'equipment' ? newData.equip : newData.labour;
+        const list = entryType === 'equipment' ? newData.equip : entryType === 'labour' ? newData.labour : newData.material;
         const index = list.findIndex(e => e.id === id);
         if (index > -1) {
           list[index] = { ...list[index], status: newStatus, rejection_reason: reason };
@@ -146,6 +165,10 @@ export default function ForemanReports() {
     selectedForeman && (entry.created_by
       ? entry.created_by === selectedForeman.key
       : entry.foreman_name === selectedForeman.name);
+
+  // Derived, not stored -- so it updates automatically if the admin widens the date
+  // range and a match now exists, instead of staying stuck on a stale "not found".
+  const deepLinkNotFound = !loading && !!deepLinkUserId && !foremenStats.some(f => f.key === deepLinkUserId);
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -256,6 +279,17 @@ export default function ForemanReports() {
             </View>
           </View>
 
+          {deepLinkNotFound && (
+            <View className="py-6 px-6 items-center justify-center bg-amber-50 rounded-3xl border border-amber-200 shadow-sm mt-4 mb-4">
+              <Text className="text-amber-900 text-lg font-black tracking-tight text-center">
+                {deepLinkName || 'This foreman'} has no submissions
+              </Text>
+              <Text className="text-amber-700 mt-1 text-center">
+                Nothing found between {fromDate} and {toDate} across Equipment, Labour, or Material entries. Try widening the date range above.
+              </Text>
+            </View>
+          )}
+
           {foremenStats.length === 0 ? (
             <View className="py-20 items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm mt-4">
               <View className="bg-slate-50 p-4 rounded-full mb-4">
@@ -303,7 +337,7 @@ export default function ForemanReports() {
                   </View>
 
                   <View className="flex-row border-t border-slate-100 pt-4">
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       onPress={() => {
                         setSelectedListType('equipment');
                         setSelectedForeman(foreman);
@@ -313,15 +347,25 @@ export default function ForemanReports() {
                       <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Equipment</Text>
                       <Text className="text-slate-700 font-black text-lg">{foreman.equipment}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       onPress={() => {
                         setSelectedListType('labour');
                         setSelectedForeman(foreman);
                       }}
-                      className="flex-1 items-center py-2"
+                      className="flex-1 border-r border-slate-100 items-center py-2"
                     >
                       <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Labour</Text>
                       <Text className="text-slate-700 font-black text-lg">{foreman.labour}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedListType('material');
+                        setSelectedForeman(foreman);
+                      }}
+                      className="flex-1 items-center py-2"
+                    >
+                      <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Material</Text>
+                      <Text className="text-slate-700 font-black text-lg">{foreman.material}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -352,7 +396,7 @@ export default function ForemanReports() {
                   <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Equipment</Text>
                   {allData.equip.filter(e => matchesSelectedForeman(e)).length === 0 ? (
                     <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
-                      <Text className="text-slate-500 font-medium">No equipment entries today.</Text>
+                      <Text className="text-slate-500 font-medium">No equipment entries in this date range.</Text>
                     </View>
                   ) : (
                     allData.equip.filter(e => matchesSelectedForeman(e)).map(entry => (
@@ -395,7 +439,7 @@ export default function ForemanReports() {
                   <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Labour</Text>
                   {allData.labour.filter(e => matchesSelectedForeman(e)).length === 0 ? (
                     <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
-                      <Text className="text-slate-500 font-medium">No labour entries today.</Text>
+                      <Text className="text-slate-500 font-medium">No labour entries in this date range.</Text>
                     </View>
                   ) : (
                     allData.labour.filter(e => matchesSelectedForeman(e)).map(entry => (
@@ -425,6 +469,49 @@ export default function ForemanReports() {
                           <View className="items-end">
                             <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Time</Text>
                             <Text className="text-slate-800 font-black text-lg">{entry.start_time} - {entry.end_time}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {selectedListType === 'material' && (
+                <View className="mb-6">
+                  <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Material</Text>
+                  {allData.material.filter(e => matchesSelectedForeman(e)).length === 0 ? (
+                    <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
+                      <Text className="text-slate-500 font-medium">No material transfers in this date range.</Text>
+                    </View>
+                  ) : (
+                    allData.material.filter(e => matchesSelectedForeman(e)).map(entry => (
+                      <TouchableOpacity
+                        key={entry.id}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSelectedEntry(entry);
+                          setEntryType('material');
+                          setDetailsModalVisible(true);
+                        }}
+                        className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-3"
+                      >
+                        <View className="flex-row justify-between items-start mb-2">
+                          <View className="flex-1 pr-2">
+                            <Text className="text-slate-900 font-bold text-base leading-tight mb-1">{entry.material_description}</Text>
+                            <Text className="text-slate-500 text-sm">{entry.from_job?.job_number} → {entry.to_job?.job_number}</Text>
+                          </View>
+                          <StatusPill status={entry.status} />
+                        </View>
+
+                        <View className="flex-row justify-between bg-white p-3 rounded-xl border border-slate-100 mt-2">
+                          <View>
+                            <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Quantity</Text>
+                            <Text className="text-slate-800 font-black text-lg">{entry.quantity} {entry.unit}</Text>
+                          </View>
+                          <View className="items-end">
+                            <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Vehicle</Text>
+                            <Text className="text-slate-800 font-black text-lg">{entry.vehicle_number || 'N/A'}</Text>
                           </View>
                         </View>
                       </TouchableOpacity>
@@ -463,66 +550,106 @@ export default function ForemanReports() {
                 
                 <View className="h-px bg-slate-100 w-full mb-4" />
                 
-                <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Job Details</Text>
-                <Text className="text-slate-900 font-bold text-base">{selectedEntry.jobs?.job_number}</Text>
-                <Text className="text-slate-500 mb-4">{selectedEntry.jobs?.job_name}</Text>
-
-                {entryType === 'equipment' ? (
+                {entryType === 'material' ? (
                   <>
-                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Equipment</Text>
-                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.equipment_master?.equipment_name}</Text>
+                    <View className="flex-row justify-between mb-4">
+                      <View className="flex-1 mr-2">
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">From Job</Text>
+                        <Text className="text-slate-900 font-bold text-base">{selectedEntry.from_job?.job_number}</Text>
+                        <Text className="text-slate-500 text-sm">{selectedEntry.from_job?.job_name}</Text>
+                      </View>
+                      <View className="flex-1 ml-2">
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">To Job</Text>
+                        <Text className="text-slate-900 font-bold text-base">{selectedEntry.to_job?.job_number}</Text>
+                        <Text className="text-slate-500 text-sm">{selectedEntry.to_job?.job_name}</Text>
+                      </View>
+                    </View>
+
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Material</Text>
+                    <Text className="text-slate-900 font-bold text-base mb-4">{selectedEntry.material_description}</Text>
+
+                    <View className="flex-row justify-between mb-6">
+                      <View className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 mr-2">
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Quantity</Text>
+                        <Text className="text-slate-900 font-bold text-lg">{selectedEntry.quantity} {selectedEntry.unit}</Text>
+                      </View>
+                      <View className="flex-1 bg-amber-50 p-4 rounded-2xl border border-amber-100 ml-2">
+                        <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Vehicle</Text>
+                        <Text className="text-amber-700 font-black text-lg">{selectedEntry.vehicle_number || 'N/A'}</Text>
+                      </View>
+                    </View>
+
+                    {!!selectedEntry.driver_name && (
+                      <View className="mb-4">
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Driver</Text>
+                        <Text className="text-slate-900 font-bold text-base">{selectedEntry.driver_name}</Text>
+                      </View>
+                    )}
                   </>
                 ) : (
                   <>
-                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Labour</Text>
-                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.employee_name}</Text>
-                    <Text className="text-slate-500 mb-4">{selectedEntry.labour_designations?.designation_name} • {selectedEntry.suppliers?.supplier_name}</Text>
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Job Details</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.jobs?.job_number}</Text>
+                    <Text className="text-slate-500 mb-4">{selectedEntry.jobs?.job_name}</Text>
+
+                    {entryType === 'equipment' ? (
+                      <>
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Equipment</Text>
+                        <Text className="text-slate-900 font-bold text-base">{selectedEntry.equipment_master?.equipment_name}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Labour</Text>
+                        <Text className="text-slate-900 font-bold text-base">{selectedEntry.employee_name}</Text>
+                        <Text className="text-slate-500 mb-4">{selectedEntry.labour_designations?.designation_name} • {selectedEntry.suppliers?.supplier_name}</Text>
+                      </>
+                    )}
+                    {entryType === 'equipment' && <Text className="text-slate-500 mb-4">{selectedEntry.suppliers?.supplier_name}</Text>}
+
+                    <View className="flex-row justify-between mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <View className="flex-1">
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Start Time</Text>
+                        <Text className="text-slate-900 font-bold text-lg">{selectedEntry.start_time || 'N/A'}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">End Time</Text>
+                        <Text className="text-slate-900 font-bold text-lg">{selectedEntry.end_time || 'N/A'}</Text>
+                      </View>
+                    </View>
+
+                    <View className="flex-row justify-between mb-6">
+                      <View className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 mr-2">
+                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Break</Text>
+                        <Text className="text-slate-900 font-bold text-lg">{selectedEntry.break_hours || 0} hr</Text>
+                      </View>
+                      <View className={`flex-1 ${entryType === 'equipment' ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100'} p-4 rounded-2xl border ml-2`}>
+                        <Text className={`text-xs font-bold ${entryType === 'equipment' ? 'text-blue-600' : 'text-emerald-600'} uppercase mb-1`}>Total</Text>
+                        <Text className={`${entryType === 'equipment' ? 'text-blue-700' : 'text-emerald-700'} font-black text-2xl`}>
+                          {entryType === 'equipment' ? selectedEntry.working_hours : selectedEntry.total_working_hours} hr
+                        </Text>
+                      </View>
+                    </View>
+
+                    {entryType === 'labour' && selectedEntry.overtime_hours > 0 && (
+                      <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                        <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Overtime</Text>
+                        <Text className="text-amber-700 font-bold text-lg">{selectedEntry.overtime_hours} hours</Text>
+                      </View>
+                    )}
+
+                    {entryType === 'equipment' && selectedEntry.fuel_provided && (
+                      <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row justify-between items-center">
+                        <View>
+                          <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Fuel Provided</Text>
+                          <Text className="text-amber-800 font-bold">Yes</Text>
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Quantity</Text>
+                          <Text className="text-amber-800 font-bold">{selectedEntry.fuel_quantity} {selectedEntry.fuel_unit}</Text>
+                        </View>
+                      </View>
+                    )}
                   </>
-                )}
-                {entryType === 'equipment' && <Text className="text-slate-500 mb-4">{selectedEntry.suppliers?.supplier_name}</Text>}
-
-                <View className="flex-row justify-between mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <View className="flex-1">
-                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Start Time</Text>
-                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.start_time || 'N/A'}</Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">End Time</Text>
-                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.end_time || 'N/A'}</Text>
-                  </View>
-                </View>
-
-                <View className="flex-row justify-between mb-6">
-                  <View className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 mr-2">
-                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Break</Text>
-                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.break_hours || 0} hr</Text>
-                  </View>
-                  <View className={`flex-1 ${entryType === 'equipment' ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100'} p-4 rounded-2xl border ml-2`}>
-                    <Text className={`text-xs font-bold ${entryType === 'equipment' ? 'text-blue-600' : 'text-emerald-600'} uppercase mb-1`}>Total</Text>
-                    <Text className={`${entryType === 'equipment' ? 'text-blue-700' : 'text-emerald-700'} font-black text-2xl`}>
-                      {entryType === 'equipment' ? selectedEntry.working_hours : selectedEntry.total_working_hours} hr
-                    </Text>
-                  </View>
-                </View>
-
-                {entryType === 'labour' && selectedEntry.overtime_hours > 0 && (
-                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                    <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Overtime</Text>
-                    <Text className="text-amber-700 font-bold text-lg">{selectedEntry.overtime_hours} hours</Text>
-                  </View>
-                )}
-
-                {entryType === 'equipment' && selectedEntry.fuel_provided && (
-                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row justify-between items-center">
-                    <View>
-                      <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Fuel Provided</Text>
-                      <Text className="text-amber-800 font-bold">Yes</Text>
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Quantity</Text>
-                      <Text className="text-amber-800 font-bold">{selectedEntry.fuel_quantity} {selectedEntry.fuel_unit}</Text>
-                    </View>
-                  </View>
                 )}
 
                 {!!selectedEntry.remarks && (

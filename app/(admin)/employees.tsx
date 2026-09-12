@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions, Linking } from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle } from 'lucide-react-native';
+import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText } from 'lucide-react-native';
 
 export default function EmployeesScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const [loading, setLoading] = useState(true);
@@ -498,6 +500,18 @@ export default function EmployeesScreen() {
                 <Text className="text-slate-500 text-xs font-mono">{selectedUser?.id?.split('-')[0]}...</Text>
               </View>
             </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                const user = selectedUser;
+                setSelectedUser(null);
+                router.push({ pathname: '/(admin)/foremen', params: { userId: user.id, name: user.full_name } });
+              }}
+              className="flex-row items-center justify-center mb-6 py-3.5 rounded-lg border border-indigo-200 bg-indigo-50 active:bg-indigo-100"
+            >
+              <FileText size={18} color="#4338ca" />
+              <Text className="text-indigo-700 font-bold ml-2">View Submission History</Text>
+            </TouchableOpacity>
 
             <View className="mb-6">
               <Text className="text-sm font-bold text-slate-700 mb-1">Phone Number</Text>
