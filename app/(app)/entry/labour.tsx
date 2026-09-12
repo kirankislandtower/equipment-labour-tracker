@@ -16,7 +16,6 @@ import { isStoreForeman } from '../../../lib/foremanFlags';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
 import { fetchWithCache } from '../../../lib/dataCache';
-import { NO_PHOTO_REASONS } from '../../../lib/noPhotoReasons';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
 type Supplier = { id: string; supplier_name: string };
@@ -140,8 +139,6 @@ export default function LabourEntryScreen() {
   // entry sits in the offline queue.
   const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
   const [isStoreUser, setIsStoreUser] = useState(false);
-  const [noPhotoReason, setNoPhotoReason] = useState<string | null>(null);
-  const [showNoPhotoReasonModal, setShowNoPhotoReasonModal] = useState(false);
 
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
@@ -167,7 +164,6 @@ export default function LabourEntryScreen() {
         const compressedUri = await compressImageToDataUri(asset.uri, asset.width, asset.height);
         setPhotoUri(compressedUri);
         setPhotoCapturedAt(new Date());
-        setNoPhotoReason(null);
         if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
       }
     } catch (error) {
@@ -329,7 +325,6 @@ export default function LabourEntryScreen() {
         setPhotoUri(null);
         setPhotoCapturedAt(null);
         setInitialPhotoUri(null);
-        setNoPhotoReason(null);
         setErrors({});
       }
     } catch (error) {
@@ -361,9 +356,7 @@ export default function LabourEntryScreen() {
 
   const totalWorkingHours = calculateTotalHours();
 
-  const handleSubmit = async (photoReasonOverride?: string) => {
-    const effectiveNoPhotoReason = photoReasonOverride || noPhotoReason;
-
+  const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
     if (!selectedJob) newErrors.job = 'Job is required';
     if (!selectedSupplier) newErrors.supplier = 'Supplier is required';
@@ -373,18 +366,11 @@ export default function LabourEntryScreen() {
     if (!isStoreUser && !endTime) newErrors.end_time = 'End Time is required';
     if (!foremanName) newErrors.foreman_name = 'Foreman Name is required';
 
-    const missingPhoto = !isStoreUser && !photoUri && !id && !effectiveNoPhotoReason;
-    if (missingPhoto) newErrors.photo = 'Live photo is required';
+    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
 
     if (isStoreUser) {
       if (!requestedBy) newErrors.requested_by = 'Requested By is required';
       if (!assignedJob) newErrors.assigned_job = 'Assign to Job is required';
-    }
-
-    if (missingPhoto && Object.keys(newErrors).length === 1) {
-      setErrors(newErrors);
-      setShowNoPhotoReasonModal(true);
-      return;
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -420,7 +406,6 @@ export default function LabourEntryScreen() {
         rejection_reason: null,
         requested_by: isStoreUser ? requestedBy : null,
         assigned_job_id: isStoreUser ? (assignedJob?.id || null) : null,
-        no_photo_reason: (!photoUri && effectiveNoPhotoReason) ? effectiveNoPhotoReason : null
       };
 
       // New entries only (not edits) go through the offline queue -- an edit while
@@ -432,7 +417,7 @@ export default function LabourEntryScreen() {
             type: 'labour',
             table: 'labour_entries',
             photoColumn: 'labour_photo_url',
-            payload: { ...basePayload, labour_photo_url: (isStoreUser || effectiveNoPhotoReason) && !photoUri ? 'NOT_REQUIRED' : 'pending' },
+            payload: { ...basePayload, labour_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
             photoDataUri: photoUri,
             photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
             watermarkJobLabel: jobName,
@@ -454,7 +439,7 @@ export default function LabourEntryScreen() {
         }
       }
 
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : ((isStoreUser || effectiveNoPhotoReason) && !photoUri ? 'NOT_REQUIRED' : 'pending');
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {
@@ -564,33 +549,6 @@ export default function LabourEntryScreen() {
           <Text className="text-white font-semibold ml-1">Save</Text>
         </TouchableOpacity>
       </View>
-
-      <Modal visible={showNoPhotoReasonModal} transparent animationType="fade" onRequestClose={() => setShowNoPhotoReasonModal(false)}>
-        <View className="flex-1 bg-black/60 justify-center items-center px-6">
-          <View className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <Text className="text-xl font-black text-slate-900 mb-2">No Live Photo?</Text>
-            <Text className="text-slate-500 mb-5 text-sm leading-relaxed">
-              A photo is normally required. Tell us why so we can still accept this entry.
-            </Text>
-            {NO_PHOTO_REASONS.map((reason) => (
-              <TouchableOpacity
-                key={reason}
-                onPress={() => {
-                  setShowNoPhotoReasonModal(false);
-                  setNoPhotoReason(reason);
-                  handleSubmit(reason);
-                }}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 mb-2.5 active:bg-slate-100"
-              >
-                <Text className="text-slate-800 font-semibold">{reason}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={() => setShowNoPhotoReasonModal(false)} className="mt-2 py-3 items-center">
-              <Text className="text-slate-400 font-bold">Cancel -- I'll take a photo</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
@@ -956,7 +914,7 @@ export default function LabourEntryScreen() {
                 </View>
               </View>
             ) : Platform.OS === 'web' ? (
-              <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); setNoPhotoReason(null); }} colorTheme="green" />
+              <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); }} colorTheme="green" />
             ) : (
               <TouchableOpacity
                 onPress={pickImage}

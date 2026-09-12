@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Check, X, Download, Filter, Image as ImageIcon, Calendar, AlertTriangle, Info } from 'lucide-react-native';
+import { Check, X, Download, Filter, Image as ImageIcon, Calendar, AlertTriangle } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -611,16 +611,6 @@ export default function AdminEquipment() {
                     <Text className="text-amber-800 font-medium ml-2 flex-1 text-sm">
                       Photo upload didn't finish when this was submitted (likely a weak connection). The foreman needs to edit this entry to attach it.
                     </Text>
-                  </View>
-                )}
-
-                {!!selectedEntry.no_photo_reason && (
-                  <View className="mb-4 bg-blue-50 p-4 rounded-2xl border border-blue-100 flex-row items-start">
-                    <Info size={18} color="#2563eb" />
-                    <View className="ml-2 flex-1">
-                      <Text className="text-blue-800 font-bold text-xs uppercase tracking-wide mb-0.5">No Photo Provided</Text>
-                      <Text className="text-blue-800 font-medium text-sm">{selectedEntry.no_photo_reason}</Text>
-                    </View>
                   </View>
                 )}
 
