@@ -437,6 +437,30 @@ export default function LabourEntryScreen() {
           );
           return;
         }
+
+        // Same employee under the same supplier can only be logged once per day,
+        // regardless of job -- catches an accidental double-submit for one worker.
+        // Matched by supplier (not employee name alone) since the same name can
+        // legitimately belong to different workers at different suppliers.
+        const normalizedEmployee = employeeName.trim().toUpperCase().replace(/\s+/g, ' ');
+        const { data: sameDayEntries } = await supabase
+          .from('labour_entries')
+          .select('employee_name')
+          .eq('entry_date', entryDate)
+          .eq('supplier_id', resolvedSupplierId);
+
+        const isDuplicateEmployee = (sameDayEntries || []).some((e: any) =>
+          (e.employee_name || '').trim().toUpperCase().replace(/\s+/g, ' ') === normalizedEmployee
+        );
+
+        if (isDuplicateEmployee) {
+          setErrors(prev => ({ ...prev, employee_name: 'This employee already has an entry for this date' }));
+          Alert.alert(
+            'Duplicate Entry',
+            `${employeeName} already has a labour entry logged with this supplier for ${entryDate}. Check with the foreman/admin before submitting it again.`
+          );
+          return;
+        }
       }
 
       let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
