@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, useWindowDimensions, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Calendar, ChevronDown, Check, X, FileText, Calculator, AlertCircle, CheckCircle2 } from 'lucide-react-native';
+import { Calendar, ChevronDown, Check, X, FileText, Calculator, AlertCircle, CheckCircle2, Search } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredOptions = searchQuery.trim()
+    ? options.filter((o: any) => o.label.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : options;
 
   return (
     <View className="mb-4">
@@ -22,7 +27,7 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => 
         <ChevronDown size={20} color="#64748b" />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} transparent animationType="slide">
+      <Modal visible={modalVisible} transparent animationType="slide" onShow={() => setSearchQuery('')} onRequestClose={() => setModalVisible(false)}>
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl h-[70%] shadow-2xl">
             <View className="flex-row items-center justify-between p-6 border-b border-slate-100">
@@ -31,8 +36,30 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => 
                 <X size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-              {options.map((item: any) => (
+            <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl mx-6 mt-4 mb-2 px-4 h-12">
+              <Search size={18} color="#94a3b8" />
+              <TextInput
+                placeholder={`Search ${label.toLowerCase()}...`}
+                placeholderTextColor="#94a3b8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                className="flex-1 ml-3 text-slate-900"
+                style={{ outlineStyle: 'none' } as any}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
+                  <X size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {filteredOptions.length === 0 && (
+              <View className="py-10 items-center">
+                <Text className="text-slate-400 font-medium">No matches for "{searchQuery}"</Text>
+              </View>
+            )}
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {filteredOptions.map((item: any) => (
                 <TouchableOpacity
                   key={item.value}
                   onPress={() => {
