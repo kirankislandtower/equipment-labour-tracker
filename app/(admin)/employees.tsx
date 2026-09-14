@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText } from 'lucide-react-native';
+import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText, Trash2, RotateCcw } from 'lucide-react-native';
 
 export default function EmployeesScreen() {
   const router = useRouter();
@@ -37,6 +37,13 @@ export default function EmployeesScreen() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editPhoneNumber, setEditPhoneNumber] = useState('');
   const [savingPhone, setSavingPhone] = useState(false);
+  const [deletingForeman, setDeletingForeman] = useState(false);
+
+  // Trash modal state
+  const [trashModalVisible, setTrashModalVisible] = useState(false);
+  const [trashList, setTrashList] = useState<any[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -51,6 +58,7 @@ export default function EmployeesScreen() {
         .from('users')
         .select('*')
         .eq('role', 'FOREMAN')
+        .is('deleted_at', null)
         .order('full_name');
 
       if (error) throw error;
@@ -219,6 +227,77 @@ export default function EmployeesScreen() {
     }
   };
 
+  const handleDeleteForeman = (u: any) => {
+    Alert.alert(
+      'Delete Foreman?',
+      `${u.full_name} will be moved to Trash and won't be able to log in until restored. You can undo this anytime from Trash.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingForeman(true);
+            try {
+              const { error } = await supabase
+                .from('users')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', u.id);
+              if (error) throw error;
+
+              setUsersList(prev => prev.filter(x => x.id !== u.id));
+              setSelectedUser(null);
+            } catch (error: any) {
+              console.error(error);
+              Alert.alert('Error', 'Failed to delete foreman');
+            } finally {
+              setDeletingForeman(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openTrash = async () => {
+    setTrashModalVisible(true);
+    setTrashLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'FOREMAN')
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+      if (error) throw error;
+      setTrashList(data || []);
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to load trash');
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const handleRestoreForeman = async (u: any) => {
+    setRestoringId(u.id);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ deleted_at: null })
+        .eq('id', u.id);
+      if (error) throw error;
+
+      setTrashList(prev => prev.filter(x => x.id !== u.id));
+      fetchUsers();
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to restore foreman');
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
   const loggedInCount = usersList.filter((u) => loggedInIds.has(u.id)).length;
   const notLoggedInCount = usersList.filter((u) => !everLoggedInIds.has(u.id)).length;
   const submittedCount = usersList.filter((u) => everSubmittedIds.has(u.id)).length;
@@ -247,13 +326,22 @@ export default function EmployeesScreen() {
           </View>
           <Text className="text-slate-500 mt-1">Manage Foremen and system access.</Text>
         </View>
-        <TouchableOpacity
-          onPress={() => setAddModal(true)}
-          className={`bg-[#1e3a8a] px-5 py-3 rounded-xl flex-row items-center active:opacity-80 ${isMobile ? 'justify-center' : ''}`}
-        >
-          <Plus size={20} color="#fff" />
-          <Text className="text-white font-bold ml-2">New Foreman</Text>
-        </TouchableOpacity>
+        <View className={`flex-row ${isMobile ? '' : 'items-center'}`} style={{ gap: 8 }}>
+          <TouchableOpacity
+            onPress={openTrash}
+            className={`bg-white border border-slate-200 px-4 py-3 rounded-xl flex-row items-center active:bg-slate-50 ${isMobile ? 'justify-center flex-1' : ''}`}
+          >
+            <Trash2 size={18} color="#64748b" />
+            <Text className="text-slate-700 font-bold ml-2">Trash</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setAddModal(true)}
+            className={`bg-[#1e3a8a] px-5 py-3 rounded-xl flex-row items-center active:opacity-80 ${isMobile ? 'justify-center flex-1' : ''}`}
+          >
+            <Plus size={20} color="#fff" />
+            <Text className="text-white font-bold ml-2">New Foreman</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -662,6 +750,79 @@ export default function EmployeesScreen() {
                 </>
               )}
             </TouchableOpacity>
+
+            <View className="mt-6 pt-5 border-t border-slate-100">
+              <TouchableOpacity
+                onPress={() => selectedUser && handleDeleteForeman(selectedUser)}
+                disabled={deletingForeman}
+                className={`flex-row items-center justify-center py-3.5 rounded-lg border border-red-200 bg-red-50 active:bg-red-100 ${deletingForeman ? 'opacity-70' : ''}`}
+              >
+                {deletingForeman ? (
+                  <ActivityIndicator size="small" color="#dc2626" />
+                ) : (
+                  <>
+                    <Trash2 size={18} color="#dc2626" />
+                    <Text className="text-red-700 font-bold ml-2">Delete Foreman</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Trash Modal */}
+      <Modal visible={trashModalVisible} transparent animationType="slide" onRequestClose={() => setTrashModalVisible(false)}>
+        <View className="flex-1 bg-slate-900/60 justify-end">
+          <View className="bg-white rounded-t-[32px] p-6 h-[80%]">
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-2xl font-black text-slate-900">Trash</Text>
+              <TouchableOpacity onPress={() => setTrashModalVisible(false)} className="bg-slate-100 p-2 rounded-full active:bg-slate-200">
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-slate-500 font-medium mb-4">Deleted foremen can't log in until restored.</Text>
+
+            {trashLoading ? (
+              <View className="flex-1 justify-center items-center">
+                <ActivityIndicator size="large" color="#0f172a" />
+              </View>
+            ) : trashList.length === 0 ? (
+              <View className="py-16 items-center">
+                <Text className="text-slate-500 font-medium">Trash is empty.</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                {trashList.map((u) => {
+                  const username = u.email ? u.email.split('@')[0] : 'unknown';
+                  return (
+                    <View key={u.id} className="flex-row items-center justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50 mb-3">
+                      <View className="flex-1 pr-3">
+                        <Text className="text-slate-900 font-bold">{u.full_name}</Text>
+                        <Text className="text-slate-500 text-sm">{username}</Text>
+                        {!!u.deleted_at && (
+                          <Text className="text-slate-400 text-xs mt-1">Deleted {new Date(u.deleted_at).toLocaleDateString()}</Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleRestoreForeman(u)}
+                        disabled={restoringId === u.id}
+                        className={`flex-row items-center px-3.5 py-2.5 rounded-lg border border-green-200 bg-green-50 active:bg-green-100 ${restoringId === u.id ? 'opacity-70' : ''}`}
+                      >
+                        {restoringId === u.id ? (
+                          <ActivityIndicator size="small" color="#16a34a" />
+                        ) : (
+                          <>
+                            <RotateCcw size={16} color="#16a34a" />
+                            <Text className="text-green-700 font-bold ml-1.5 text-sm">Restore</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>

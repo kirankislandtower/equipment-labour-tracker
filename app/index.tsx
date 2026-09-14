@@ -45,12 +45,19 @@ export default function LoginScreen() {
       // Check role
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('role')
+        .select('role, deleted_at')
         .eq('id', data.user.id)
-        .maybeSingle(); 
-        
+        .maybeSingle();
+
       if (userError) {
         console.error('Role check error:', userError);
+      }
+
+      if (userData?.deleted_at) {
+        await supabase.auth.signOut();
+        Alert.alert('Account Deactivated', 'Your account has been deactivated. Please contact your admin.');
+        setLoading(false);
+        return;
       }
 
       let finalRole = selectedRole; // default to what they selected
