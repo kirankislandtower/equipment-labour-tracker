@@ -11,7 +11,7 @@ export default function EmployeesScreen() {
   const [loading, setLoading] = useState(true);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'loggedin' | 'notloggedin'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'loggedin' | 'notloggedin' | 'submitted' | 'notsubmitted'>('all');
   // A foreman is "currently logged in" when their single most recent
   // attendance_logs row is a LOGIN with no LOGOUT after it -- the same signal the
   // Attendance screen shows per-day, just taken across all time and per account.
@@ -214,10 +214,14 @@ export default function EmployeesScreen() {
 
   const loggedInCount = usersList.filter((u) => loggedInIds.has(u.id)).length;
   const notLoggedInCount = usersList.filter((u) => !everLoggedInIds.has(u.id)).length;
+  const submittedCount = usersList.filter((u) => everSubmittedIds.has(u.id)).length;
+  const notSubmittedCount = usersList.filter((u) => !everSubmittedIds.has(u.id)).length;
 
   const filteredUsers = usersList.filter((u) => {
     if (activeTab === 'loggedin' && !loggedInIds.has(u.id)) return false;
     if (activeTab === 'notloggedin' && everLoggedInIds.has(u.id)) return false;
+    if (activeTab === 'submitted' && !everSubmittedIds.has(u.id)) return false;
+    if (activeTab === 'notsubmitted' && everSubmittedIds.has(u.id)) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.trim().toLowerCase();
     const username = u.email ? u.email.split('@')[0] : '';
@@ -280,6 +284,26 @@ export default function EmployeesScreen() {
             <Text className={`text-xs font-bold ${activeTab === 'notloggedin' ? 'text-white' : 'text-amber-700'}`}>{notLoggedInCount}</Text>
           </View>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('submitted')}
+          className={`px-4 py-2 rounded-full border flex-row items-center ${activeTab === 'submitted' ? 'bg-teal-600 border-teal-600' : 'bg-white border-slate-200'}`}
+        >
+          <View className={`w-2 h-2 rounded-full mr-2 ${activeTab === 'submitted' ? 'bg-white' : 'bg-teal-500'}`} />
+          <Text className={`font-bold text-sm ${activeTab === 'submitted' ? 'text-white' : 'text-slate-600'}`}>Submitted</Text>
+          <View className={`ml-2 px-2 py-0.5 rounded-full ${activeTab === 'submitted' ? 'bg-white/20' : 'bg-teal-50'}`}>
+            <Text className={`text-xs font-bold ${activeTab === 'submitted' ? 'text-white' : 'text-teal-700'}`}>{submittedCount}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('notsubmitted')}
+          className={`px-4 py-2 rounded-full border flex-row items-center ${activeTab === 'notsubmitted' ? 'bg-rose-600 border-rose-600' : 'bg-white border-slate-200'}`}
+        >
+          <View className={`w-2 h-2 rounded-full mr-2 ${activeTab === 'notsubmitted' ? 'bg-white' : 'bg-rose-500'}`} />
+          <Text className={`font-bold text-sm ${activeTab === 'notsubmitted' ? 'text-white' : 'text-slate-600'}`}>Not Submitted Yet</Text>
+          <View className={`ml-2 px-2 py-0.5 rounded-full ${activeTab === 'notsubmitted' ? 'bg-white/20' : 'bg-rose-50'}`}>
+            <Text className={`text-xs font-bold ${activeTab === 'notsubmitted' ? 'text-white' : 'text-rose-700'}`}>{notSubmittedCount}</Text>
+          </View>
+        </TouchableOpacity>
       </ScrollView>
 
       <View className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 h-12 mb-6">
@@ -330,6 +354,10 @@ export default function EmployeesScreen() {
                       ? 'No foremen are currently logged in.'
                       : activeTab === 'notloggedin'
                       ? 'Everyone has logged in at least once.'
+                      : activeTab === 'submitted'
+                      ? 'No foremen have submitted anything yet.'
+                      : activeTab === 'notsubmitted'
+                      ? 'Everyone has submitted at least one entry.'
                       : 'No foremen found.'}
                   </Text>
                 </View>
