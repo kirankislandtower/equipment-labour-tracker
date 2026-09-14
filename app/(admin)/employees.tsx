@@ -38,6 +38,7 @@ export default function EmployeesScreen() {
   const [editPhoneNumber, setEditPhoneNumber] = useState('');
   const [savingPhone, setSavingPhone] = useState(false);
   const [deletingForeman, setDeletingForeman] = useState(false);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<any>(null);
 
   // Trash modal state
   const [trashModalVisible, setTrashModalVisible] = useState(false);
@@ -227,36 +228,25 @@ export default function EmployeesScreen() {
     }
   };
 
-  const handleDeleteForeman = (u: any) => {
-    Alert.alert(
-      'Delete Foreman?',
-      `${u.full_name} will be moved to Trash and won't be able to log in until restored. You can undo this anytime from Trash.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeletingForeman(true);
-            try {
-              const { error } = await supabase
-                .from('users')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('id', u.id);
-              if (error) throw error;
+  const confirmDeleteForeman = async () => {
+    if (!deleteConfirmUser) return;
+    setDeletingForeman(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', deleteConfirmUser.id);
+      if (error) throw error;
 
-              setUsersList(prev => prev.filter(x => x.id !== u.id));
-              setSelectedUser(null);
-            } catch (error: any) {
-              console.error(error);
-              Alert.alert('Error', 'Failed to delete foreman');
-            } finally {
-              setDeletingForeman(false);
-            }
-          },
-        },
-      ]
-    );
+      setUsersList(prev => prev.filter(x => x.id !== deleteConfirmUser.id));
+      setDeleteConfirmUser(null);
+      setSelectedUser(null);
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to delete foreman');
+    } finally {
+      setDeletingForeman(false);
+    }
   };
 
   const openTrash = async () => {
@@ -753,17 +743,45 @@ export default function EmployeesScreen() {
 
             <View className="mt-6 pt-5 border-t border-slate-100">
               <TouchableOpacity
-                onPress={() => selectedUser && handleDeleteForeman(selectedUser)}
+                onPress={() => selectedUser && setDeleteConfirmUser(selectedUser)}
+                className="flex-row items-center justify-center py-3.5 rounded-lg border border-red-200 bg-red-50 active:bg-red-100"
+              >
+                <Trash2 size={18} color="#dc2626" />
+                <Text className="text-red-700 font-bold ml-2">Delete Foreman</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={!!deleteConfirmUser} transparent animationType="fade" onRequestClose={() => setDeleteConfirmUser(null)}>
+        <View className="flex-1 bg-black/50 justify-center items-center p-8">
+          <View className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl items-center">
+            <View className="bg-red-100 p-4 rounded-full mb-4">
+              <Trash2 size={32} color="#ef4444" />
+            </View>
+            <Text className="text-xl font-black text-slate-900 mb-2 text-center">Delete {deleteConfirmUser?.full_name}?</Text>
+            <Text className="text-slate-500 text-center mb-6">
+              They'll be moved to Trash and won't be able to log in until restored. You can undo this anytime from Trash.
+            </Text>
+            <View className="flex-row gap-3 w-full">
+              <TouchableOpacity
+                onPress={() => setDeleteConfirmUser(null)}
                 disabled={deletingForeman}
-                className={`flex-row items-center justify-center py-3.5 rounded-lg border border-red-200 bg-red-50 active:bg-red-100 ${deletingForeman ? 'opacity-70' : ''}`}
+                className="flex-1 bg-slate-100 border border-slate-200 py-3 rounded-xl items-center active:bg-slate-200"
+              >
+                <Text className="text-slate-700 font-bold">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={confirmDeleteForeman}
+                disabled={deletingForeman}
+                className={`flex-1 ${deletingForeman ? 'bg-red-400' : 'bg-red-500'} py-3 rounded-xl items-center flex-row justify-center active:bg-red-600`}
               >
                 {deletingForeman ? (
-                  <ActivityIndicator size="small" color="#dc2626" />
+                  <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <>
-                    <Trash2 size={18} color="#dc2626" />
-                    <Text className="text-red-700 font-bold ml-2">Delete Foreman</Text>
-                  </>
+                  <Text className="text-white font-bold">Delete</Text>
                 )}
               </TouchableOpacity>
             </View>
