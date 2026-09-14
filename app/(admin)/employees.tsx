@@ -185,6 +185,13 @@ export default function EmployeesScreen() {
     openWhatsApp(u.phone_number, message);
   };
 
+  const sendSubmissionReminder = (u: any) => {
+    if (!u.phone_number) return;
+    const firstName = (u.full_name || '').split(' ')[0] || 'Sir';
+    const message = `Hi ${firstName}, you're logged in to the Island Tower app but haven't submitted any Equipment, Labour, or Material entries yet. Please submit your daily entries so your work gets recorded. Need help? Call or WhatsApp +971 52 660 5909 or +971 54 771 4315.`;
+    openWhatsApp(u.phone_number, message);
+  };
+
   const openUserDetails = (u: any) => {
     setSelectedUser(u);
     setEditPhoneNumber(u.phone_number || '');
@@ -339,7 +346,7 @@ export default function EmployeesScreen() {
                   <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">User ID</Text>
                   <Text className="w-24 font-bold text-slate-500 text-xs uppercase text-center">Role</Text>
                   <Text className="w-36 font-bold text-slate-500 text-xs uppercase text-center">Submissions</Text>
-                  {activeTab === 'notloggedin' && (
+                  {(activeTab === 'notloggedin' || activeTab === 'notsubmitted') && (
                     <Text className="w-40 font-bold text-slate-500 text-xs uppercase text-right">Reminder</Text>
                   )}
                 </View>
@@ -432,6 +439,16 @@ export default function EmployeesScreen() {
                       </TouchableOpacity>
                     )}
 
+                    {isMobile && activeTab === 'notsubmitted' && !!u.phone_number && (
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation(); sendSubmissionReminder(u); }}
+                        className="flex-row items-center justify-center mt-3 py-2.5 rounded-lg border border-rose-200 bg-rose-50 active:bg-rose-100"
+                      >
+                        <MessageCircle size={16} color="#e11d48" />
+                        <Text className="text-rose-700 font-bold ml-2 text-sm">Send Submission Reminder</Text>
+                      </TouchableOpacity>
+                    )}
+
                     {!isMobile && (
                       <View className="w-24 items-center">
                         <View className={`px-2 py-1 rounded ${u.role === 'ADMIN' ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50 border border-slate-200'}`}>
@@ -465,6 +482,20 @@ export default function EmployeesScreen() {
                           >
                             <MessageCircle size={14} color="#16a34a" />
                             <Text className="text-green-700 font-bold ml-1.5 text-xs">Remind</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+
+                    {!isMobile && activeTab === 'notsubmitted' && (
+                      <View className="w-40 items-end">
+                        {!!u.phone_number && (
+                          <TouchableOpacity
+                            onPress={(e) => { e.stopPropagation(); sendSubmissionReminder(u); }}
+                            className="flex-row items-center px-3 py-2 rounded-lg border border-rose-200 bg-rose-50 active:bg-rose-100"
+                          >
+                            <MessageCircle size={14} color="#e11d48" />
+                            <Text className="text-rose-700 font-bold ml-1.5 text-xs">Remind</Text>
                           </TouchableOpacity>
                         )}
                       </View>
