@@ -110,33 +110,46 @@ export default function UsageReports() {
         else if (status === 'REJECTED') stat.rejected++;
       };
 
+      // Hours/quantities only count APPROVED entries -- a rejected entry means that
+      // claimed work was deemed invalid, so it shouldn't inflate a usage total. The
+      // pending/approved/rejected pill counts still tally every entry regardless.
       equipData.forEach((entry: any) => {
+        const isApproved = entry.status === 'APPROVED';
         if (entry.job_id) {
           const stat = jobAgg.ensure(entry.job_id, entry.jobs ? `${entry.jobs.job_number} - ${entry.jobs.job_name}` : 'Unknown Job');
           bumpStatus(stat, entry.status);
-          stat.equipmentCount++;
-          stat.equipmentHours += parseFloat(entry.working_hours) || 0;
+          if (isApproved) {
+            stat.equipmentCount++;
+            stat.equipmentHours += parseFloat(entry.working_hours) || 0;
+          }
         }
         if (entry.supplier_id) {
           const stat = supplierAgg.ensure(entry.supplier_id, entry.suppliers?.supplier_name || 'Unknown Supplier');
           bumpStatus(stat, entry.status);
-          stat.equipmentCount++;
-          stat.equipmentHours += parseFloat(entry.working_hours) || 0;
+          if (isApproved) {
+            stat.equipmentCount++;
+            stat.equipmentHours += parseFloat(entry.working_hours) || 0;
+          }
         }
       });
 
       labourData.forEach((entry: any) => {
+        const isApproved = entry.status === 'APPROVED';
         if (entry.job_id) {
           const stat = jobAgg.ensure(entry.job_id, entry.jobs ? `${entry.jobs.job_number} - ${entry.jobs.job_name}` : 'Unknown Job');
           bumpStatus(stat, entry.status);
-          stat.labourCount++;
-          stat.labourHours += parseFloat(entry.total_working_hours) || 0;
+          if (isApproved) {
+            stat.labourCount++;
+            stat.labourHours += parseFloat(entry.total_working_hours) || 0;
+          }
         }
         if (entry.supplier_id) {
           const stat = supplierAgg.ensure(entry.supplier_id, entry.suppliers?.supplier_name || 'Unknown Supplier');
           bumpStatus(stat, entry.status);
-          stat.labourCount++;
-          stat.labourHours += parseFloat(entry.total_working_hours) || 0;
+          if (isApproved) {
+            stat.labourCount++;
+            stat.labourHours += parseFloat(entry.total_working_hours) || 0;
+          }
         }
       });
 
@@ -145,9 +158,11 @@ export default function UsageReports() {
         if (entry.from_job_id) {
           const stat = jobAgg.ensure(entry.from_job_id, entry.from_job ? `${entry.from_job.job_number} - ${entry.from_job.job_name}` : 'Unknown Job');
           bumpStatus(stat, entry.status);
-          stat.materialCount++;
-          const unit = entry.unit || 'unit';
-          stat.materialByUnit[unit] = (stat.materialByUnit[unit] || 0) + (parseFloat(entry.quantity) || 0);
+          if (entry.status === 'APPROVED') {
+            stat.materialCount++;
+            const unit = entry.unit || 'unit';
+            stat.materialByUnit[unit] = (stat.materialByUnit[unit] || 0) + (parseFloat(entry.quantity) || 0);
+          }
         }
       });
 
@@ -220,11 +235,11 @@ export default function UsageReports() {
     'Pending': stat.pending,
     'Approved': stat.approved,
     'Rejected': stat.rejected,
-    'Equipment Hours': stat.equipmentHours.toFixed(2),
-    'Equipment Entries': stat.equipmentCount,
-    'Labour Hours': stat.labourHours.toFixed(2),
-    'Labour Entries': stat.labourCount,
-    ...(groupBy === 'job' ? { 'Material Transfers': stat.materialCount, 'Material Quantity': materialSummary(stat) || '' } : {}),
+    'Equipment Hours (Approved)': stat.equipmentHours.toFixed(2),
+    'Equipment Entries (Approved)': stat.equipmentCount,
+    'Labour Hours (Approved)': stat.labourHours.toFixed(2),
+    'Labour Entries (Approved)': stat.labourCount,
+    ...(groupBy === 'job' ? { 'Material Transfers (Approved)': stat.materialCount, 'Material Quantity (Approved)': materialSummary(stat) || '' } : {}),
   }));
 
   const openDrillDown = (stat: Stat, filter: StatusFilter) => {
@@ -423,18 +438,18 @@ export default function UsageReports() {
 
                 <TouchableOpacity onPress={() => openDrillDown(stat, 'ALL')} className="flex-row border-t border-slate-100 pt-4 active:opacity-60">
                   <View className="flex-1 border-r border-slate-100 items-center py-1">
-                    <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Equipment</Text>
+                    <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Equipment (Approved)</Text>
                     <Text className="text-slate-700 font-black text-lg">{stat.equipmentHours.toFixed(1)} hr</Text>
                     <Text className="text-slate-400 text-[10px] font-medium">{stat.equipmentCount} entries</Text>
                   </View>
                   <View className={`flex-1 items-center py-1 ${groupBy === 'job' ? 'border-r border-slate-100' : ''}`}>
-                    <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Labour</Text>
+                    <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Labour (Approved)</Text>
                     <Text className="text-slate-700 font-black text-lg">{stat.labourHours.toFixed(1)} hr</Text>
                     <Text className="text-slate-400 text-[10px] font-medium">{stat.labourCount} entries</Text>
                   </View>
                   {groupBy === 'job' && (
                     <View className="flex-1 items-center py-1">
-                      <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Material</Text>
+                      <Text className="text-slate-400 font-bold text-[10px] uppercase mb-1">Material (Approved)</Text>
                       <Text className="text-slate-700 font-black text-lg">{stat.materialCount}</Text>
                       <Text className="text-slate-400 text-[10px] font-medium text-center">{materialSummary(stat) || 'transfers'}</Text>
                     </View>
