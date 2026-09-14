@@ -20,6 +20,10 @@ export default function EmployeesScreen() {
   // now -- used for "Not Logged In", which should mean "has never used the app",
   // not "isn't signed in at this exact moment".
   const [everLoggedInIds, setEverLoggedInIds] = useState<Set<string>>(new Set());
+  // Anyone who has ever had an Equipment, Labour, or Material entry attributed to
+  // their account -- a foreman can be logged in without ever actually submitting a
+  // form, which this catches separately from login status.
+  const [everSubmittedIds, setEverSubmittedIds] = useState<Set<string>>(new Set());
 
   // Modal state
   const [addModal, setAddModal] = useState(false);
@@ -37,6 +41,7 @@ export default function EmployeesScreen() {
   useEffect(() => {
     fetchUsers();
     fetchLoginStatus();
+    fetchSubmissionStatus();
   }, []);
 
   const fetchUsers = async () => {
@@ -84,6 +89,26 @@ export default function EmployeesScreen() {
       setEverLoggedInIds(everLoggedIn);
     } catch (error) {
       console.error('Error fetching login status:', error);
+    }
+  };
+
+  const fetchSubmissionStatus = async () => {
+    try {
+      const [equipRes, labourRes, materialRes] = await Promise.all([
+        supabase.from('equipment_entries').select('created_by'),
+        supabase.from('labour_entries').select('created_by'),
+        supabase.from('material_transfers').select('created_by'),
+      ]);
+
+      const submitted = new Set<string>();
+      [equipRes.data, labourRes.data, materialRes.data].forEach((rows) => {
+        (rows || []).forEach((row: any) => {
+          if (row.created_by) submitted.add(row.created_by);
+        });
+      });
+      setEverSubmittedIds(submitted);
+    } catch (error) {
+      console.error('Error fetching submission status:', error);
     }
   };
 
@@ -289,6 +314,7 @@ export default function EmployeesScreen() {
                   <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Username</Text>
                   <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">User ID</Text>
                   <Text className="w-24 font-bold text-slate-500 text-xs uppercase text-center">Role</Text>
+                  <Text className="w-36 font-bold text-slate-500 text-xs uppercase text-center">Submissions</Text>
                   {activeTab === 'notloggedin' && (
                     <Text className="w-40 font-bold text-slate-500 text-xs uppercase text-right">Reminder</Text>
                   )}
@@ -344,7 +370,7 @@ export default function EmployeesScreen() {
                     {!isMobile && <Text className="flex-1 text-slate-400 text-xs font-mono">{u.id.split('-')[0]}...</Text>}
                     
                     {isMobile && (
-                      <View className="flex-row justify-between">
+                      <View className="flex-row justify-between mb-3">
                         <View>
                           <Text className="text-xs font-bold text-slate-400 mb-1 uppercase">Username</Text>
                           <Text className="text-slate-600">{username}</Text>
@@ -354,6 +380,18 @@ export default function EmployeesScreen() {
                           <Text className="text-slate-400 text-xs font-mono text-right">{u.id.split('-')[0]}...</Text>
                         </View>
                       </View>
+                    )}
+
+                    {isMobile && (
+                      everSubmittedIds.has(u.id) ? (
+                        <View className="self-start px-2.5 py-1 rounded-full bg-green-50 border border-green-200">
+                          <Text className="text-[10px] font-bold uppercase tracking-wider text-green-700">Submitted</Text>
+                        </View>
+                      ) : (
+                        <View className="self-start px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200">
+                          <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Not Yet Submitted</Text>
+                        </View>
+                      )
                     )}
 
                     {isMobile && activeTab === 'notloggedin' && !!u.phone_number && (
@@ -373,6 +411,20 @@ export default function EmployeesScreen() {
                             {u.role}
                           </Text>
                         </View>
+                      </View>
+                    )}
+
+                    {!isMobile && (
+                      <View className="w-36 items-center">
+                        {everSubmittedIds.has(u.id) ? (
+                          <View className="px-2.5 py-1 rounded-full bg-green-50 border border-green-200">
+                            <Text className="text-[10px] font-bold uppercase tracking-wider text-green-700">Submitted</Text>
+                          </View>
+                        ) : (
+                          <View className="px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200">
+                            <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Not Yet Submitted</Text>
+                          </View>
+                        )}
                       </View>
                     )}
 
