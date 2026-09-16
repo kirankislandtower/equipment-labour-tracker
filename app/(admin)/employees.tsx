@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText, Trash2, RotateCcw } from 'lucide-react-native';
+import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText, Trash2, RotateCcw, AlertCircle } from 'lucide-react-native';
 
 export default function EmployeesScreen() {
   const router = useRouter();
@@ -36,6 +36,7 @@ export default function EmployeesScreen() {
   // Foreman details/edit modal state
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [editAwayReason, setEditAwayReason] = useState('');
   const [savingPhone, setSavingPhone] = useState(false);
   const [deletingForeman, setDeletingForeman] = useState(false);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<any>(null);
@@ -204,25 +205,27 @@ export default function EmployeesScreen() {
   const openUserDetails = (u: any) => {
     setSelectedUser(u);
     setEditPhoneNumber(u.phone_number || '');
+    setEditAwayReason(u.away_reason || '');
   };
 
   const handleSavePhone = async () => {
     if (!selectedUser) return;
     setSavingPhone(true);
     try {
-      const trimmed = editPhoneNumber.trim();
+      const trimmedPhone = editPhoneNumber.trim();
+      const trimmedAwayReason = editAwayReason.trim();
       const { error } = await supabase
         .from('users')
-        .update({ phone_number: trimmed || null })
+        .update({ phone_number: trimmedPhone || null, away_reason: trimmedAwayReason || null })
         .eq('id', selectedUser.id);
 
       if (error) throw error;
 
-      setUsersList(prev => prev.map(u => u.id === selectedUser.id ? { ...u, phone_number: trimmed || null } : u));
+      setUsersList(prev => prev.map(u => u.id === selectedUser.id ? { ...u, phone_number: trimmedPhone || null, away_reason: trimmedAwayReason || null } : u));
       setSelectedUser(null);
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Error', 'Failed to save phone number');
+      Alert.alert('Error', 'Failed to save foreman details');
     } finally {
       setSavingPhone(false);
     }
@@ -466,6 +469,9 @@ export default function EmployeesScreen() {
                           </View>
                           {loggedInIds.has(u.id) && (
                             <View className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white" />
+                          )}
+                          {!!u.away_reason && (
+                            <View className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
                           )}
                         </View>
                         <Text className="text-slate-900 font-bold">{u.full_name}</Text>
@@ -724,6 +730,27 @@ export default function EmployeesScreen() {
                   <Text className="text-green-700 font-bold ml-2">Message on WhatsApp</Text>
                 </TouchableOpacity>
               )}
+            </View>
+
+            <View className="mb-6">
+              <Text className="text-sm font-bold text-slate-700 mb-1">Away / Absence Reason</Text>
+              <Text className="text-slate-400 text-xs mb-2">
+                Set this when the foreman tells you they're unavailable (e.g. gone to native place). Shows a red dot on the list. Clear it and Save when they're back.
+              </Text>
+              <View className="w-full bg-slate-50 border border-slate-200 rounded-lg flex-row items-start px-4 py-3">
+                <AlertCircle size={16} color="#94a3b8" style={{ marginTop: 12 }} />
+                <TextInput
+                  placeholder="e.g. Gone to native place, back on 20th"
+                  placeholderTextColor="#94a3b8"
+                  value={editAwayReason}
+                  onChangeText={setEditAwayReason}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  className="flex-1 p-2 ml-2 text-slate-900"
+                  style={{ minHeight: 60 }}
+                />
+              </View>
             </View>
 
             <TouchableOpacity
