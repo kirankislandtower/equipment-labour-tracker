@@ -109,6 +109,7 @@ export default function MaterialTransferEntryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successVisible, setSuccessVisible] = useState(false);
+  const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
@@ -284,7 +285,10 @@ export default function MaterialTransferEntryScreen() {
       newErrors.to_job_id = 'Destination cannot be same as source';
     }
 
-    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
+    // Photo is expected but no longer blocks submission -- a foreman who couldn't
+    // get a live photo at the time can still submit and attach it later by editing
+    // this entry. The Success screen tells them that's still needed.
+    const missingPhoto = !isStoreUser && !photoUri && !id;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -341,6 +345,7 @@ export default function MaterialTransferEntryScreen() {
               unit: formData.unit,
             },
           });
+          setPhotoPendingReason(missingPhoto ? 'missing' : null);
           Alert.alert(
             'Saved Offline',
             'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
@@ -404,14 +409,13 @@ export default function MaterialTransferEntryScreen() {
       }
 
       if (photoUploadFailed) {
-        Alert.alert(
-          'Saved — Photo Pending',
-          'Your entry was saved, but the photo could not be uploaded right now (connection issue or storage limit). Edit this entry later to attach the photo once you\'re back online.',
-          [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
-        );
+        setPhotoPendingReason('upload_failed');
+      } else if (missingPhoto) {
+        setPhotoPendingReason('missing');
       } else {
-        setSuccessVisible(true);
+        setPhotoPendingReason(null);
       }
+      setSuccessVisible(true);
     } catch (error: any) {
       console.error('Submit error:', error);
       const errorMessage = error.message || (error.code ? `Error ${error.code}: ${error.details || ''}` : JSON.stringify(error));
@@ -463,11 +467,17 @@ export default function MaterialTransferEntryScreen() {
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white rounded-3xl p-8 items-center w-full max-w-sm border border-slate-200 shadow-2xl">
             <View className="bg-amber-100 p-4 rounded-full mb-4">
-              <ArrowRightLeft size={64} color="#d97706" />
+              {photoPendingReason ? <Camera size={64} color="#d97706" /> : <ArrowRightLeft size={64} color="#d97706" />}
             </View>
-            <Text className="text-2xl font-black text-slate-900 mb-2">Success!</Text>
+            <Text className="text-2xl font-black text-slate-900 mb-2">
+              {photoPendingReason ? 'Submitted — Photo Needed' : 'Success!'}
+            </Text>
             <Text className="text-slate-500 text-center mb-8">
-              Your material transfer has been {id ? 'updated' : 'submitted'} successfully and is awaiting review.
+              {photoPendingReason === 'missing'
+                ? `Your material transfer has been ${id ? 'updated' : 'submitted'}, but no live photo was attached. Please edit this entry later to upload it.`
+                : photoPendingReason === 'upload_failed'
+                ? `Your material transfer has been ${id ? 'updated' : 'submitted'}, but the photo could not be uploaded (connection issue or storage limit). Edit this entry later to attach it.`
+                : `Your material transfer has been ${id ? 'updated' : 'submitted'} successfully and is awaiting review.`}
             </Text>
             <TouchableOpacity 
               className={`w-full bg-[#d97706] rounded-xl py-4 flex-row justify-center items-center ${navigating ? 'opacity-80' : ''}`}
@@ -476,6 +486,7 @@ export default function MaterialTransferEntryScreen() {
                 setNavigating(true);
                 setTimeout(() => {
                   setSuccessVisible(false);
+                  setPhotoPendingReason(null);
                   setNavigating(false);
                   router.setParams({ id: '' });
                   router.replace('/(app)/home');

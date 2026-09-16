@@ -111,6 +111,7 @@ export default function EquipmentEntryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successVisible, setSuccessVisible] = useState(false);
+  const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
@@ -459,7 +460,10 @@ export default function EquipmentEntryScreen() {
       if (!formData.fuel_unit) newErrors.fuel_unit = 'Unit is required';
     }
 
-    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
+    // Photo is expected but no longer blocks submission -- a foreman who couldn't
+    // get a live photo at the time can still submit and attach it later by editing
+    // this entry. The Success screen tells them that's still needed.
+    const missingPhoto = !isStoreUser && !photoUri && !id;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -536,6 +540,7 @@ export default function EquipmentEntryScreen() {
               working_hours: basePayload.working_hours,
             },
           });
+          setPhotoPendingReason(missingPhoto ? 'missing' : null);
           Alert.alert(
             'Saved Offline',
             'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
@@ -602,14 +607,13 @@ export default function EquipmentEntryScreen() {
       }
 
       if (photoUploadFailed) {
-        Alert.alert(
-          'Saved — Photo Pending',
-          'Your entry was saved, but the photo could not be uploaded right now (connection issue or storage limit). Edit this entry later to attach the photo once you\'re back online.',
-          [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
-        );
+        setPhotoPendingReason('upload_failed');
+      } else if (missingPhoto) {
+        setPhotoPendingReason('missing');
       } else {
-        setSuccessVisible(true);
+        setPhotoPendingReason(null);
       }
+      setSuccessVisible(true);
     } catch (error: any) {
       console.error('Submit error:', error);
       Alert.alert('Error', error.message || 'Failed to submit entry');
@@ -704,12 +708,18 @@ export default function EquipmentEntryScreen() {
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white rounded-3xl p-8 items-center w-full max-w-sm border border-slate-200 shadow-2xl">
-            <View className="bg-green-100 p-4 rounded-full mb-4">
-              <Truck size={64} color="#10b981" />
+            <View className={`p-4 rounded-full mb-4 ${photoPendingReason ? 'bg-amber-100' : 'bg-green-100'}`}>
+              {photoPendingReason ? <Camera size={64} color="#d97706" /> : <Truck size={64} color="#10b981" />}
             </View>
-            <Text className="text-2xl font-black text-slate-900 mb-2">Success!</Text>
+            <Text className="text-2xl font-black text-slate-900 mb-2">
+              {photoPendingReason ? 'Submitted — Photo Needed' : 'Success!'}
+            </Text>
             <Text className="text-slate-500 text-center mb-8">
-              Your equipment entry has been {id ? 'updated' : 'submitted'} successfully and is awaiting review.
+              {photoPendingReason === 'missing'
+                ? `Your equipment entry has been ${id ? 'updated' : 'submitted'}, but no live photo was attached. Please edit this entry later to upload it.`
+                : photoPendingReason === 'upload_failed'
+                ? `Your equipment entry has been ${id ? 'updated' : 'submitted'}, but the photo could not be uploaded (connection issue or storage limit). Edit this entry later to attach it.`
+                : `Your equipment entry has been ${id ? 'updated' : 'submitted'} successfully and is awaiting review.`}
             </Text>
             <TouchableOpacity 
               className={`w-full bg-[#1e3a8a] rounded-xl py-4 flex-row justify-center items-center ${navigating ? 'opacity-80' : ''}`}
@@ -718,6 +728,7 @@ export default function EquipmentEntryScreen() {
                 setNavigating(true);
                 setTimeout(() => {
                   setSuccessVisible(false);
+                  setPhotoPendingReason(null);
                   setNavigating(false);
                   setFormData({
                     entry_date: getLocalDateString(),

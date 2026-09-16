@@ -132,6 +132,7 @@ export default function LabourEntryScreen() {
   const [designationModalVisible, setDesignationModalVisible] = useState(false);
   const [assignedJobModalVisible, setAssignedJobModalVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
+  const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
   // The exact moment the photo was taken -- used for the watermark stamp instead of
@@ -366,7 +367,10 @@ export default function LabourEntryScreen() {
     if (!isStoreUser && !endTime) newErrors.end_time = 'End Time is required';
     if (!foremanName) newErrors.foreman_name = 'Foreman Name is required';
 
-    if (!isStoreUser && !photoUri && !id) newErrors.photo = 'Live photo is required';
+    // Photo is expected but no longer blocks submission -- a foreman who couldn't
+    // get a live photo at the time can still submit and attach it later by editing
+    // this entry. The Success screen tells them that's still needed.
+    const missingPhoto = !isStoreUser && !photoUri && !id;
 
     if (isStoreUser) {
       if (!requestedBy) newErrors.requested_by = 'Requested By is required';
@@ -430,6 +434,7 @@ export default function LabourEntryScreen() {
               total_working_hours: basePayload.total_working_hours,
             },
           });
+          setPhotoPendingReason(missingPhoto ? 'missing' : null);
           Alert.alert(
             'Saved Offline',
             'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
@@ -498,14 +503,13 @@ export default function LabourEntryScreen() {
       }
 
       if (photoUploadFailed) {
-        Alert.alert(
-          'Saved — Photo Pending',
-          'Your entry was saved, but the photo could not be uploaded right now (connection issue or storage limit). Edit this entry later to attach the photo once you\'re back online.',
-          [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
-        );
+        setPhotoPendingReason('upload_failed');
+      } else if (missingPhoto) {
+        setPhotoPendingReason('missing');
       } else {
-        setSuccessVisible(true);
+        setPhotoPendingReason(null);
       }
+      setSuccessVisible(true);
     } catch (error: any) {
       console.error(error);
       Alert.alert('Error', error.message || 'Failed to submit entry');
@@ -577,17 +581,24 @@ export default function LabourEntryScreen() {
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white rounded-3xl p-8 items-center w-full max-w-sm border border-slate-200 shadow-2xl">
-            <View className="bg-green-100 p-4 rounded-full mb-4">
-              <Users size={64} color="#10b981" />
+            <View className={`p-4 rounded-full mb-4 ${photoPendingReason ? 'bg-amber-100' : 'bg-green-100'}`}>
+              {photoPendingReason ? <Camera size={64} color="#d97706" /> : <Users size={64} color="#10b981" />}
             </View>
-            <Text className="text-2xl font-black text-slate-900 mb-2">Success!</Text>
+            <Text className="text-2xl font-black text-slate-900 mb-2">
+              {photoPendingReason ? 'Submitted — Photo Needed' : 'Success!'}
+            </Text>
             <Text className="text-slate-500 text-center mb-8">
-              Your labour entry has been {id ? 'updated' : 'submitted'} successfully and is awaiting review.
+              {photoPendingReason === 'missing'
+                ? `Your labour entry has been ${id ? 'updated' : 'submitted'}, but no live photo was attached. Please edit this entry later to upload it.`
+                : photoPendingReason === 'upload_failed'
+                ? `Your labour entry has been ${id ? 'updated' : 'submitted'}, but the photo could not be uploaded (connection issue or storage limit). Edit this entry later to attach it.`
+                : `Your labour entry has been ${id ? 'updated' : 'submitted'} successfully and is awaiting review.`}
             </Text>
             <TouchableOpacity 
               className="w-full bg-[#166534] rounded-xl py-4 items-center"
               onPress={() => {
                 setSuccessVisible(false);
+                setPhotoPendingReason(null);
                 router.replace('/(app)/home');
               }}
             >
