@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, useWindowDimensions, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Calendar, User, Users, Clock, CheckCircle, XCircle, ChevronRight, Activity, X, Check } from 'lucide-react-native';
+import { Calendar, User, Users, Clock, CheckCircle, XCircle, ChevronRight, Activity, X, Check, Search } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString } from '../../lib/dateUtils';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -28,6 +28,7 @@ export default function ForemanReports() {
   const [showToPicker, setShowToPicker] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [foremenStats, setForemenStats] = useState<any[]>([]);
   const [allData, setAllData] = useState<{equip: any[], labour: any[], material: any[]}>({ equip: [], labour: [], material: [] });
   const [selectedForeman, setSelectedForeman] = useState<any>(null);
@@ -170,6 +171,10 @@ export default function ForemanReports() {
   // range and a match now exists, instead of staying stuck on a stale "not found".
   const deepLinkNotFound = !loading && !!deepLinkUserId && !foremenStats.some(f => f.key === deepLinkUserId);
 
+  const filteredForemenStats = searchQuery.trim()
+    ? foremenStats.filter(f => f.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : foremenStats;
+
   return (
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
@@ -279,6 +284,24 @@ export default function ForemanReports() {
             </View>
           </View>
 
+          <View className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 h-12 mb-6">
+            <Search size={18} color="#94a3b8" />
+            <TextInput
+              placeholder="Search by foreman name"
+              placeholderTextColor="#94a3b8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              className="flex-1 ml-3 text-slate-900"
+              style={{ outlineStyle: 'none' } as any}
+            />
+            {!!searchQuery && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} className="p-1">
+                <X size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+
           {deepLinkNotFound && (
             <View className="py-6 px-6 items-center justify-center bg-amber-50 rounded-3xl border border-amber-200 shadow-sm mt-4 mb-4">
               <Text className="text-amber-900 text-lg font-black tracking-tight text-center">
@@ -290,17 +313,21 @@ export default function ForemanReports() {
             </View>
           )}
 
-          {foremenStats.length === 0 ? (
+          {filteredForemenStats.length === 0 ? (
             <View className="py-20 items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm mt-4">
               <View className="bg-slate-50 p-4 rounded-full mb-4">
                 <Activity size={32} color="#94a3b8" />
               </View>
               <Text className="text-slate-900 text-lg font-black tracking-tight">No Activity Found</Text>
-              <Text className="text-slate-500 mt-1">No foremen submitted any data between {fromDate} and {toDate}.</Text>
+              <Text className="text-slate-500 mt-1">
+                {searchQuery.trim()
+                  ? `No foreman matching "${searchQuery}" between ${fromDate} and ${toDate}.`
+                  : `No foremen submitted any data between ${fromDate} and ${toDate}.`}
+              </Text>
             </View>
           ) : (
             <View className="flex-row flex-wrap justify-between">
-              {foremenStats.map((foreman) => (
+              {filteredForemenStats.map((foreman) => (
                 <View 
                   key={foreman.key}
                   className="bg-white p-6 rounded-3xl border border-slate-200 mb-4 shadow-sm"
