@@ -12,6 +12,9 @@ export default function EmployeesScreen() {
   const [usersList, setUsersList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'loggedin' | 'notloggedin' | 'submitted' | 'notsubmitted'>('all');
+  // Sub-filter within the "Not Logged In" tab -- whether they have a saved phone
+  // number, since that's what decides if they can be WhatsApp-reminded at all.
+  const [notLoggedInPhoneFilter, setNotLoggedInPhoneFilter] = useState<'all' | 'has_number' | 'no_number'>('all');
   // A foreman is "currently logged in" when their single most recent
   // attendance_logs row is a LOGIN with no LOGOUT after it -- the same signal the
   // Attendance screen shows per-day, just taken across all time and per account.
@@ -322,9 +325,17 @@ export default function EmployeesScreen() {
   const submittedCount = usersList.filter((u) => everSubmittedIds.has(u.id)).length;
   const notSubmittedCount = usersList.filter((u) => !everSubmittedIds.has(u.id)).length;
 
+  // Only the foremen who haven't logged in can be WhatsApp-reminded, and only if
+  // there's a saved number -- this splits that group so the admin can see how many
+  // still need a phone number collected before a reminder can even be sent.
+  const notLoggedInWithNumberCount = usersList.filter((u) => !everLoggedInIds.has(u.id) && !!u.phone_number).length;
+  const notLoggedInNoNumberCount = usersList.filter((u) => !everLoggedInIds.has(u.id) && !u.phone_number).length;
+
   const filteredUsers = usersList.filter((u) => {
     if (activeTab === 'loggedin' && !loggedInIds.has(u.id)) return false;
     if (activeTab === 'notloggedin' && everLoggedInIds.has(u.id)) return false;
+    if (activeTab === 'notloggedin' && notLoggedInPhoneFilter === 'has_number' && !u.phone_number) return false;
+    if (activeTab === 'notloggedin' && notLoggedInPhoneFilter === 'no_number' && !!u.phone_number) return false;
     if (activeTab === 'submitted' && !everSubmittedIds.has(u.id)) return false;
     if (activeTab === 'notsubmitted' && everSubmittedIds.has(u.id)) return false;
     if (!searchQuery.trim()) return true;
@@ -420,6 +431,38 @@ export default function EmployeesScreen() {
         </TouchableOpacity>
       </ScrollView>
 
+      {activeTab === 'notloggedin' && (
+        <View className="mb-4">
+          <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Filter by phone number</Text>
+          <View className="flex-row bg-slate-100 rounded-2xl p-1 self-start">
+            <TouchableOpacity
+              onPress={() => setNotLoggedInPhoneFilter('all')}
+              className={`px-3.5 py-2 rounded-xl ${notLoggedInPhoneFilter === 'all' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`text-xs font-bold ${notLoggedInPhoneFilter === 'all' ? 'text-slate-900' : 'text-slate-500'}`}>
+                All ({notLoggedInCount})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setNotLoggedInPhoneFilter('has_number')}
+              className={`px-3.5 py-2 rounded-xl ${notLoggedInPhoneFilter === 'has_number' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`text-xs font-bold ${notLoggedInPhoneFilter === 'has_number' ? 'text-slate-900' : 'text-slate-500'}`}>
+                Has Number ({notLoggedInWithNumberCount})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setNotLoggedInPhoneFilter('no_number')}
+              className={`px-3.5 py-2 rounded-xl ${notLoggedInPhoneFilter === 'no_number' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`text-xs font-bold ${notLoggedInPhoneFilter === 'no_number' ? 'text-slate-900' : 'text-slate-500'}`}>
+                No Number ({notLoggedInNoNumberCount})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <View className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 h-12 mb-6">
         <Search size={18} color="#94a3b8" />
         <TextInput
@@ -466,6 +509,10 @@ export default function EmployeesScreen() {
                       ? `No foremen match "${searchQuery}".`
                       : activeTab === 'loggedin'
                       ? 'No foremen are currently logged in.'
+                      : activeTab === 'notloggedin' && notLoggedInPhoneFilter === 'has_number'
+                      ? 'None of the not-logged-in foremen have a saved number.'
+                      : activeTab === 'notloggedin' && notLoggedInPhoneFilter === 'no_number'
+                      ? 'All not-logged-in foremen have a saved number.'
                       : activeTab === 'notloggedin'
                       ? 'Everyone has logged in at least once.'
                       : activeTab === 'submitted'
