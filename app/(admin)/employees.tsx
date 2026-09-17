@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText, Trash2, RotateCcw, AlertCircle } from 'lucide-react-native';
+import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText, Trash2, RotateCcw, AlertCircle, Clock, LogIn, LogOut } from 'lucide-react-native';
 
 export default function EmployeesScreen() {
   const router = useRouter();
@@ -46,6 +46,12 @@ export default function EmployeesScreen() {
   const [trashList, setTrashList] = useState<any[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  // Login history modal state
+  const [loginHistoryVisible, setLoginHistoryVisible] = useState(false);
+  const [loginHistoryUser, setLoginHistoryUser] = useState<any>(null);
+  const [loginHistoryList, setLoginHistoryList] = useState<any[]>([]);
+  const [loginHistoryLoading, setLoginHistoryLoading] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -288,6 +294,26 @@ export default function EmployeesScreen() {
       Alert.alert('Error', 'Failed to restore foreman');
     } finally {
       setRestoringId(null);
+    }
+  };
+
+  const openLoginHistory = async (u: any) => {
+    setLoginHistoryUser(u);
+    setLoginHistoryVisible(true);
+    setLoginHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('attendance_logs')
+        .select('action, created_at')
+        .eq('user_id', u.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setLoginHistoryList(data || []);
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to load login history');
+    } finally {
+      setLoginHistoryLoading(false);
     }
   };
 
@@ -702,10 +728,18 @@ export default function EmployeesScreen() {
                 setSelectedUser(null);
                 router.push({ pathname: '/(admin)/foremen', params: { userId: user.id, name: user.full_name } });
               }}
-              className="flex-row items-center justify-center mb-6 py-3.5 rounded-lg border border-indigo-200 bg-indigo-50 active:bg-indigo-100"
+              className="flex-row items-center justify-center mb-3 py-3.5 rounded-lg border border-indigo-200 bg-indigo-50 active:bg-indigo-100"
             >
               <FileText size={18} color="#4338ca" />
               <Text className="text-indigo-700 font-bold ml-2">View Submission History</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => selectedUser && openLoginHistory(selectedUser)}
+              className="flex-row items-center justify-center mb-6 py-3.5 rounded-lg border border-blue-200 bg-blue-50 active:bg-blue-100"
+            >
+              <Clock size={18} color="#1d4ed8" />
+              <Text className="text-blue-700 font-bold ml-2">View Login History</Text>
             </TouchableOpacity>
 
             <View className="mb-6">
@@ -866,6 +900,84 @@ export default function EmployeesScreen() {
                     </View>
                   );
                 })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Login History Modal */}
+      <Modal visible={loginHistoryVisible} transparent animationType="slide" onRequestClose={() => setLoginHistoryVisible(false)}>
+        <View className="flex-1 bg-slate-900/60 justify-end">
+          <View className="bg-white rounded-t-[32px] p-6 h-[80%]">
+            <View className="flex-row justify-between items-center mb-2">
+              <View className="flex-1 pr-2">
+                <Text className="text-2xl font-black text-slate-900">{loginHistoryUser?.full_name}</Text>
+                <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider">Login / Logout History</Text>
+              </View>
+              <TouchableOpacity onPress={() => setLoginHistoryVisible(false)} className="bg-slate-100 p-2 rounded-full active:bg-slate-200">
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {loginHistoryLoading ? (
+              <View className="flex-1 justify-center items-center">
+                <ActivityIndicator size="large" color="#0f172a" />
+              </View>
+            ) : loginHistoryList.length === 0 ? (
+              <View className="py-16 items-center">
+                <Text className="text-slate-500 font-medium">No login activity yet.</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
+                {(() => {
+                  const today = new Date();
+                  const yesterday = new Date(today);
+                  yesterday.setDate(yesterday.getDate() - 1);
+
+                  const groupedByDate: Record<string, any[]> = {};
+                  loginHistoryList.forEach((log: any) => {
+                    const dateObj = new Date(log.created_at);
+                    let dateLabel = '';
+                    if (dateObj.toDateString() === today.toDateString()) {
+                      dateLabel = 'Today';
+                    } else if (dateObj.toDateString() === yesterday.toDateString()) {
+                      dateLabel = 'Yesterday';
+                    } else {
+                      dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    if (!groupedByDate[dateLabel]) groupedByDate[dateLabel] = [];
+                    groupedByDate[dateLabel].push(log);
+                  });
+
+                  return Object.entries(groupedByDate).map(([dateLabel, logsForDate]) => (
+                    <View key={dateLabel} className="mb-6">
+                      <Text className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-3 px-1">{dateLabel}</Text>
+                      <View className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                        {logsForDate.map((log, idx) => {
+                          const dObj = new Date(log.created_at);
+                          const isLogLogin = log.action === 'LOGIN';
+                          return (
+                            <View key={`${log.created_at}-${idx}`} className={`p-4 flex-row items-center justify-between ${idx !== logsForDate.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                              <View className="flex-row items-center">
+                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${isLogLogin ? 'bg-green-100' : 'bg-red-100'}`}>
+                                  {isLogLogin ? <LogIn size={18} color="#16a34a" /> : <LogOut size={18} color="#dc2626" />}
+                                </View>
+                                <View>
+                                  <Text className="text-slate-900 font-bold text-base">{isLogLogin ? 'Logged In' : 'Logged Out'}</Text>
+                                  <Text className="text-slate-500 text-sm mt-0.5">{dObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                                </View>
+                              </View>
+                              <Text className={`font-black text-xs uppercase tracking-wider ${isLogLogin ? 'text-green-600' : 'text-red-600'}`}>
+                                {log.action}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ));
+                })()}
               </ScrollView>
             )}
           </View>
