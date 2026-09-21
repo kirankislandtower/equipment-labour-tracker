@@ -16,6 +16,8 @@ import { isStoreForeman } from '../../../lib/foremanFlags';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
 import { fetchWithCache } from '../../../lib/dataCache';
+import MessageModal, { MessageModalContent } from '../../../components/MessageModal';
+import { logDuplicateAttempt } from '../../../lib/duplicateAttempts';
 
 type Job = { id: string; job_number: string; job_name: string; location?: string };
 type Supplier = { id: string; supplier_name: string };
@@ -132,6 +134,7 @@ export default function LabourEntryScreen() {
   const [designationModalVisible, setDesignationModalVisible] = useState(false);
   const [assignedJobModalVisible, setAssignedJobModalVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
+  const [messageModal, setMessageModal] = useState<MessageModalContent | null>(null);
   const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
@@ -435,11 +438,11 @@ export default function LabourEntryScreen() {
             },
           });
           setPhotoPendingReason(missingPhoto ? 'missing' : null);
-          Alert.alert(
-            'Saved Offline',
-            'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
-            [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
-          );
+          setMessageModal({
+            title: 'Saved Offline',
+            message: 'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
+            onClose: () => setSuccessVisible(true),
+          });
           return;
         }
 
@@ -460,10 +463,11 @@ export default function LabourEntryScreen() {
 
         if (isDuplicateEmployee) {
           setErrors(prev => ({ ...prev, employee_name: 'This employee already has an entry for this date' }));
-          Alert.alert(
-            'Duplicate Entry',
-            `${employeeName} already has a labour entry logged with this supplier for ${entryDate}. Check with the foreman/admin before submitting it again.`
-          );
+          logDuplicateAttempt({ entryType: 'labour', entryDate, detail: `${employeeName} (${selectedSupplier?.supplier_name || 'supplier'})`, userId: userData?.user?.id, foremanName });
+          setMessageModal({
+            title: 'Duplicate Entry Warning',
+            message: `${employeeName} already has a labour entry logged with this supplier for ${entryDate}, so this one was not submitted. This attempt has been recorded for the admin.`,
+          });
           return;
         }
       }
@@ -512,7 +516,7 @@ export default function LabourEntryScreen() {
       setSuccessVisible(true);
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Error', error.message || 'Failed to submit entry');
+      setMessageModal({ title: 'Could Not Submit', message: error.message || 'Failed to submit entry. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -577,6 +581,8 @@ export default function LabourEntryScreen() {
           <Text className="text-white font-semibold ml-1">Save</Text>
         </TouchableOpacity>
       </View>
+
+      <MessageModal content={messageModal} onDismiss={() => setMessageModal(null)} />
 
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">

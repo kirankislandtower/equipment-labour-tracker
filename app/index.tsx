@@ -1,8 +1,9 @@
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Building2, Eye, EyeOff } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
+import MessageModal, { MessageModalContent } from '../components/MessageModal';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<'FOREMAN' | 'ADMIN'>('FOREMAN');
   const [roleLoading, setRoleLoading] = useState(false);
+  const [messageModal, setMessageModal] = useState<MessageModalContent | null>(null);
 
   const handleRoleToggle = (role: 'FOREMAN' | 'ADMIN') => {
     if (role === selectedRole) return;
@@ -25,7 +27,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (loading) return;
     if (!username || !password) {
-      Alert.alert('Error', 'Please enter username and password');
+      setMessageModal({ title: 'Missing Details', message: 'Please enter username and password.' });
       return;
     }
 
@@ -55,7 +57,7 @@ export default function LoginScreen() {
 
       if (userData?.deleted_at) {
         await supabase.auth.signOut();
-        Alert.alert('Account Deactivated', 'Your account has been deactivated. Please contact your admin.');
+        setMessageModal({ title: 'Account Deactivated', message: 'Your account has been deactivated. Please contact your admin.' });
         setLoading(false);
         return;
       }
@@ -80,7 +82,7 @@ export default function LoginScreen() {
         // Validate that they selected the correct portal
         if (userData.role !== selectedRole) {
           await supabase.auth.signOut();
-          Alert.alert('Incorrect Portal', `Your account is registered as an ${userData.role}. Please select the ${userData.role} portal.`);
+          setMessageModal({ title: 'Incorrect Portal', message: `Your account is registered as an ${userData.role}. Please select the ${userData.role} portal.` });
           setLoading(false);
           return;
         }
@@ -103,7 +105,7 @@ export default function LoginScreen() {
       
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Login Failed', 'Invalid username or password.');
+      setMessageModal({ title: 'Login Failed', message: 'Invalid username or password.' });
     } finally {
       setLoading(false);
     }
@@ -227,6 +229,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </View>
+      <MessageModal content={messageModal} onDismiss={() => setMessageModal(null)} />
     </KeyboardAvoidingView>
   );
 }

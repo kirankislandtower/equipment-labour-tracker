@@ -19,6 +19,8 @@ import { isStoreForeman } from '../../../lib/foremanFlags';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
 import { fetchWithCache } from '../../../lib/dataCache';
+import MessageModal, { MessageModalContent } from '../../../components/MessageModal';
+import { logDuplicateAttempt } from '../../../lib/duplicateAttempts';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
@@ -111,6 +113,7 @@ export default function EquipmentEntryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successVisible, setSuccessVisible] = useState(false);
+  const [messageModal, setMessageModal] = useState<MessageModalContent | null>(null);
   const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -541,11 +544,11 @@ export default function EquipmentEntryScreen() {
             },
           });
           setPhotoPendingReason(missingPhoto ? 'missing' : null);
-          Alert.alert(
-            'Saved Offline',
-            'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
-            [{ text: 'OK', onPress: () => setSuccessVisible(true) }]
-          );
+          setMessageModal({
+            title: 'Saved Offline',
+            message: 'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
+            onClose: () => setSuccessVisible(true),
+          });
           return;
         }
 
@@ -564,10 +567,11 @@ export default function EquipmentEntryScreen() {
 
         if (isDuplicateVehicle) {
           setErrors(prev => ({ ...prev, vehicle_number: 'This vehicle already has an entry for this date' }));
-          Alert.alert(
-            'Duplicate Entry',
-            `Vehicle ${formData.vehicle_number} already has an equipment entry logged for ${formData.entry_date}. Check with the foreman/admin before submitting it again.`
-          );
+          logDuplicateAttempt({ entryType: 'equipment', entryDate: formData.entry_date, detail: formData.vehicle_number, userId: user?.id, foremanName: formData.foreman_name });
+          setMessageModal({
+            title: 'Duplicate Entry Warning',
+            message: `Vehicle ${formData.vehicle_number} already has an equipment entry logged for ${formData.entry_date}, so this one was not submitted. This attempt has been recorded for the admin.`,
+          });
           return;
         }
       }
@@ -616,7 +620,7 @@ export default function EquipmentEntryScreen() {
       setSuccessVisible(true);
     } catch (error: any) {
       console.error('Submit error:', error);
-      Alert.alert('Error', error.message || 'Failed to submit entry');
+      setMessageModal({ title: 'Could Not Submit', message: error.message || 'Failed to submit entry. Please try again.' });
     } finally {
       setSubmitting(false);
     }
@@ -704,6 +708,8 @@ export default function EquipmentEntryScreen() {
           <Text className="text-white font-semibold ml-1">Save</Text>
         </TouchableOpacity>
       </View>
+
+      <MessageModal content={messageModal} onDismiss={() => setMessageModal(null)} />
 
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
