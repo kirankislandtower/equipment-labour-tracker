@@ -18,7 +18,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         const { options } = descriptors[route.key];
         
         // Hide routes that shouldn't be in the tab bar (like entry forms)
-        if (['entry/select', 'history'].includes(route.name)) return null;
+        if (['entry/select', 'history', 'missing-photos'].includes(route.name)) return null;
 
         const label =
           options.tabBarLabel !== undefined
@@ -127,6 +127,7 @@ export default function AppLayout() {
       {/* Hidden Screens inside the Tabs layout */}
       <Tabs.Screen name="entry/select" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
+      <Tabs.Screen name="missing-photos" options={{ href: null }} />
     </Tabs>
   );
 

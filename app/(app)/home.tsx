@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../lib/auth';
-import { Truck, Users, FileCheck2, Clock, Plus, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Truck, Users, FileCheck2, Clock, Plus, ChevronLeft, ChevronRight, Camera } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
 
@@ -10,6 +10,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [loadingStats, setLoadingStats] = useState(true);
+  const [missingPhotoCount, setMissingPhotoCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [stats, setStats] = useState({
     equipment: 0,
@@ -23,6 +24,22 @@ export default function HomeScreen() {
     useCallback(() => {
       fetchStats();
     }, [selectedDate])
+  );
+
+  // Across all dates, not just the selected day -- an old entry missing its photo
+  // still needs attention. Only Submitted/Rejected entries count since those are
+  // the ones the foreman can still edit to attach it.
+  useFocusEffect(
+    useCallback(() => {
+      const editable = ['SUBMITTED', 'REJECTED'];
+      Promise.all([
+        supabase.from('equipment_entries').select('id', { count: 'exact', head: true }).eq('created_by', user?.id).eq('equipment_photo_url', 'pending').in('status', editable),
+        supabase.from('labour_entries').select('id', { count: 'exact', head: true }).eq('created_by', user?.id).eq('labour_photo_url', 'pending').in('status', editable),
+        supabase.from('material_transfers').select('id', { count: 'exact', head: true }).eq('created_by', user?.id).eq('photo_url', 'pending').in('status', editable),
+      ]).then(results => {
+        setMissingPhotoCount(results.reduce((sum, r) => sum + (r.count || 0), 0));
+      }).catch(err => console.error('Error counting entries missing photos:', err));
+    }, [user?.id])
   );
 
   const fetchStats = async () => {
@@ -111,6 +128,24 @@ export default function HomeScreen() {
       </View>
 
       <View className="px-6 pt-6 pb-32">
+        {missingPhotoCount > 0 && (
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/missing-photos')}
+            className="flex-row items-center bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 active:opacity-80"
+          >
+            <View className="bg-amber-100 w-10 h-10 rounded-xl items-center justify-center mr-3">
+              <Camera size={20} color="#d97706" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-amber-900 font-outfit-bold text-[15px]">
+                {missingPhotoCount} {missingPhotoCount === 1 ? 'entry needs' : 'entries need'} a photo
+              </Text>
+              <Text className="text-amber-700 font-outfit-medium text-xs mt-0.5">Tap to see which ones and add them</Text>
+            </View>
+            <ChevronRight size={20} color="#d97706" />
+          </TouchableOpacity>
+        )}
+
         {/* Date Navigator */}
         <View className="flex-row justify-between items-center mb-4">
           <Text className="text-lg font-outfit-black text-slate-900 tracking-tight">
