@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Modal, SafeAreaView, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
-import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy } from 'lucide-react-native';
+import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 
 export default function AdminLayout() {
@@ -113,6 +113,7 @@ export default function AdminLayout() {
         <NavItem icon={BarChart3} label="Usage Reports" href="/(admin)/reports" />
         <NavItem icon={Calculator} label="Invoice Reconciler" href="/(admin)/invoices" />
         <NavItem icon={Copy} label="Duplicate Alerts" href="/(admin)/duplicates" />
+        <NavItem icon={Bell} label="Follow-ups" href="/(admin)/followups" />
         <NavItem icon={AttendanceIcon} label="Attendance" href="/(admin)/attendance" />
         <NavItem icon={MapPin} label="Site Allocations" href="/(admin)/allocations" />
         <NavItem icon={Settings} label="Master Data" href="/(admin)/settings" />
