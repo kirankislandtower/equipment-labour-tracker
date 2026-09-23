@@ -93,6 +93,7 @@ export default function InvoiceTracking() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const [onlyMissingTimesheet, setOnlyMissingTimesheet] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -139,7 +140,8 @@ export default function InvoiceTracking() {
 
   const pending = entries.filter(e => e.invoice_status !== 'VERIFIED' && matchesSearch(e));
   const verified = entries.filter(e => e.invoice_status === 'VERIFIED' && matchesSearch(e));
-  const listForTab = tab === 'PENDING' ? pending : verified;
+  const missingTimesheetCount = pending.filter(e => !e.supplier_timesheet_number).length;
+  const listForTab = (tab === 'PENDING' ? pending : verified).filter(e => !onlyMissingTimesheet || tab !== 'PENDING' || !e.supplier_timesheet_number);
 
   const handleSaved = (updated: any) => {
     setEntries(prev => prev.map(e => (e.id === updated.id ? { ...e, ...updated } : e)));
@@ -168,6 +170,17 @@ export default function InvoiceTracking() {
             <Text className={`font-bold text-sm ${tab === 'VERIFIED' ? 'text-slate-900' : 'text-slate-500'}`}>Verified ({verified.length})</Text>
           </TouchableOpacity>
         </View>
+
+        {tab === 'PENDING' && missingTimesheetCount > 0 && (
+          <TouchableOpacity
+            onPress={() => setOnlyMissingTimesheet(v => !v)}
+            className={`flex-row items-center self-start px-3.5 py-2 rounded-full border mb-5 ${onlyMissingTimesheet ? 'bg-red-600 border-red-600' : 'bg-red-50 border-red-200'}`}
+          >
+            <Text className={`text-xs font-bold ${onlyMissingTimesheet ? 'text-white' : 'text-red-700'}`}>
+              {onlyMissingTimesheet ? 'Showing only' : 'Show only'} missing Timesheet # ({missingTimesheetCount})
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <View className={isMobile ? 'flex-col mb-4' : 'flex-row items-start'} style={{ gap: 12 }}>
           <View style={{ flex: isMobile ? undefined : 1 }}>
@@ -262,9 +275,16 @@ export default function InvoiceTracking() {
                   )}
                 </View>
                 <Text className="text-slate-500 text-sm">{e.suppliers?.supplier_name || 'Unknown Supplier'} · {e.vehicle_number}</Text>
+                <Text className="text-slate-400 text-xs mt-1">Foreman: {e.foreman_name || 'Unknown'}</Text>
                 <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-slate-100">
                   <Text className="text-slate-600 text-xs font-bold">Job {e.jobs?.job_number || '—'} · {e.entry_date} · {qty}</Text>
-                  {!!e.supplier_timesheet_number && <Text className="text-slate-400 text-xs">TS# {e.supplier_timesheet_number}</Text>}
+                  {e.supplier_timesheet_number ? (
+                    <Text className="text-slate-400 text-xs">TS# {e.supplier_timesheet_number}</Text>
+                  ) : (
+                    <View className="bg-red-50 px-2 py-0.5 rounded-full">
+                      <Text className="text-red-600 text-[10px] font-bold uppercase">No Timesheet #</Text>
+                    </View>
+                  )}
                 </View>
                 {tab === 'VERIFIED' && !!e.invoice_number && (
                   <Text className="text-indigo-700 font-bold text-sm mt-2">Invoice: {e.invoice_number}</Text>
