@@ -556,25 +556,42 @@ export default function EquipmentEntryScreen() {
           return;
         }
 
-        // A vehicle can only be logged once per day, regardless of which job it's
-        // under -- catches the same vehicle getting double-billed across different
-        // foremen or jobs, not just accidental resubmits by the same person.
+        // A vehicle can only be logged once per day for Hourly equipment, regardless
+        // of which job it's under -- catches the same vehicle getting double-billed
+        // across different foremen or jobs, not just accidental resubmits.
+        // Trip-Basis equipment (e.g. tankers) legitimately makes several trips a day
+        // with the same vehicle, so that's only flagged when it's the exact same
+        // trip re-submitted -- i.e. the Supplier Timesheet Number also matches. A
+        // blank timesheet number can't be compared reliably, so it isn't blocked.
         const normalizedVehicle = formData.vehicle_number.trim().toUpperCase().replace(/\s+/g, '');
         const { data: sameDayEntries } = await supabase
           .from('equipment_entries')
-          .select('vehicle_number')
+          .select('vehicle_number, supplier_timesheet_number')
           .eq('entry_date', formData.entry_date);
 
-        const isDuplicateVehicle = (sameDayEntries || []).some((e: any) =>
+        const sameVehicleEntries = (sameDayEntries || []).filter((e: any) =>
           (e.vehicle_number || '').trim().toUpperCase().replace(/\s+/g, '') === normalizedVehicle
         );
 
+        const normalizedTimesheet = formData.supplier_timesheet_number.trim().toUpperCase();
+        const isDuplicateVehicle = formData.rental_type === 'TRIP_BASIS'
+          ? !!normalizedTimesheet && sameVehicleEntries.some((e: any) => (e.supplier_timesheet_number || '').trim().toUpperCase() === normalizedTimesheet)
+          : sameVehicleEntries.length > 0;
+
         if (isDuplicateVehicle) {
-          setErrors(prev => ({ ...prev, vehicle_number: 'This vehicle already has an entry for this date' }));
-          logDuplicateAttempt({ entryType: 'equipment', entryDate: formData.entry_date, detail: formData.vehicle_number, userId: user?.id, foremanName: formData.foreman_name });
+          const duplicateDetail = formData.rental_type === 'TRIP_BASIS'
+            ? `${formData.vehicle_number} (Timesheet #${formData.supplier_timesheet_number})`
+            : formData.vehicle_number;
+          setErrors(prev => ({
+            ...prev,
+            vehicle_number: formData.rental_type === 'TRIP_BASIS' ? 'This vehicle already has an entry with this timesheet number for this date' : 'This vehicle already has an entry for this date',
+          }));
+          logDuplicateAttempt({ entryType: 'equipment', entryDate: formData.entry_date, detail: duplicateDetail, userId: user?.id, foremanName: formData.foreman_name });
           setMessageModal({
             title: 'Duplicate Entry Warning',
-            message: `Vehicle ${formData.vehicle_number} already has an equipment entry logged for ${formData.entry_date}, so this one was not submitted. This attempt has been recorded for the admin.`,
+            message: formData.rental_type === 'TRIP_BASIS'
+              ? `Vehicle ${formData.vehicle_number} already has an entry for ${formData.entry_date} with Timesheet #${formData.supplier_timesheet_number}, so this one was not submitted. This attempt has been recorded for the admin.`
+              : `Vehicle ${formData.vehicle_number} already has an equipment entry logged for ${formData.entry_date}, so this one was not submitted. This attempt has been recorded for the admin.`,
           });
           return;
         }
