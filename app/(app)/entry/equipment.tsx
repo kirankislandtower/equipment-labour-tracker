@@ -1114,7 +1114,7 @@ export default function EquipmentEntryScreen() {
 
         <View className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">Supplier Timesheet Number</Text>
-          <Text className="text-slate-400 text-xs mb-2">If the driver gave you a timesheet on-site, enter its number here.</Text>
+          <Text className="text-slate-400 text-xs mb-2">Enter the number from the SUPPLIER'S timesheet, not your own.</Text>
           <TextInput
             value={formData.supplier_timesheet_number}
             onChangeText={(t) => updateForm('supplier_timesheet_number', t)}
