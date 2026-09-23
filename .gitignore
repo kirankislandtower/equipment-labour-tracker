@@ -40,3 +40,6 @@ yarn-error.*
 /ios
 /android
 .env
+
+# Old business records -- never publish these, keep local-only
+reference/
