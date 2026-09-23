@@ -148,7 +148,7 @@ export default function SiteAllocationsScreen() {
       const [jobsRes, equipRes, suppRes] = await Promise.all([
         supabase.from('jobs').select('id, job_number, job_name').order('job_number'),
         supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name'),
-        supabase.from('suppliers').select('id, supplier_name, supplier_type').order('supplier_name')
+        supabase.from('suppliers').select('id, supplier_name, supplier_type').eq('is_active', true).order('supplier_name')
       ]);
 
       if (jobsRes.data && jobsRes.data.length > 0) {

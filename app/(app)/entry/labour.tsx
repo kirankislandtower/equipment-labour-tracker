@@ -259,7 +259,7 @@ export default function LabourEntryScreen() {
       setFetching(true);
       const [jobsRes, suppliersRes, designationsRes, { data: { user } }] = await Promise.all([
         fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
-        supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
+        supabase.from('suppliers').select('id, supplier_name').eq('is_active', true).order('supplier_name'),
         fetchWithCache('labour_designations', () => supabase.from('labour_designations').select('id, designation_name').order('designation_name')),
         supabase.auth.getUser()
       ]);

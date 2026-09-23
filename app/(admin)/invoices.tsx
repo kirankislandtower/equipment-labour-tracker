@@ -116,7 +116,7 @@ export default function InvoiceReconciler() {
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('suppliers').select('id, supplier_name').order('supplier_name');
+      const { data, error } = await supabase.from('suppliers').select('id, supplier_name').eq('is_active', true).order('supplier_name');
       if (data) {
         setSuppliers(data.map(s => ({ label: s.supplier_name, value: s.id })));
       }
