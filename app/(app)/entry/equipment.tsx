@@ -20,6 +20,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
 import { fetchWithCache } from '../../../lib/dataCache';
 import MessageModal, { MessageModalContent } from '../../../components/MessageModal';
+import ConfirmModal from '../../../components/ConfirmModal';
 import { logDuplicateAttempt } from '../../../lib/duplicateAttempts';
 
 // Helper for modal picker
@@ -114,6 +115,7 @@ export default function EquipmentEntryScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successVisible, setSuccessVisible] = useState(false);
   const [messageModal, setMessageModal] = useState<MessageModalContent | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{ vehicle: string; date: string } | null>(null);
   const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
   const [navigating, setNavigating] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -443,7 +445,7 @@ export default function EquipmentEntryScreen() {
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (skipDuplicateWarning: boolean = false) => {
     const newErrors: Record<string, string> = {};
     if (!formData.job_id) newErrors.job_id = 'Job is required';
     if (!formData.supplier_id) newErrors.supplier_id = 'Supplier is required';
@@ -558,42 +560,38 @@ export default function EquipmentEntryScreen() {
 
         // A vehicle can only be logged once per day for Hourly equipment, regardless
         // of which job it's under -- catches the same vehicle getting double-billed
-        // across different foremen or jobs, not just accidental resubmits.
-        // Trip-Basis equipment (e.g. tankers) legitimately makes several trips a day
-        // with the same vehicle, so that's only flagged when it's the exact same
-        // trip re-submitted -- i.e. the Supplier Timesheet Number also matches. A
-        // blank timesheet number can't be compared reliably, so it isn't blocked.
+        // across different foremen or jobs, not just accidental resubmits. Trip-Basis
+        // equipment (e.g. tankers) legitimately makes several real trips a day with
+        // the same vehicle, and the Supplier Timesheet Number can't reliably tell
+        // those apart either (a supplier sometimes reuses one timesheet number for a
+        // whole month), so that case is a warning the foreman can confirm past
+        // instead of a hard block -- see skipDuplicateWarning below.
         const normalizedVehicle = formData.vehicle_number.trim().toUpperCase().replace(/\s+/g, '');
         const { data: sameDayEntries } = await supabase
           .from('equipment_entries')
-          .select('vehicle_number, supplier_timesheet_number')
+          .select('vehicle_number')
           .eq('entry_date', formData.entry_date);
 
-        const sameVehicleEntries = (sameDayEntries || []).filter((e: any) =>
+        const isDuplicateVehicle = (sameDayEntries || []).some((e: any) =>
           (e.vehicle_number || '').trim().toUpperCase().replace(/\s+/g, '') === normalizedVehicle
         );
 
-        const normalizedTimesheet = formData.supplier_timesheet_number.trim().toUpperCase();
-        const isDuplicateVehicle = formData.rental_type === 'TRIP_BASIS'
-          ? !!normalizedTimesheet && sameVehicleEntries.some((e: any) => (e.supplier_timesheet_number || '').trim().toUpperCase() === normalizedTimesheet)
-          : sameVehicleEntries.length > 0;
-
         if (isDuplicateVehicle) {
-          const duplicateDetail = formData.rental_type === 'TRIP_BASIS'
-            ? `${formData.vehicle_number} (Timesheet #${formData.supplier_timesheet_number})`
-            : formData.vehicle_number;
-          setErrors(prev => ({
-            ...prev,
-            vehicle_number: formData.rental_type === 'TRIP_BASIS' ? 'This vehicle already has an entry with this timesheet number for this date' : 'This vehicle already has an entry for this date',
-          }));
-          logDuplicateAttempt({ entryType: 'equipment', entryDate: formData.entry_date, detail: duplicateDetail, userId: user?.id, foremanName: formData.foreman_name });
-          setMessageModal({
-            title: 'Duplicate Entry Warning',
-            message: formData.rental_type === 'TRIP_BASIS'
-              ? `Vehicle ${formData.vehicle_number} already has an entry for ${formData.entry_date} with Timesheet #${formData.supplier_timesheet_number}, so this one was not submitted. This attempt has been recorded for the admin.`
-              : `Vehicle ${formData.vehicle_number} already has an equipment entry logged for ${formData.entry_date}, so this one was not submitted. This attempt has been recorded for the admin.`,
-          });
-          return;
+          logDuplicateAttempt({ entryType: 'equipment', entryDate: formData.entry_date, detail: formData.vehicle_number, userId: user?.id, foremanName: formData.foreman_name });
+
+          if (formData.rental_type !== 'TRIP_BASIS') {
+            setErrors(prev => ({ ...prev, vehicle_number: 'This vehicle already has an entry for this date' }));
+            setMessageModal({
+              title: 'Duplicate Entry Warning',
+              message: `Vehicle ${formData.vehicle_number} already has an equipment entry logged for ${formData.entry_date}, so this one was not submitted. This attempt has been recorded for the admin.`,
+            });
+            return;
+          }
+
+          if (!skipDuplicateWarning) {
+            setDuplicateWarning({ vehicle: formData.vehicle_number, date: formData.entry_date });
+            return;
+          }
         }
       }
 
@@ -731,6 +729,19 @@ export default function EquipmentEntryScreen() {
       </View>
 
       <MessageModal content={messageModal} onDismiss={() => setMessageModal(null)} />
+
+      <ConfirmModal
+        visible={!!duplicateWarning}
+        title="Same Vehicle Already Logged Today"
+        message={duplicateWarning ? `Vehicle ${duplicateWarning.vehicle} already has an equipment entry for ${duplicateWarning.date}. If this is a different trip, you can submit anyway.` : ''}
+        confirmText="Submit Anyway"
+        cancelText="Cancel"
+        onCancel={() => setDuplicateWarning(null)}
+        onConfirm={() => {
+          setDuplicateWarning(null);
+          handleSubmit(true);
+        }}
+      />
 
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
