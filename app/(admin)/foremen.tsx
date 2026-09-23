@@ -33,6 +33,8 @@ export default function ForemanReports() {
   const [allData, setAllData] = useState<{equip: any[], labour: any[], material: any[]}>({ equip: [], labour: [], material: [] });
   const [selectedForeman, setSelectedForeman] = useState<any>(null);
   const [selectedListType, setSelectedListType] = useState<'equipment' | 'labour' | 'material' | null>(null);
+  const [entryDateFilter, setEntryDateFilter] = useState('');
+  const [showEntryDatePicker, setShowEntryDatePicker] = useState(false);
   // Auto-select the deep-linked foreman only once -- fetchData also re-runs after
   // approving/rejecting an entry, and we don't want that to keep forcing the modal
   // back open if the admin has since closed it.
@@ -166,6 +168,11 @@ export default function ForemanReports() {
     selectedForeman && (entry.created_by
       ? entry.created_by === selectedForeman.key
       : entry.foreman_name === selectedForeman.name);
+
+  // Narrows the modal list down to a single day, on top of matchesSelectedForeman,
+  // so an admin can answer "did he submit on this date?" without opening every entry.
+  const matchesForemanAndDate = (entry: any) =>
+    matchesSelectedForeman(entry) && (!entryDateFilter || entry.entry_date === entryDateFilter);
 
   // Derived, not stored -- so it updates automatically if the admin widens the date
   // range and a match now exists, instead of staying stuck on a stale "not found".
@@ -368,6 +375,7 @@ export default function ForemanReports() {
                       onPress={() => {
                         setSelectedListType('equipment');
                         setSelectedForeman(foreman);
+                        setEntryDateFilter('');
                       }}
                       className="flex-1 border-r border-slate-100 items-center py-2"
                     >
@@ -378,6 +386,7 @@ export default function ForemanReports() {
                       onPress={() => {
                         setSelectedListType('labour');
                         setSelectedForeman(foreman);
+                        setEntryDateFilter('');
                       }}
                       className="flex-1 border-r border-slate-100 items-center py-2"
                     >
@@ -388,6 +397,7 @@ export default function ForemanReports() {
                       onPress={() => {
                         setSelectedListType('material');
                         setSelectedForeman(foreman);
+                        setEntryDateFilter('');
                       }}
                       className="flex-1 items-center py-2"
                     >
@@ -417,16 +427,51 @@ export default function ForemanReports() {
               </TouchableOpacity>
             </View>
 
+            <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-2xl px-4 h-12 mb-4">
+              <Calendar size={18} color="#94a3b8" />
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={entryDateFilter}
+                  min={fromDate}
+                  max={toDate}
+                  onChange={(e: any) => setEntryDateFilter(e.target.value)}
+                  style={{ border: 'none', outline: 'none', flex: 1, marginLeft: 12, backgroundColor: 'transparent', color: '#0f172a', fontWeight: '700', fontSize: '14px' }}
+                />
+              ) : (
+                <TouchableOpacity onPress={() => setShowEntryDatePicker(true)} className="flex-1 ml-3">
+                  <Text className={entryDateFilter ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'}>
+                    {entryDateFilter || 'Filter by a specific date'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {!!entryDateFilter && (
+                <TouchableOpacity onPress={() => setEntryDateFilter('')} className="p-1 ml-2">
+                  <X size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {showEntryDatePicker && Platform.OS !== 'web' && (
+              <DateTimePicker
+                value={new Date(entryDateFilter || fromDate)}
+                mode="date"
+                display="default"
+                onChange={(e, d) => { setShowEntryDatePicker(false); if (d) setEntryDateFilter(getLocalDateString(d)); }}
+              />
+            )}
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
               {selectedListType === 'equipment' && (
                 <View className="mb-6">
                   <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Equipment</Text>
-                  {allData.equip.filter(e => matchesSelectedForeman(e)).length === 0 ? (
+                  {allData.equip.filter(matchesForemanAndDate).length === 0 ? (
                     <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
-                      <Text className="text-slate-500 font-medium">No equipment entries in this date range.</Text>
+                      <Text className="text-slate-500 font-medium">
+                        {entryDateFilter ? `No equipment entries on ${entryDateFilter}.` : 'No equipment entries in this date range.'}
+                      </Text>
                     </View>
                   ) : (
-                    allData.equip.filter(e => matchesSelectedForeman(e)).map(entry => (
+                    allData.equip.filter(matchesForemanAndDate).map(entry => (
                       <TouchableOpacity 
                         key={entry.id} 
                         activeOpacity={0.7}
@@ -464,12 +509,14 @@ export default function ForemanReports() {
               {selectedListType === 'labour' && (
                 <View className="mb-6">
                   <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Labour</Text>
-                  {allData.labour.filter(e => matchesSelectedForeman(e)).length === 0 ? (
+                  {allData.labour.filter(matchesForemanAndDate).length === 0 ? (
                     <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
-                      <Text className="text-slate-500 font-medium">No labour entries in this date range.</Text>
+                      <Text className="text-slate-500 font-medium">
+                        {entryDateFilter ? `No labour entries on ${entryDateFilter}.` : 'No labour entries in this date range.'}
+                      </Text>
                     </View>
                   ) : (
-                    allData.labour.filter(e => matchesSelectedForeman(e)).map(entry => (
+                    allData.labour.filter(matchesForemanAndDate).map(entry => (
                       <TouchableOpacity 
                         key={entry.id} 
                         activeOpacity={0.7}
@@ -507,12 +554,14 @@ export default function ForemanReports() {
               {selectedListType === 'material' && (
                 <View className="mb-6">
                   <Text className="text-sm font-black text-slate-900 uppercase tracking-widest mb-3 px-1">Material</Text>
-                  {allData.material.filter(e => matchesSelectedForeman(e)).length === 0 ? (
+                  {allData.material.filter(matchesForemanAndDate).length === 0 ? (
                     <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
-                      <Text className="text-slate-500 font-medium">No material transfers in this date range.</Text>
+                      <Text className="text-slate-500 font-medium">
+                        {entryDateFilter ? `No material transfers on ${entryDateFilter}.` : 'No material transfers in this date range.'}
+                      </Text>
                     </View>
                   ) : (
-                    allData.material.filter(e => matchesSelectedForeman(e)).map(entry => (
+                    allData.material.filter(matchesForemanAndDate).map(entry => (
                       <TouchableOpacity
                         key={entry.id}
                         activeOpacity={0.7}
