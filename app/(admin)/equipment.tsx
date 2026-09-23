@@ -148,12 +148,12 @@ export default function AdminEquipment() {
 
   const exportToCSV = async () => {
     try {
-      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Hours', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit'];
+      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Hours', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
       const rows = entries.map(e => [
-        e.entry_date || '', 
+        e.entry_date || '',
         e.jobs?.job_number || '',
-        e.jobs?.job_name || '', 
-        e.suppliers?.supplier_name || '', 
+        e.jobs?.job_name || '',
+        e.suppliers?.supplier_name || '',
         e.equipment_master?.equipment_name || '',
         e.working_hours || 0,
         e.status || '',
@@ -161,7 +161,10 @@ export default function AdminEquipment() {
         e.remarks || '',
         e.fuel_provided ? 'Yes' : 'No',
         e.fuel_quantity || '',
-        e.fuel_unit || ''
+        e.fuel_unit || '',
+        e.supplier_timesheet_number || '',
+        e.invoice_status === 'VERIFIED' ? 'VERIFIED' : 'PENDING',
+        e.invoice_number || ''
       ]);
 
       const csvContent = buildCSV(headers, rows);
@@ -648,6 +651,13 @@ export default function AdminEquipment() {
                     <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                       <Text className="text-slate-700 italic">"{selectedEntry.remarks}"</Text>
                     </View>
+                  </View>
+                )}
+
+                {!!selectedEntry.supplier_timesheet_number && (
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Supplier Timesheet Number</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.supplier_timesheet_number}</Text>
                   </View>
                 )}
 

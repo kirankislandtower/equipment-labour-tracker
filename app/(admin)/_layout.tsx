@@ -112,7 +112,7 @@ export default function AdminLayout() {
         <NavItem icon={FileText} label="Foreman Reports" href="/(admin)/foremen" />
         <NavItem icon={BarChart3} label="Usage Reports" href="/(admin)/reports" />
         <NavItem icon={Calculator} label="Invoice Reconciler" href="/(admin)/invoices" />
-        <NavItem icon={Receipt} label="Supplier Invoices" href="/(admin)/supplier-invoices" />
+        <NavItem icon={Receipt} label="Invoice Tracking" href="/(admin)/invoice-tracking" />
         <NavItem icon={Copy} label="Duplicate Alerts" href="/(admin)/duplicates" />
         <NavItem icon={Bell} label="Follow-ups" href="/(admin)/followups" />
         <NavItem icon={AttendanceIcon} label="Attendance" href="/(admin)/attendance" />

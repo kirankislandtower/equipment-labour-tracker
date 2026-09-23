@@ -183,6 +183,7 @@ export default function EquipmentEntryScreen() {
     fuel_provided: false,
     fuel_quantity: '',
     fuel_unit: 'Gallons',
+    supplier_timesheet_number: '',
     location: '',
     requested_by: '',
     assigned_job_id: ''
@@ -375,6 +376,7 @@ export default function EquipmentEntryScreen() {
             fuel_provided: entryData.fuel_provided || false,
             fuel_quantity: entryData.fuel_quantity ? entryData.fuel_quantity.toString() : '',
             fuel_unit: entryData.fuel_unit || 'Gallons',
+            supplier_timesheet_number: entryData.supplier_timesheet_number || '',
             requested_by: entryData.requested_by || '',
             assigned_job_id: entryData.assigned_job_id || ''
           }));
@@ -405,6 +407,7 @@ export default function EquipmentEntryScreen() {
           fuel_provided: false,
           fuel_quantity: '',
           fuel_unit: 'Gallons',
+          supplier_timesheet_number: '',
           location: '',
           requested_by: '',
           assigned_job_id: ''
@@ -518,6 +521,7 @@ export default function EquipmentEntryScreen() {
         fuel_provided: formData.fuel_provided,
         fuel_quantity: formData.fuel_provided && formData.fuel_quantity ? parseFloat(formData.fuel_quantity) : null,
         fuel_unit: formData.fuel_provided ? formData.fuel_unit : null,
+        supplier_timesheet_number: formData.supplier_timesheet_number.trim() || null,
         requested_by: isStoreUser ? formData.requested_by : null,
         assigned_job_id: isStoreUser ? formData.assigned_job_id : null
       };
@@ -756,6 +760,7 @@ export default function EquipmentEntryScreen() {
                     fuel_provided: false,
                     fuel_quantity: '',
                     fuel_unit: 'Gallons',
+                    supplier_timesheet_number: '',
                     location: '',
                     requested_by: '',
                     assigned_job_id: ''
@@ -1105,6 +1110,18 @@ export default function EquipmentEntryScreen() {
               </View>
             </View>
           )}
+        </View>
+
+        <View className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
+          <Text className="text-sm font-medium text-slate-700 mb-1">Supplier Timesheet Number</Text>
+          <Text className="text-slate-400 text-xs mb-2">If the driver gave you a timesheet on-site, enter its number here.</Text>
+          <TextInput
+            value={formData.supplier_timesheet_number}
+            onChangeText={(t) => updateForm('supplier_timesheet_number', t)}
+            className="bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-4 py-3"
+            placeholder="e.g. 9489"
+            placeholderTextColor="#94a3b8"
+          />
         </View>
 
         <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
