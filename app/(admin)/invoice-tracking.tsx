@@ -95,6 +95,23 @@ export default function InvoiceTracking() {
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [onlyMissingTimesheet, setOnlyMissingTimesheet] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkModalVisible, setBulkModalVisible] = useState(false);
+
+  // Bulk-selecting only makes sense against the Pending list, so drop any
+  // selection when switching tabs rather than carrying it over silently.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [tab]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setLoadError(false);
@@ -146,6 +163,18 @@ export default function InvoiceTracking() {
   const handleSaved = (updated: any) => {
     setEntries(prev => prev.map(e => (e.id === updated.id ? { ...e, ...updated } : e)));
     setSelectedEntry(null);
+  };
+
+  const handleBulkVerify = async (invoiceNumber: string) => {
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase
+      .from('equipment_entries')
+      .update({ invoice_status: 'VERIFIED', invoice_number: invoiceNumber })
+      .in('id', ids);
+    if (error) throw error;
+    setEntries(prev => prev.map(e => (ids.includes(e.id) ? { ...e, invoice_status: 'VERIFIED', invoice_number: invoiceNumber } : e)));
+    setSelectedIds(new Set());
+    setBulkModalVisible(false);
   };
 
   return (
@@ -231,6 +260,26 @@ export default function InvoiceTracking() {
           )}
         </View>
 
+        {tab === 'PENDING' && !loading && listForTab.length > 0 && (
+          <View className="flex-row items-center justify-between mb-4">
+            <TouchableOpacity
+              onPress={() => {
+                const visibleIds = listForTab.map(e => e.id);
+                const allSelected = visibleIds.every(id => selectedIds.has(id));
+                setSelectedIds(allSelected ? new Set() : new Set(visibleIds));
+              }}
+              className="flex-row items-center"
+            >
+              <View className={`w-5 h-5 rounded-md border-2 items-center justify-center mr-2 ${listForTab.every(e => selectedIds.has(e.id)) ? 'bg-blue-700 border-blue-700' : 'border-slate-300 bg-white'}`}>
+                {listForTab.every(e => selectedIds.has(e.id)) && <Check size={13} color="#fff" />}
+              </View>
+              <Text className="text-slate-600 font-bold text-sm">
+                {selectedIds.size > 0 ? `${selectedIds.size} selected` : `Select all ${listForTab.length}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {loading ? (
           <View className="py-20 items-center">
             <ActivityIndicator size="large" color="#1e3a8a" />
@@ -259,8 +308,20 @@ export default function InvoiceTracking() {
               <TouchableOpacity
                 key={e.id}
                 onPress={() => setSelectedEntry(e)}
-                className="bg-white p-4 rounded-2xl border border-slate-200 mb-3"
+                className={`bg-white p-4 rounded-2xl border mb-3 flex-row ${selectedIds.has(e.id) ? 'border-blue-400' : 'border-slate-200'}`}
               >
+                {tab === 'PENDING' && (
+                  <TouchableOpacity
+                    onPress={(evt) => { evt.stopPropagation(); toggleSelect(e.id); }}
+                    className="pr-3 pt-0.5"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <View className={`w-5 h-5 rounded-md border-2 items-center justify-center ${selectedIds.has(e.id) ? 'bg-blue-700 border-blue-700' : 'border-slate-300 bg-white'}`}>
+                      {selectedIds.has(e.id) && <Check size={13} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                <View className="flex-1">
                 <View className="flex-row justify-between items-start mb-1.5">
                   <Text className="text-slate-900 font-black text-base flex-1 pr-2">{e.equipment_master?.equipment_name || e.vehicle_number}</Text>
                   {tab === 'VERIFIED' ? (
@@ -289,13 +350,38 @@ export default function InvoiceTracking() {
                 {tab === 'VERIFIED' && !!e.invoice_number && (
                   <Text className="text-indigo-700 font-bold text-sm mt-2">Invoice: {e.invoice_number}</Text>
                 )}
+                </View>
               </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
 
+      {tab === 'PENDING' && selectedIds.size > 0 && (
+        <View
+          className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-4 flex-row items-center justify-between"
+          style={{ shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 8 }}
+        >
+          <Text className="text-slate-900 font-bold">{selectedIds.size} selected</Text>
+          <View className="flex-row items-center" style={{ gap: 12 }}>
+            <TouchableOpacity onPress={() => setSelectedIds(new Set())} className="px-4 py-3 rounded-xl border border-slate-200">
+              <Text className="text-slate-600 font-bold">Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setBulkModalVisible(true)} className="px-5 py-3 rounded-xl bg-green-600 flex-row items-center">
+              <CheckCircle2 size={18} color="#fff" />
+              <Text className="text-white font-bold ml-2">Verify {selectedIds.size}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <EntryDetailModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} onSaved={handleSaved} />
+      <BulkVerifyModal
+        visible={bulkModalVisible}
+        count={selectedIds.size}
+        onClose={() => setBulkModalVisible(false)}
+        onVerify={handleBulkVerify}
+      />
     </View>
   );
 }
@@ -424,6 +510,71 @@ function EntryDetailModal({ entry, onClose, onSaved }: { entry: any; onClose: ()
               </TouchableOpacity>
             </>
           )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function BulkVerifyModal({ visible, count, onClose, onVerify }: { visible: boolean; count: number; onClose: () => void; onVerify: (invoiceNumber: string) => Promise<void> }) {
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (visible) { setInvoiceNumber(''); setError(''); }
+  }, [visible]);
+
+  const handleSubmit = async () => {
+    if (!invoiceNumber.trim()) { setError('Enter the invoice number.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await onVerify(invoiceNumber.trim());
+    } catch (err: any) {
+      setError(err.message || 'Failed to save.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View className="flex-1 bg-black/50 justify-center items-center p-6">
+        <View className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl">
+          <View className="flex-row justify-between items-start mb-4">
+            <Text className="text-xl font-black text-slate-900 flex-1 pr-2">Verify {count} {count === 1 ? 'Entry' : 'Entries'}</Text>
+            <TouchableOpacity onPress={onClose} className="bg-slate-100 p-2 rounded-full active:bg-slate-200">
+              <X size={18} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <Text className="text-slate-500 text-sm mb-5">
+            All selected entries will be stamped with this same invoice number — use this when one supplier invoice covers several daily entries.
+          </Text>
+
+          <Text className="text-sm font-bold text-slate-700 mb-1.5">Invoice Number</Text>
+          <TextInput
+            value={invoiceNumber}
+            onChangeText={setInvoiceNumber}
+            placeholder="e.g. T00681"
+            placeholderTextColor="#94a3b8"
+            autoFocus
+            className="bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 mb-4"
+            style={{ outlineStyle: 'none' } as any}
+          />
+          {!!error && <Text className="text-red-600 text-sm mb-3">{error}</Text>}
+          <TouchableOpacity
+            onPress={handleSubmit}
+            disabled={saving}
+            className={`py-3.5 rounded-xl items-center flex-row justify-center ${saving ? 'bg-slate-400' : 'bg-green-600'}`}
+          >
+            {saving ? <ActivityIndicator color="#fff" /> : (
+              <>
+                <CheckCircle2 size={18} color="#fff" />
+                <Text className="text-white font-bold ml-2">Mark {count} Verified</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
