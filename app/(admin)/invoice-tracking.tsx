@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, useWindowDimensions, Modal, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { FileText, Search, X, Check, ChevronDown, CheckCircle2, RotateCcw } from 'lucide-react-native';
+import { FileText, Search, X, Check, ChevronDown, CheckCircle2, RotateCcw, Download } from 'lucide-react-native';
 
 type Tab = 'PENDING' | 'VERIFIED';
 
@@ -97,6 +99,7 @@ export default function InvoiceTracking() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Bulk-selecting only makes sense against the Pending list, so drop any
   // selection when switching tabs rather than carrying it over silently.
@@ -177,6 +180,96 @@ export default function InvoiceTracking() {
     setBulkModalVisible(false);
   };
 
+  const handleExportExcel = async () => {
+    if (listForTab.length === 0) {
+      alert('No entries to export for this tab and filter.');
+      return;
+    }
+    setExporting(true);
+    try {
+      // Loaded on demand so the ~400KB xlsx library only ships to clients that
+      // actually export, same pattern as the Dashboard's daily report export.
+      const xlsxModule: any = await import('xlsx-js-style');
+      const XLSX = xlsxModule.utils ? xlsxModule : xlsxModule.default;
+
+      const headers = [
+        'Equipment', 'Supplier', 'Vehicle Number', 'Job Number', 'Job Name', 'Date',
+        'Rental Type', 'Working Hours', 'Number of Trips', 'Foreman',
+        'Supplier Timesheet #', 'Status', 'Invoice Number',
+      ];
+      const rows = listForTab.map((e: any) => [
+        e.equipment_master?.equipment_name || '',
+        e.suppliers?.supplier_name || '',
+        e.vehicle_number || '',
+        e.jobs?.job_number || '',
+        e.jobs?.job_name || '',
+        e.entry_date,
+        e.rental_type,
+        e.rental_type === 'TRIP_BASIS' ? '' : (e.working_hours ?? ''),
+        e.rental_type === 'TRIP_BASIS' ? (e.number_of_trips ?? '') : '',
+        e.foreman_name || '',
+        e.supplier_timesheet_number || '',
+        e.invoice_status,
+        e.invoice_number || '',
+      ]);
+
+      const statusColIndex = headers.indexOf('Status');
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      worksheet['!cols'] = [22, 22, 14, 12, 20, 12, 12, 13, 14, 16, 18, 12, 16].map(wch => ({ wch }));
+
+      headers.forEach((_, colIndex) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: colIndex });
+        if (worksheet[cellRef]) {
+          worksheet[cellRef].s = { font: { bold: true }, fill: { fgColor: { rgb: 'FFE2E8F0' } } };
+        }
+      });
+
+      rows.forEach((row, rowIndex) => {
+        if (row[statusColIndex] !== 'VERIFIED') return;
+        headers.forEach((_, colIndex) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIndex + 1, c: colIndex });
+          if (worksheet[cellRef]) {
+            worksheet[cellRef].s = { fill: { fgColor: { rgb: 'FFC6EFCE' } }, font: { color: { rgb: 'FF006100' } } };
+          }
+        });
+      });
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, tab === 'PENDING' ? 'Pending' : 'Verified');
+      const fileName = `InvoiceTracking_${tab === 'PENDING' ? 'Pending' : 'Verified'}_${fromDate}_to_${toDate}.xlsx`;
+
+      if (Platform.OS === 'web') {
+        const wbArray = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+        const blob = new Blob([wbArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        const wbBase64 = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+        await FileSystem.writeAsStringAsync(fileUri, wbBase64, { encoding: FileSystem.EncodingType.Base64 });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            dialogTitle: 'Export Invoice Tracking',
+          });
+        } else {
+          alert('Sharing is not available on this device.');
+        }
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to export.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
@@ -185,18 +278,35 @@ export default function InvoiceTracking() {
           <Text className="text-slate-500 font-medium">Verify approved Equipment entries against the supplier's invoice.</Text>
         </View>
 
-        <View className="flex-row bg-slate-200/70 rounded-2xl p-1 self-start mb-5">
+        <View className={isMobile ? 'mb-5' : 'flex-row items-center justify-between mb-5'} style={isMobile ? { gap: 12 } : undefined}>
+          <View className="flex-row bg-slate-200/70 rounded-2xl p-1 self-start">
+            <TouchableOpacity
+              onPress={() => setTab('PENDING')}
+              className={`flex-row items-center px-4 py-2.5 rounded-xl ${tab === 'PENDING' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`font-bold text-sm ${tab === 'PENDING' ? 'text-slate-900' : 'text-slate-500'}`}>Pending ({pending.length})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setTab('VERIFIED')}
+              className={`flex-row items-center px-4 py-2.5 rounded-xl ${tab === 'VERIFIED' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`font-bold text-sm ${tab === 'VERIFIED' ? 'text-slate-900' : 'text-slate-500'}`}>Verified ({verified.length})</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            onPress={() => setTab('PENDING')}
-            className={`flex-row items-center px-4 py-2.5 rounded-xl ${tab === 'PENDING' ? 'bg-white shadow-sm' : ''}`}
+            onPress={handleExportExcel}
+            disabled={exporting || listForTab.length === 0}
+            className={`flex-row items-center justify-center px-4 py-2.5 rounded-xl self-start ${exporting || listForTab.length === 0 ? 'bg-slate-300' : 'bg-emerald-600 active:bg-emerald-700'}`}
           >
-            <Text className={`font-bold text-sm ${tab === 'PENDING' ? 'text-slate-900' : 'text-slate-500'}`}>Pending ({pending.length})</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTab('VERIFIED')}
-            className={`flex-row items-center px-4 py-2.5 rounded-xl ${tab === 'VERIFIED' ? 'bg-white shadow-sm' : ''}`}
-          >
-            <Text className={`font-bold text-sm ${tab === 'VERIFIED' ? 'text-slate-900' : 'text-slate-500'}`}>Verified ({verified.length})</Text>
+            {exporting ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Download size={16} color="#fff" />
+                <Text className="text-white font-bold ml-2 text-sm">Export {tab === 'PENDING' ? 'Pending' : 'Verified'} to Excel</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
