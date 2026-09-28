@@ -149,19 +149,33 @@ export default function LabourEntryScreen() {
 
   // viewShotRef removed
 
-  const pickImage = async () => {
+  const pickImage = async (source: 'camera' | 'gallery' = 'camera') => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'We need camera permissions to verify labour on-site!');
-        return;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'We need camera permissions to verify labour on-site!');
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'We need photo library permission to choose a photo.');
+          return;
+        }
       }
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.7,
-      });
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+          });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
@@ -927,7 +941,7 @@ export default function LabourEntryScreen() {
         </View>
 
         <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-            <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo (Live Camera Only) {!isStoreUser && <Text className="text-red-500">*</Text>}</Text>
+            <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo {!isStoreUser && <Text className="text-red-500">*</Text>}</Text>
             {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
 
             {photoUri ? (
@@ -957,16 +971,27 @@ export default function LabourEntryScreen() {
             ) : Platform.OS === 'web' ? (
               <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); }} colorTheme="green" />
             ) : (
-              <TouchableOpacity
-                onPress={pickImage}
-                className="bg-green-50 border-2 border-dashed border-green-200 rounded-lg py-8 items-center justify-center active:bg-green-100"
-              >
-                <Camera size={32} color="#16a34a" className="mb-2" />
-                <Text className="text-green-900 font-bold text-base">Take Live Photo</Text>
-                <Text className="text-green-600 text-xs mt-1 text-center px-4">
-                  Photos are time and location stamped to prevent fraud.
+              <>
+                <View className="flex-row" style={{ gap: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => pickImage('camera')}
+                    className="flex-1 bg-green-50 border-2 border-dashed border-green-200 rounded-lg py-8 items-center justify-center active:bg-green-100"
+                  >
+                    <Camera size={28} color="#16a34a" className="mb-2" />
+                    <Text className="text-green-900 font-bold text-sm text-center">Take Live Photo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => pickImage('gallery')}
+                    className="flex-1 bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg py-8 items-center justify-center active:bg-slate-100"
+                  >
+                    <ImageIcon size={28} color="#475569" className="mb-2" />
+                    <Text className="text-slate-700 font-bold text-sm text-center">Choose from Gallery</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text className="text-green-600 text-xs mt-2 text-center px-2">
+                  A live photo is preferred and gets time-stamped. Use Gallery only if you couldn't take one on-site.
                 </Text>
-              </TouchableOpacity>
+              </>
             )}
           </View>
 
