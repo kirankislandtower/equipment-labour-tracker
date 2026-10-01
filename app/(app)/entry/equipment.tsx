@@ -492,6 +492,33 @@ export default function EquipmentEntryScreen() {
       return;
     }
 
+    // A foreman can't have finished work that, by the clock, hasn't ended yet --
+    // this catches a full day's hours being pre-filled and submitted before the
+    // shift is actually over. Only checked for new, same-day entries; editing an
+    // existing entry or logging a past date is unaffected. No override -- the
+    // foreman just has to come back and submit once the work is actually done.
+    if (!id && formData.entry_date === getLocalDateString()) {
+      const to24h = (time12: string, ampm: string) => {
+        let [h, m] = (time12 || '').split(':').map(Number);
+        if (isNaN(h) || isNaN(m)) return null;
+        if (ampm === 'PM' && h !== 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      };
+      const end24 = to24h(formData.end_time, formData.end_am_pm);
+      const now = new Date();
+      const nowHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const nowLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      if (end24 && nowHHMM < end24) {
+        setMessageModal({
+          title: 'Too Early to Submit',
+          message: `You can submit this entry only at work finish time. This entry claims work until ${formData.end_time} ${formData.end_am_pm}, but it's only ${nowLabel} right now.`,
+        });
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Modal, Image, TextInput, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Download, ChevronDown, Check, X, Building2, Truck, HardHat, Calendar, Clock, AlertCircle, Image as ImageIcon } from 'lucide-react-native';
+import { Download, ChevronDown, Check, X, Building2, Truck, HardHat, Calendar, Clock, AlertCircle, AlertTriangle, Image as ImageIcon } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
+import { getLocalDateString, getFirstOfMonthString, getEarlySubmissionFlag } from '../../lib/dateUtils';
 import { isStoreForemanEntry } from '../../lib/foremanFlags';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -208,6 +208,23 @@ export default function AdminLabour() {
     return (
       <View className={`${bg} px-3 py-1 rounded-full self-start`}>
         <Text className={`${text} text-xs font-bold uppercase`}>{status}</Text>
+      </View>
+    );
+  };
+
+  // Flags an entry whose submission timestamp is earlier than the work period it
+  // claims -- the exact fraud pattern of pre-filling a full day's hours and
+  // submitting before the shift even begins.
+  const EarlyFlagBadge = ({ entry, className = '' }: { entry: any; className?: string }) => {
+    const flag = getEarlySubmissionFlag(entry);
+    if (!flag) return null;
+    const isSevere = flag === 'BEFORE_START';
+    return (
+      <View className={`${isSevere ? 'bg-red-100 border-red-200' : 'bg-amber-100 border-amber-200'} border px-2.5 py-1 rounded-full flex-row items-center self-start ${className}`}>
+        <AlertTriangle size={11} color={isSevere ? '#dc2626' : '#d97706'} />
+        <Text className={`${isSevere ? 'text-red-700' : 'text-amber-700'} text-[10px] font-bold uppercase ml-1`}>
+          {isSevere ? 'Submitted Before Start' : 'Submitted Before Finish'}
+        </Text>
       </View>
     );
   };
@@ -420,7 +437,8 @@ export default function AdminLabour() {
                           <Text className="text-slate-900 font-bold">{entry.entry_date}</Text>
                           <StatusPill status={entry.status} />
                         </View>
-                        
+                        <EarlyFlagBadge entry={entry} className="mb-3" />
+
                         <View className="flex-row justify-between mb-3 border-b border-slate-100 pb-3">
                           <View className="flex-1">
                             <Text className="text-xs font-bold text-slate-400 mb-1 uppercase">Job Details</Text>
@@ -495,8 +513,9 @@ export default function AdminLabour() {
                           <Text className="text-slate-500 text-xs">{entry.labour_designations?.designation_name} - {entry.suppliers?.supplier_name}</Text>
                         </View>
                         <Text className="flex-1 text-slate-900 font-medium" numberOfLines={1}>{entry.foreman_name}</Text>
-                        <View className="flex-1 items-center justify-center">
+                        <View className="flex-1 items-center justify-center" style={{ gap: 4 }}>
                           <StatusPill status={entry.status} />
+                          <EarlyFlagBadge entry={entry} />
                         </View>
                         <View className="flex-1 flex-row justify-end space-x-2">
                           {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && entry.labour_photo_url !== 'NOT_REQUIRED' && (
@@ -567,11 +586,12 @@ export default function AdminLabour() {
                   <View className="items-end">
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Status</Text>
                     <StatusPill status={selectedEntry.status} />
+                    <EarlyFlagBadge entry={selectedEntry} className="mt-2" />
                   </View>
                 </View>
-                
+
                 <View className="h-px bg-slate-100 w-full mb-4" />
-                
+
                 <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Job Details</Text>
                 <Text className="text-slate-900 font-bold text-base">{selectedEntry.jobs?.job_number}</Text>
                 <Text className="text-slate-500 mb-4">{selectedEntry.jobs?.job_name}</Text>

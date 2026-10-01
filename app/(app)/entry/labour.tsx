@@ -399,6 +399,25 @@ export default function LabourEntryScreen() {
       return;
     }
 
+    // A foreman can't have finished work that, by the clock, hasn't ended yet --
+    // this catches a full day's hours being pre-filled and submitted before the
+    // shift is actually over. Only checked for new, same-day entries; editing an
+    // existing entry or logging a past date is unaffected. No override -- the
+    // foreman just has to come back and submit once the work is actually done.
+    if (!id && entryDate === getLocalDateString()) {
+      const now = new Date();
+      const nowHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const nowLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      if (endTime && nowHHMM < endTime) {
+        setMessageModal({
+          title: 'Too Early to Submit',
+          message: `You can submit this entry only at work finish time. This entry claims work until ${endTime}, but it's only ${nowLabel} right now.`,
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
