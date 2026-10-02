@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, Modal, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Copy, Search, X } from 'lucide-react-native';
 
@@ -17,6 +17,7 @@ export default function DuplicateAlerts() {
   const [loadError, setLoadError] = useState(false);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAttempt, setSelectedAttempt] = useState<any>(null);
 
   useEffect(() => {
     (async () => {
@@ -113,7 +114,12 @@ export default function DuplicateAlerts() {
               filtered.map(a => {
                 const style = TYPE_STYLES[a.entry_type] || TYPE_STYLES.equipment;
                 return (
-                  <View key={a.id} className="bg-white p-5 rounded-2xl border border-slate-200 mb-3">
+                  <TouchableOpacity
+                    key={a.id}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedAttempt(a)}
+                    className="bg-white p-5 rounded-2xl border border-slate-200 mb-3"
+                  >
                     <View className="flex-row justify-between items-start mb-2">
                       <Text className="text-slate-900 font-black text-lg flex-1 pr-2">{a.foreman_name || 'Unknown Foreman'}</Text>
                       <View className={`px-3 py-1 rounded-full ${style.bg}`}>
@@ -123,13 +129,69 @@ export default function DuplicateAlerts() {
                     <Text className="text-slate-700 font-bold">{a.detail}</Text>
                     <Text className="text-slate-500 text-sm mt-1">Entry date {a.entry_date}</Text>
                     <Text className="text-slate-400 text-xs mt-2">Tried on {new Date(a.created_at).toLocaleString()}</Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}
           </>
         )}
       </ScrollView>
+
+      <Modal visible={!!selectedAttempt} transparent animationType="slide" onRequestClose={() => setSelectedAttempt(null)}>
+        <View className="flex-1 bg-slate-900/60 justify-end">
+          <View className="bg-white rounded-t-[32px] p-6 max-h-[90%]">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-2xl font-black text-slate-900">Attempt Details</Text>
+              <TouchableOpacity onPress={() => setSelectedAttempt(null)} className="bg-slate-100 p-2 rounded-full active:bg-slate-200">
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {selectedAttempt && (() => {
+              const style = TYPE_STYLES[selectedAttempt.entry_type] || TYPE_STYLES.equipment;
+              return (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }} style={{ minHeight: 0 }}>
+                  <View className="flex-row justify-between mb-4">
+                    <View>
+                      <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Foreman</Text>
+                      <Text className="text-slate-900 font-bold text-lg">{selectedAttempt.foreman_name || 'Unknown Foreman'}</Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Type</Text>
+                      <View className={`px-3 py-1 rounded-full ${style.bg}`}>
+                        <Text className={`text-[10px] font-bold uppercase ${style.text}`}>{style.label}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View className="h-px bg-slate-100 w-full mb-4" />
+
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">What They Tried to Log</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedAttempt.detail}</Text>
+                  </View>
+
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Entry Date</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedAttempt.entry_date}</Text>
+                  </View>
+
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Attempted At</Text>
+                    <Text className="text-slate-900 font-bold text-base">{new Date(selectedAttempt.created_at).toLocaleString()}</Text>
+                  </View>
+
+                  <View className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <Text className="text-slate-500 text-sm">
+                      This attempt was blocked by the duplicate check and was never saved as an entry -- there's no submission to approve or reject here.
+                    </Text>
+                  </View>
+                </ScrollView>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
