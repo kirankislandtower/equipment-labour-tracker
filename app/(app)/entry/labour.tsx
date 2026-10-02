@@ -400,11 +400,13 @@ export default function LabourEntryScreen() {
     }
 
     // A foreman can't have finished work that, by the clock, hasn't ended yet --
-    // this catches a full day's hours being pre-filled and submitted before the
-    // shift is actually over. Only checked for new, same-day entries; editing an
-    // existing entry or logging a past date is unaffected. No override -- the
-    // foreman just has to come back and submit once the work is actually done.
-    if (!id && entryDate === getLocalDateString()) {
+    // this catches a full day's hours being pre-filled and submitted (or padded
+    // in later via an edit) before the shift is actually over. Checked for any
+    // same-day entry, new or edited -- there's no legitimate reason a same-day
+    // edit should be allowed to claim finished work that hasn't finished yet
+    // either. Logging a past date is unaffected. No override -- the foreman just
+    // has to come back and save once the work is actually done.
+    if (entryDate === getLocalDateString()) {
       const now = new Date();
       const nowHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       const nowLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

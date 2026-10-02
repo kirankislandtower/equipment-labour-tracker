@@ -493,11 +493,13 @@ export default function EquipmentEntryScreen() {
     }
 
     // A foreman can't have finished work that, by the clock, hasn't ended yet --
-    // this catches a full day's hours being pre-filled and submitted before the
-    // shift is actually over. Only checked for new, same-day entries; editing an
-    // existing entry or logging a past date is unaffected. No override -- the
-    // foreman just has to come back and submit once the work is actually done.
-    if (!id && formData.entry_date === getLocalDateString()) {
+    // this catches a full day's hours being pre-filled and submitted (or padded
+    // in later via an edit) before the shift is actually over. Checked for any
+    // same-day entry, new or edited -- there's no legitimate reason a same-day
+    // edit should be allowed to claim finished work that hasn't finished yet
+    // either. Logging a past date is unaffected. No override -- the foreman just
+    // has to come back and save once the work is actually done.
+    if (formData.entry_date === getLocalDateString()) {
       const to24h = (time12: string, ampm: string) => {
         let [h, m] = (time12 || '').split(':').map(Number);
         if (isNaN(h) || isNaN(m)) return null;
