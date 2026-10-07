@@ -23,13 +23,19 @@ export function getFirstOfMonthString(): string {
  * Built from the entry's own local wall-clock fields, compared against created_at
  * read in the viewer's local timezone (same assumption the rest of the app makes
  * about "local" meaning the site's own time).
+ *
+ * Trip Basis equipment entries are exempt -- those are logged per-trip, often
+ * several times in one shift, so start/end time don't represent a single "work
+ * period" the way they do for every other rental type.
  */
 export function getEarlySubmissionFlag(entry: {
   entry_date?: string | null;
   start_time?: string | null;
   end_time?: string | null;
   created_at?: string | null;
+  rental_type?: string | null;
 }): 'BEFORE_START' | 'BEFORE_END' | null {
+  if (entry.rental_type === 'TRIP_BASIS') return null;
   if (!entry.entry_date || !entry.created_at) return null;
   const createdAt = new Date(entry.created_at);
   if (isNaN(createdAt.getTime())) return null;

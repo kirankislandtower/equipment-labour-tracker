@@ -499,7 +499,10 @@ export default function EquipmentEntryScreen() {
     // edit should be allowed to claim finished work that hasn't finished yet
     // either. Logging a past date is unaffected. No override -- the foreman just
     // has to come back and save once the work is actually done.
-    if (formData.entry_date === getLocalDateString()) {
+    // Trip Basis is exempt -- those entries are logged per-trip, often several
+    // times in a single shift, so there's no single "end of work" time to check
+    // against and this would just block legitimate rapid-fire trip logging.
+    if (formData.rental_type !== 'TRIP_BASIS' && formData.entry_date === getLocalDateString()) {
       const to24h = (time12: string, ampm: string) => {
         let [h, m] = (time12 || '').split(':').map(Number);
         if (isNaN(h) || isNaN(m)) return null;
