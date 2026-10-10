@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { User, Mail, LogOut, Shield, Download, CheckCircle, Share, X, PhoneCall } from 'lucide-react-native';
+import { User, Mail, LogOut, Shield, Download, CheckCircle, Share, X, PhoneCall, Hash } from 'lucide-react-native';
 import {
   canPromptInstall,
   promptInstall,
@@ -20,6 +20,11 @@ export default function ProfileScreen() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // The big name at the top used to just be a capitalized guess from the email
+  // prefix (e.g. "anil@..." -> "Anil"), which has nothing to do with the real
+  // full_name on file -- fetched fresh each time this tab is opened so an admin
+  // correcting someone's name shows up without the foreman needing to log out.
+  const [fullName, setFullName] = useState('');
 
   // Re-rendered whenever the browser's install-availability changes (the event
   // that makes canPromptInstall() true can fire after this screen has already
@@ -44,8 +49,14 @@ export default function ProfileScreen() {
     React.useCallback(() => {
       setIsTransitioning(true);
       const timer = setTimeout(() => setIsTransitioning(false), 300);
+
+      if (user?.id) {
+        supabase.from('users').select('full_name').eq('id', user.id).maybeSingle()
+          .then(({ data }) => setFullName(data?.full_name || ''));
+      }
+
       return () => clearTimeout(timer);
-    }, [])
+    }, [user?.id])
   );
 
   const handleLogoutConfirm = async () => {
@@ -70,6 +81,7 @@ export default function ProfileScreen() {
 
   const username = user?.email?.split('@')[0] || 'Foreman';
   const role = user?.email?.includes('admin') ? 'Administrator' : 'Foreman';
+  const displayName = fullName || (username.charAt(0).toUpperCase() + username.slice(1));
 
   if (isTransitioning) {
     return (
@@ -95,9 +107,9 @@ export default function ProfileScreen() {
           {/* Avatar Section */}
           <View className="items-center mb-10">
             <View className="w-24 h-24 bg-blue-100 rounded-full items-center justify-center border-4 border-white shadow-sm mb-4">
-              <Text className="text-blue-900 text-4xl font-black">{username.charAt(0).toUpperCase()}</Text>
+              <Text className="text-blue-900 text-4xl font-black">{displayName.charAt(0).toUpperCase()}</Text>
             </View>
-            <Text className="text-2xl font-black text-slate-900 tracking-tight">{username.charAt(0).toUpperCase() + username.slice(1)}</Text>
+            <Text className="text-2xl font-black text-slate-900 tracking-tight">{displayName}</Text>
             <View className="flex-row items-center mt-2 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
               <Shield size={14} color="#64748b" />
               <Text className="text-slate-600 font-bold text-xs ml-1.5 uppercase tracking-wider">{role}</Text>
@@ -118,13 +130,25 @@ export default function ProfileScreen() {
 
             <View className="h-px bg-slate-100 w-full mb-6" />
 
-            <View className="flex-row items-center">
+            <View className="flex-row items-center mb-6">
               <View className="bg-slate-50 p-3 rounded-full border border-slate-100 mr-4">
                 <Mail size={20} color="#64748b" />
               </View>
               <View>
                 <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Email Address</Text>
                 <Text className="text-base font-bold text-slate-900">{user?.email || 'No email provided'}</Text>
+              </View>
+            </View>
+
+            <View className="h-px bg-slate-100 w-full mb-6" />
+
+            <View className="flex-row items-center">
+              <View className="bg-slate-50 p-3 rounded-full border border-slate-100 mr-4">
+                <Hash size={20} color="#64748b" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">User ID</Text>
+                <Text className="text-sm font-bold text-slate-900" selectable>{user?.id || 'Unavailable'}</Text>
               </View>
             </View>
           </View>
