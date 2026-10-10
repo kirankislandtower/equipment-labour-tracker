@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from './cloudinary';
 
-export type QueuedEntryType = 'equipment' | 'labour' | 'material';
+export type QueuedEntryType = 'equipment' | 'labour' | 'material' | 'flushing';
 
 export interface QueuedEntry {
   id: string;

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Home, Truck, Users, User, ArrowRightLeft } from 'lucide-react-native';
+import { Home, Truck, Users, User, ArrowRightLeft, Droplets } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import { processQueue } from '../../lib/offlineQueue';
@@ -37,7 +37,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            if (route.name === 'entry/equipment' || route.name === 'entry/labour' || route.name === 'entry/material') {
+            if (route.name === 'entry/equipment' || route.name === 'entry/labour' || route.name === 'entry/material' || route.name === 'entry/flushing') {
               navigation.navigate(route.name, { ...route.params, id: undefined });
             } else {
               navigation.navigate(route.name, route.params);
@@ -109,15 +109,22 @@ export default function AppLayout() {
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} />
         }} 
       />
-      <Tabs.Screen 
-        name="entry/material" 
-        options={{ 
+      <Tabs.Screen
+        name="entry/material"
+        options={{
           title: 'Material',
           tabBarIcon: ({ color, size }) => <ArrowRightLeft color={color} size={size} />
-        }} 
+        }}
       />
-      <Tabs.Screen 
-        name="profile" 
+      <Tabs.Screen
+        name="entry/flushing"
+        options={{
+          title: 'Flushing',
+          tabBarIcon: ({ color, size }) => <Droplets color={color} size={size} />
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
         options={{ 
           title: 'Profile',
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />

@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 // Best-effort: the foreman still gets their warning even if this can't be saved
 // (e.g. the table hasn't been created yet or the connection just dropped).
 export async function logDuplicateAttempt(attempt: {
-  entryType: 'equipment' | 'labour' | 'material';
+  entryType: 'equipment' | 'labour' | 'material' | 'flushing';
   entryDate: string;
   detail: string;
   userId?: string | null;

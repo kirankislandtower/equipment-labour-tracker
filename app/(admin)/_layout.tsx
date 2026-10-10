@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Modal, SafeAreaView, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
-import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell, Receipt } from 'lucide-react-native';
+import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell, Receipt, Droplets } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 
 export default function AdminLayout() {
@@ -109,10 +109,12 @@ export default function AdminLayout() {
         <NavItem icon={Truck} label="Equipment Entries" href="/(admin)/equipment" />
         <NavItem icon={Users} label="Labour Entries" href="/(admin)/labour" />
         <NavItem icon={ArrowRightLeft} label="Material Transfers" href="/(admin)/materials" />
+        <NavItem icon={Droplets} label="Flushing Entries" href="/(admin)/flushing" />
         <NavItem icon={FileText} label="Foreman Reports" href="/(admin)/foremen" />
         <NavItem icon={BarChart3} label="Usage Reports" href="/(admin)/reports" />
         <NavItem icon={Calculator} label="Invoice Reconciler" href="/(admin)/invoices" />
-        <NavItem icon={Receipt} label="Invoice Tracking" href="/(admin)/invoice-tracking" />
+        <NavItem icon={Receipt} label="Equipment Invoice Tracking" href="/(admin)/invoice-tracking" />
+        <NavItem icon={Receipt} label="Flushing Invoice Tracking" href="/(admin)/flushing-invoice-tracking" />
         <NavItem icon={Copy} label="Duplicate Alerts" href="/(admin)/duplicates" />
         <NavItem icon={Bell} label="Follow-ups" href="/(admin)/followups" />
         <NavItem icon={AttendanceIcon} label="Attendance" href="/(admin)/attendance" />
