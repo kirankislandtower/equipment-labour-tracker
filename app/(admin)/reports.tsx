@@ -3,8 +3,9 @@ import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, useWindowD
 import { supabase } from '../../lib/supabase';
 import { Calendar, Briefcase, Building2, BarChart3, X, Check, Search } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
+import { getLocalDateString, getFirstOfMonthString, formatSubmittedAt } from '../../lib/dateUtils';
 import ExportCSVButton from '../../components/ExportCSVButton';
+import { FadeInUp } from '../../components/Animations';
 
 type GroupBy = 'job' | 'supplier';
 type StatusFilter = 'ALL' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
@@ -261,6 +262,7 @@ export default function UsageReports() {
   const filteredMaterial = groupBy === 'job' ? allData.material.filter(e => matchesSelectedStat(e, true)) : [];
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         <View className="mb-6 flex-row justify-between items-end">
@@ -751,7 +753,7 @@ export default function UsageReports() {
                   <View>
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1 text-right">Submitted At</Text>
                     <Text className="text-slate-700 font-medium text-right">
-                      {new Date(selectedEntry.created_at).toLocaleDateString()} at {new Date(selectedEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatSubmittedAt(selectedEntry.created_at)}
                     </Text>
                   </View>
                 </View>
@@ -834,5 +836,6 @@ export default function UsageReports() {
         </View>
       )}
     </View>
+    </FadeInUp>
   );
 }

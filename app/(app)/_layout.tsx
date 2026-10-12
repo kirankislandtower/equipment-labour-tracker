@@ -5,20 +5,24 @@ import { Home, Truck, Users, User, ArrowRightLeft, Droplets } from 'lucide-react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import { processQueue } from '../../lib/offlineQueue';
+import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../lib/foremanFlags';
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
-  
+
   return (
-    <View 
+    <View
       className="absolute left-4 right-4 bg-white/95 shadow-sm border border-slate-200 rounded-3xl flex-row justify-between items-center px-2 py-2"
       style={{ bottom: Platform.OS === 'web' ? 24 : Math.max(insets.bottom, 16), elevation: 5, backdropFilter: 'blur(10px)' } as any}
     >
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
-        
+
         // Hide routes that shouldn't be in the tab bar (like entry forms)
-        if (['entry/select', 'history', 'missing-photos'].includes(route.name)) return null;
+        const hiddenRoutes = FLUSHING_ENABLED_FOR_FOREMEN
+          ? ['entry/select', 'history', 'missing-photos']
+          : ['entry/select', 'history', 'missing-photos', 'entry/flushing'];
+        if (hiddenRoutes.includes(route.name)) return null;
 
         const label =
           options.tabBarLabel !== undefined
@@ -118,10 +122,10 @@ export default function AppLayout() {
       />
       <Tabs.Screen
         name="entry/flushing"
-        options={{
+        options={FLUSHING_ENABLED_FOR_FOREMEN ? {
           title: 'Flushing',
           tabBarIcon: ({ color, size }) => <Droplets color={color} size={size} />
-        }}
+        } : { href: null }}
       />
       <Tabs.Screen
         name="profile"

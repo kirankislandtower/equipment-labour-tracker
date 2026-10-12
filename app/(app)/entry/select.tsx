@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Truck, Users, ArrowLeft, ChevronRight, ArrowRightLeft, Droplets } from 'lucide-react-native';
+import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../../lib/foremanFlags';
 
 export default function EntrySelectScreen() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function EntrySelectScreen() {
         {/* Material Transfer Card */}
         <TouchableOpacity
           onPress={() => router.push('/(app)/entry/material')}
-          className="bg-white rounded-2xl p-5 mb-4 border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center"
+          className={`bg-white rounded-2xl p-5 ${FLUSHING_ENABLED_FOR_FOREMEN ? 'mb-4' : 'mb-10'} border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center`}
         >
           <View className="w-14 h-14 rounded-xl bg-amber-50 items-center justify-center mr-4 border border-amber-100">
             <ArrowRightLeft size={28} color="#d97706" />
@@ -70,20 +71,22 @@ export default function EntrySelectScreen() {
           <ChevronRight size={20} color="#cbd5e1" />
         </TouchableOpacity>
 
-        {/* Flushing Card */}
-        <TouchableOpacity
-          onPress={() => router.push('/(app)/entry/flushing')}
-          className="bg-white rounded-2xl p-5 mb-10 border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center"
-        >
-          <View className="w-14 h-14 rounded-xl bg-sky-50 items-center justify-center mr-4 border border-sky-100">
-            <Droplets size={28} color="#0369a1" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">Flushing</Text>
-            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">Log tanker water supply/removal for flushing work</Text>
-          </View>
-          <ChevronRight size={20} color="#cbd5e1" />
-        </TouchableOpacity>
+        {/* Flushing Card -- temporarily paused, see FLUSHING_ENABLED_FOR_FOREMEN */}
+        {FLUSHING_ENABLED_FOR_FOREMEN && (
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/entry/flushing')}
+            className="bg-white rounded-2xl p-5 mb-10 border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center"
+          >
+            <View className="w-14 h-14 rounded-xl bg-sky-50 items-center justify-center mr-4 border border-sky-100">
+              <Droplets size={28} color="#0369a1" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">Flushing</Text>
+              <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">Log tanker water supply/removal for flushing work</Text>
+            </View>
+            <ChevronRight size={20} color="#cbd5e1" />
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

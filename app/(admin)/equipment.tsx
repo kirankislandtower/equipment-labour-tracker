@@ -5,11 +5,12 @@ import { Check, X, Download, Filter, Image as ImageIcon, Calendar, AlertTriangle
 import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getLocalDateString, getFirstOfMonthString, getEarlySubmissionFlag } from '../../lib/dateUtils';
+import { getLocalDateString, getFirstOfMonthString, getEarlySubmissionFlag, formatSubmittedAt } from '../../lib/dateUtils';
 import { isStoreForemanEntry } from '../../lib/foremanFlags';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { buildCSV } from '../../lib/csv';
+import { FadeInUp } from '../../components/Animations';
 
 export default function AdminEquipment() {
   const { width } = useWindowDimensions();
@@ -232,10 +233,11 @@ export default function AdminEquipment() {
   };
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-      
-      <ConfirmModal 
+
+      <ConfirmModal
         visible={!!confirmApproveId}
         title="Approve Entry"
         message="Are you sure you want to approve this entry?"
@@ -721,7 +723,7 @@ export default function AdminEquipment() {
                   <View>
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1 text-right">Submitted At</Text>
                     <Text className="text-slate-700 font-medium text-right">
-                      {new Date(selectedEntry.created_at).toLocaleDateString()} at {new Date(selectedEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatSubmittedAt(selectedEntry.created_at)}
                     </Text>
                   </View>
                 </View>
@@ -769,5 +771,6 @@ export default function AdminEquipment() {
         </View>
       )}
     </View>
+    </FadeInUp>
   );
 }

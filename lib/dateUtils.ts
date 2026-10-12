@@ -17,6 +17,21 @@ export function getFirstOfMonthString(): string {
 }
 
 /**
+ * Formats a timestamp as "DD-MM-YYYY at h:mm AM/PM" -- used for "Submitted At"
+ * displays. Explicit day-month-year instead of the browser-locale-dependent
+ * toLocaleDateString() (which renders M/D/YYYY in en-US) -- that format reads
+ * as day-month to anyone used to DD/MM, so e.g. "10/11/2026" gets misread as
+ * 10 November instead of the 11th of October it actually is.
+ */
+export function formatSubmittedAt(isoString: string): string {
+  const d = new Date(isoString);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return `${day}-${month}-${d.getFullYear()} at ${time}`;
+}
+
+/**
  * Flags an entry whose submission timestamp is earlier than the work period it
  * claims -- e.g. submitted at 06:02 for a shift claimed as 08:00-17:00, which is
  * only possible if the hours were filled in before the work actually happened.

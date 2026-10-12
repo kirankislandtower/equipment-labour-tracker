@@ -3,8 +3,9 @@ import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, useWindowD
 import { supabase } from '../../lib/supabase';
 import { Calendar, User, Users, Clock, CheckCircle, XCircle, ChevronRight, Activity, X, Check, Search } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getLocalDateString } from '../../lib/dateUtils';
+import { getLocalDateString, formatSubmittedAt } from '../../lib/dateUtils';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { FadeInUp } from '../../components/Animations';
 
 const StatusPill = ({ status }: { status: string }) => {
   if (status === 'APPROVED') return <View className="bg-green-100 px-3 py-1 rounded-full"><Text className="text-green-700 font-bold text-[10px] uppercase">Approved</Text></View>;
@@ -183,6 +184,7 @@ export default function ForemanReports() {
     : foremenStats;
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       <View className="mb-6 flex-row justify-between items-end">
@@ -754,7 +756,7 @@ export default function ForemanReports() {
                   <View>
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1 text-right">Submitted At</Text>
                     <Text className="text-slate-700 font-medium text-right">
-                      {new Date(selectedEntry.created_at).toLocaleDateString()} at {new Date(selectedEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatSubmittedAt(selectedEntry.created_at)}
                     </Text>
                   </View>
                 </View>
@@ -842,5 +844,6 @@ export default function ForemanReports() {
       )}
 
     </View>
+    </FadeInUp>
   );
 }

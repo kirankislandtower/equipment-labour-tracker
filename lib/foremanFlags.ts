@@ -17,3 +17,12 @@ export function isStoreForemanEntry(foremanName?: string | null): boolean {
   if (!foremanName) return false;
   return foremanName.trim().toLowerCase() === 'store';
 }
+
+/**
+ * Temporary switch to pause the Flushing entry type on the foreman side (bottom
+ * tab bar + the "New Daily Entry" picker) without touching any of its code or
+ * data -- flip back to true to bring it back. Doesn't affect the admin side
+ * (Flushing Entries / Flushing Invoice Tracking stay visible there) or a
+ * foreman's own History tab, which still shows anything already submitted.
+ */
+export const FLUSHING_ENABLED_FOR_FOREMEN = false;
