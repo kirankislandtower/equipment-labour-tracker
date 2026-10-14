@@ -9,6 +9,7 @@ import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { buildCSV } from '../../lib/csv';
+import { FadeInUp } from '../../components/Animations';
 
 export default function AdminMaterials() {
   const { width } = useWindowDimensions();
@@ -64,7 +65,7 @@ export default function AdminMaterials() {
 
   useEffect(() => {
     fetchEntries();
-  }, [statusFilter, fromDate, toDate]);
+  }, [fromDate, toDate]);
 
   const fetchEntries = async () => {
     setLoading(true);
@@ -81,9 +82,8 @@ export default function AdminMaterials() {
       if (fromDate && fromDate.length === 10) query = query.gte('entry_date', fromDate);
       if (toDate && toDate.length === 10) query = query.lte('entry_date', toDate);
 
-      if (statusFilter !== 'ALL') {
-        query = query.eq('status', statusFilter);
-      }
+      // Status filter is applied client-side (see statusCounts/filteredEntries below)
+      // so all status counts can be shown on the filter pills at once.
 
       const { data, error } = await query;
       if (error) throw error;
@@ -144,7 +144,7 @@ export default function AdminMaterials() {
   const exportToCSV = async () => {
     try {
       const headers = ['Date', 'From Job', 'To Job', 'Material', 'Quantity', 'Unit', 'Vehicle Number', 'Driver Name', 'Status', 'Foreman', 'Remarks'];
-      const rows = entries.map(e => [
+      const rows = filteredEntries.map(e => [
         e.entry_date || '', 
         e.from_job?.job_number ? `${e.from_job.job_number} - ${e.from_job.job_name}` : '',
         e.to_job?.job_number ? `${e.to_job.job_number} - ${e.to_job.job_name}` : '',
@@ -205,11 +205,20 @@ export default function AdminMaterials() {
     );
   };
 
+  const statusCounts = {
+    SUBMITTED: entries.filter(e => e.status === 'SUBMITTED').length,
+    APPROVED: entries.filter(e => e.status === 'APPROVED').length,
+    REJECTED: entries.filter(e => e.status === 'REJECTED').length,
+    ALL: entries.length,
+  };
+  const filteredEntries = statusFilter === 'ALL' ? entries : entries.filter(e => e.status === statusFilter);
+
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-      
-      <ConfirmModal 
+
+      <ConfirmModal
         visible={!!confirmApproveId}
         title="Approve Entry"
         message="Are you sure you want to approve this entry?"
@@ -455,7 +464,7 @@ export default function AdminMaterials() {
                   className={`px-4 py-2 rounded-lg border ${statusFilter === status ? 'bg-slate-900 border-slate-900' : 'bg-slate-50 border-slate-200'}`}
                 >
                   <Text className={`font-bold text-sm ${statusFilter === status ? 'text-white' : 'text-slate-600'}`}>
-                    {status === 'ALL' ? 'All' : status}
+                    {status === 'ALL' ? 'All' : status} ({statusCounts[status]})
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -546,7 +555,7 @@ export default function AdminMaterials() {
           <ActivityIndicator size="large" color="#4f46e5" />
           <Text className="text-slate-500 mt-4 font-medium">Loading entries...</Text>
         </View>
-      ) : entries.length === 0 ? (
+      ) : filteredEntries.length === 0 ? (
         <View className="flex-1 justify-center items-center bg-white rounded-3xl border border-slate-200">
           <View className="bg-slate-50 p-6 rounded-full mb-4">
             <Filter size={48} color="#94a3b8" />
@@ -559,7 +568,7 @@ export default function AdminMaterials() {
       ) : (
         isMobile ? (
           <View className="flex-1 -mx-4 px-4">
-            {entries.map((entry) => (
+            {filteredEntries.map((entry) => (
               <TouchableOpacity 
                 key={entry.id} 
                 onPress={() => {
@@ -663,7 +672,7 @@ export default function AdminMaterials() {
 
                 {/* Table Body */}
                 <View>
-                  {entries.map((entry) => (
+                  {filteredEntries.map((entry) => (
                     <TouchableOpacity 
                       key={entry.id} 
                       onPress={() => {
@@ -734,5 +743,6 @@ export default function AdminMaterials() {
       )}
       </ScrollView>
     </View>
+    </FadeInUp>
   );
 }

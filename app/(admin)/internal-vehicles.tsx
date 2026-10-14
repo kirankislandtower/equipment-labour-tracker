@@ -73,7 +73,7 @@ export default function AdminInternalVehicles() {
 
   useEffect(() => {
     fetchEntries();
-  }, [statusFilter, companyFilter, fromDate, toDate]);
+  }, [companyFilter, fromDate, toDate]);
 
   const fetchEntries = async () => {
     setLoading(true);
@@ -90,9 +90,8 @@ export default function AdminInternalVehicles() {
       if (fromDate && fromDate.length === 10) query = query.gte('entry_date', fromDate);
       if (toDate && toDate.length === 10) query = query.lte('entry_date', toDate);
 
-      if (statusFilter !== 'ALL') {
-        query = query.eq('status', statusFilter);
-      }
+      // Status filter is applied client-side (see statusCounts/filteredEntries below)
+      // so all status counts can be shown on the filter pills at once.
 
       if (companyFilter !== 'ALL') {
         query = query.eq('company', companyFilter);
@@ -158,7 +157,7 @@ export default function AdminInternalVehicles() {
   const exportToCSV = async () => {
     try {
       const headers = ['Date', 'Company', 'Requester Name', 'Driver Name', 'Vehicle No', 'Vehicle Type', 'Job Number', 'Job Name', 'Section', 'Basis', 'Start', 'End', 'Total Working Hours', 'Trip', 'Rate / Amount - AED', 'IST Timesheet Number', 'Status', 'Remarks'];
-      const rows = entries.map(e => [
+      const rows = filteredEntries.map(e => [
         e.entry_date || '',
         COMPANY_LABELS[e.company] || e.company || '',
         e.requester_name || '',
@@ -242,6 +241,14 @@ export default function AdminInternalVehicles() {
       </View>
     );
   };
+
+  const statusCounts = {
+    SUBMITTED: entries.filter(e => e.status === 'SUBMITTED').length,
+    APPROVED: entries.filter(e => e.status === 'APPROVED').length,
+    REJECTED: entries.filter(e => e.status === 'REJECTED').length,
+    ALL: entries.length,
+  };
+  const filteredEntries = statusFilter === 'ALL' ? entries : entries.filter(e => e.status === statusFilter);
 
   return (
     <FadeInUp style={{ flex: 1 }}>
@@ -406,7 +413,7 @@ export default function AdminInternalVehicles() {
             onPress={() => setStatusFilter(filterOpt as any)}
             className={`px-4 py-2 rounded-lg border ${statusFilter === filterOpt ? 'bg-slate-800 border-slate-800' : 'bg-white border-slate-300'}`}
           >
-            <Text className={`font-semibold ${statusFilter === filterOpt ? 'text-white' : 'text-slate-600'}`}>{filterOpt}</Text>
+            <Text className={`font-semibold ${statusFilter === filterOpt ? 'text-white' : 'text-slate-600'}`}>{filterOpt} ({statusCounts[filterOpt as keyof typeof statusCounts]})</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -443,12 +450,12 @@ export default function AdminInternalVehicles() {
             </View>
           ) : (
             <View className="flex-col">
-              {entries.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <View className="py-20 items-center">
                   <Text className="text-slate-500 font-medium">No entries found for this status.</Text>
                 </View>
               ) : (
-                entries.map((entry, index) => (
+                filteredEntries.map((entry, index) => (
                   <TouchableOpacity
                     key={entry.id}
                     activeOpacity={0.7}

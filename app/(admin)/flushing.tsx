@@ -67,7 +67,7 @@ export default function AdminFlushing() {
 
   useEffect(() => {
     fetchEntries();
-  }, [statusFilter, fromDate, toDate]);
+  }, [fromDate, toDate]);
 
   const fetchEntries = async () => {
     setLoading(true);
@@ -86,9 +86,8 @@ export default function AdminFlushing() {
       if (fromDate && fromDate.length === 10) query = query.gte('entry_date', fromDate);
       if (toDate && toDate.length === 10) query = query.lte('entry_date', toDate);
 
-      if (statusFilter !== 'ALL') {
-        query = query.eq('status', statusFilter);
-      }
+      // Status filter is applied client-side (see statusCounts/filteredEntries below)
+      // so all status counts can be shown on the filter pills at once.
 
       const { data, error } = await query;
       if (error) throw error;
@@ -150,7 +149,7 @@ export default function AdminFlushing() {
   const exportToCSV = async () => {
     try {
       const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Hours', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
-      const rows = entries.map(e => [
+      const rows = filteredEntries.map(e => [
         e.entry_date || '',
         e.jobs?.job_number || '',
         e.jobs?.job_name || '',
@@ -231,6 +230,14 @@ export default function AdminFlushing() {
       </View>
     );
   };
+
+  const statusCounts = {
+    SUBMITTED: entries.filter(e => e.status === 'SUBMITTED').length,
+    APPROVED: entries.filter(e => e.status === 'APPROVED').length,
+    REJECTED: entries.filter(e => e.status === 'REJECTED').length,
+    ALL: entries.length,
+  };
+  const filteredEntries = statusFilter === 'ALL' ? entries : entries.filter(e => e.status === statusFilter);
 
   return (
     <FadeInUp style={{ flex: 1 }}>
@@ -395,7 +402,7 @@ export default function AdminFlushing() {
             onPress={() => setStatusFilter(filter as any)}
             className={`px-4 py-2 rounded-lg border ${statusFilter === filter ? 'bg-slate-800 border-slate-800' : 'bg-white border-slate-300'}`}
           >
-            <Text className={`font-semibold ${statusFilter === filter ? 'text-white' : 'text-slate-600'}`}>{filter}</Text>
+            <Text className={`font-semibold ${statusFilter === filter ? 'text-white' : 'text-slate-600'}`}>{filter} ({statusCounts[filter as keyof typeof statusCounts]})</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -419,12 +426,12 @@ export default function AdminFlushing() {
             </View>
           ) : (
             <View className="flex-col">
-              {entries.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <View className="py-20 items-center">
                   <Text className="text-slate-500 font-medium">No entries found for this status.</Text>
                 </View>
               ) : (
-                entries.map((entry, index) => (
+                filteredEntries.map((entry, index) => (
                   <TouchableOpacity
                     key={entry.id}
                     activeOpacity={0.7}
