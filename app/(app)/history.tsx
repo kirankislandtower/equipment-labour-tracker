@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRight, ArrowRightLeft, Droplets } from 'lucide-react-native';
+import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRight, ArrowRightLeft, Droplets, Wrench } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
@@ -112,13 +112,34 @@ export default function HistoryScreen() {
 
         if (error) throw error;
         serverEntries = data || [];
+      } else if (activeTab === 'INTERNAL_VEHICLE') {
+        const { data, error } = await supabase
+          .from('internal_vehicle_entries')
+          .select(`
+            id,
+            entry_date,
+            company,
+            working_hours,
+            number_of_trips,
+            status,
+            rejection_reason,
+            remarks,
+            internal_vehicles:internal_vehicle_id (vehicle_number, vehicle_type),
+            jobs:job_id (job_name)
+          `)
+          .eq('entry_date', dateStr)
+          .eq('created_by', user?.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        serverEntries = data || [];
       }
 
       // Entries saved locally while offline haven't reached Supabase yet, so they
       // can't come back from the queries above -- merge them in from the on-device
       // queue instead, using their pre-resolved `display` fields (built at submit
       // time) so they render with the same shape as a real row, fully offline.
-      const queueTypeByTab: Record<string, QueuedEntryType> = { EQUIPMENT: 'equipment', LABOUR: 'labour', MATERIAL: 'material', FLUSHING: 'flushing' };
+      const queueTypeByTab: Record<string, QueuedEntryType> = { EQUIPMENT: 'equipment', LABOUR: 'labour', MATERIAL: 'material', FLUSHING: 'flushing', INTERNAL_VEHICLE: 'internal_vehicle' };
       const queued = await getQueuedEntries();
       const queuedForTab = queued
         .filter(q => q.type === queueTypeByTab[activeTab] && q.displayDate === dateStr)
@@ -231,45 +252,56 @@ export default function HistoryScreen() {
       </View>
 
       {/* Custom Segmented Control */}
-      <View className="px-4 mb-4">
-        <View className="flex-row bg-slate-100 p-1 rounded-xl">
-          <TouchableOpacity 
-            onPress={() => setActiveTab('EQUIPMENT')}
-            className={`flex-1 flex-row items-center justify-center py-3 rounded-lg ${activeTab === 'EQUIPMENT' ? 'bg-white shadow-sm' : ''}`}
-          >
-            <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#1e3a8a' : '#64748b'} />
-            <Text className={`ml-2 font-bold ${activeTab === 'EQUIPMENT' ? 'text-blue-900' : 'text-slate-500'}`}>
-              Equipment
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => setActiveTab('LABOUR')}
-            className={`flex-1 flex-row items-center justify-center py-3 rounded-lg ${activeTab === 'LABOUR' ? 'bg-white shadow-sm' : ''}`}
-          >
-            <Users size={16} color={activeTab === 'LABOUR' ? '#1e3a8a' : '#64748b'} />
-            <Text className={`ml-2 font-bold ${activeTab === 'LABOUR' ? 'text-blue-900' : 'text-slate-500'}`}>
-              Labour
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setActiveTab('MATERIAL')}
-            className={`flex-1 flex-row items-center justify-center py-3 rounded-lg ${activeTab === 'MATERIAL' ? 'bg-white shadow-sm' : ''}`}
-          >
-            <ArrowRightLeft size={16} color={activeTab === 'MATERIAL' ? '#1e3a8a' : '#64748b'} />
-            <Text className={`ml-2 font-bold ${activeTab === 'MATERIAL' ? 'text-blue-900' : 'text-slate-500'}`}>
-              Material
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setActiveTab('FLUSHING')}
-            className={`flex-1 flex-row items-center justify-center py-3 rounded-lg ${activeTab === 'FLUSHING' ? 'bg-white shadow-sm' : ''}`}
-          >
-            <Droplets size={16} color={activeTab === 'FLUSHING' ? '#1e3a8a' : '#64748b'} />
-            <Text className={`ml-2 font-bold ${activeTab === 'FLUSHING' ? 'text-blue-900' : 'text-slate-500'}`}>
-              Flushing
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <View className="mb-4">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+          <View className="flex-row bg-slate-100 p-1 rounded-xl">
+            <TouchableOpacity
+              onPress={() => setActiveTab('EQUIPMENT')}
+              className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'EQUIPMENT' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#1e3a8a' : '#64748b'} />
+              <Text className={`ml-2 font-bold ${activeTab === 'EQUIPMENT' ? 'text-blue-900' : 'text-slate-500'}`}>
+                Equipment
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('LABOUR')}
+              className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'LABOUR' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Users size={16} color={activeTab === 'LABOUR' ? '#1e3a8a' : '#64748b'} />
+              <Text className={`ml-2 font-bold ${activeTab === 'LABOUR' ? 'text-blue-900' : 'text-slate-500'}`}>
+                Labour
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('MATERIAL')}
+              className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'MATERIAL' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <ArrowRightLeft size={16} color={activeTab === 'MATERIAL' ? '#1e3a8a' : '#64748b'} />
+              <Text className={`ml-2 font-bold ${activeTab === 'MATERIAL' ? 'text-blue-900' : 'text-slate-500'}`}>
+                Material
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('FLUSHING')}
+              className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'FLUSHING' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Droplets size={16} color={activeTab === 'FLUSHING' ? '#1e3a8a' : '#64748b'} />
+              <Text className={`ml-2 font-bold ${activeTab === 'FLUSHING' ? 'text-blue-900' : 'text-slate-500'}`}>
+                Flushing
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('INTERNAL_VEHICLE')}
+              className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'INTERNAL_VEHICLE' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Wrench size={16} color={activeTab === 'INTERNAL_VEHICLE' ? '#1e3a8a' : '#64748b'} />
+              <Text className={`ml-2 font-bold ${activeTab === 'INTERNAL_VEHICLE' ? 'text-blue-900' : 'text-slate-500'}`}>
+                Internal Vehicles
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
 
       {/* Status Filters */}
@@ -338,7 +370,7 @@ export default function HistoryScreen() {
             <View className="flex-row items-center mb-4">
               <View className="bg-slate-800 px-3 py-1.5 rounded-lg">
                 <Text className="text-white font-black text-xs tracking-wide">
-                  {filteredEntries.length} {activeTab === 'EQUIPMENT' ? 'Equipment' : activeTab === 'LABOUR' ? 'Labour' : activeTab === 'FLUSHING' ? 'Flushing' : 'Material'} {filteredEntries.length === 1 ? 'Entry' : 'Entries'}
+                  {filteredEntries.length} {activeTab === 'EQUIPMENT' ? 'Equipment' : activeTab === 'LABOUR' ? 'Labour' : activeTab === 'FLUSHING' ? 'Flushing' : activeTab === 'INTERNAL_VEHICLE' ? 'Internal Vehicle' : 'Material'} {filteredEntries.length === 1 ? 'Entry' : 'Entries'}
                 </Text>
               </View>
               <View className="flex-1 h-px bg-slate-200 ml-3" />
@@ -359,15 +391,23 @@ export default function HistoryScreen() {
                       ? entry.equipment_master?.equipment_name || 'Unknown Equipment'
                       : activeTab === 'LABOUR'
                         ? entry.employee_name || 'Unknown Employee'
-                        : entry.material_description || 'Unknown Material'}
+                        : activeTab === 'INTERNAL_VEHICLE'
+                          ? `${entry.internal_vehicles?.vehicle_number || 'Unknown'} - ${entry.internal_vehicles?.vehicle_type || 'Vehicle'}`
+                          : entry.material_description || 'Unknown Material'}
                   </Text>
                   <Text className={`font-bold tracking-wide text-[10px] px-2 py-1 border rounded uppercase ${getStatusColor(entry.status)} ${getStatusBg(entry.status)}`}>
                     {getStatusLabel(entry.status)}
                   </Text>
                 </View>
 
+                {activeTab === 'INTERNAL_VEHICLE' && !!entry.company && (
+                  <View className="bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full self-start mb-2">
+                    <Text className="text-violet-700 text-[10px] font-bold">{entry.company}</Text>
+                  </View>
+                )}
+
                 <Text className="text-slate-500 font-medium mb-3 leading-relaxed">
-                  {activeTab === 'EQUIPMENT' || activeTab === 'FLUSHING'
+                  {activeTab === 'EQUIPMENT' || activeTab === 'FLUSHING' || activeTab === 'INTERNAL_VEHICLE'
                     ? entry.jobs?.job_name
                     : activeTab === 'LABOUR'
                       ? `${entry.labour_designations?.designation_name} @ ${entry.jobs?.job_name}`
@@ -397,6 +437,16 @@ export default function HistoryScreen() {
                           <Text className="text-slate-900 font-bold">{entry.quantity}</Text> {entry.unit}
                         </Text>
                       </>
+                    ) : activeTab === 'INTERNAL_VEHICLE' ? (
+                      <>
+                        <Clock size={14} color="#94a3b8" />
+                        <Text className="text-slate-500 text-xs font-medium ml-1.5">
+                          <Text className="text-slate-900 font-bold">{entry.working_hours}</Text> Hours
+                        </Text>
+                        <Text className="text-slate-500 text-xs font-medium ml-3">
+                          <Text className="text-slate-900 font-bold">{entry.number_of_trips}</Text> Trips
+                        </Text>
+                      </>
                     ) : (
                       <>
                         <Clock size={14} color="#94a3b8" />
@@ -417,7 +467,9 @@ export default function HistoryScreen() {
                           ? '/(app)/entry/labour'
                           : activeTab === 'FLUSHING'
                             ? '/(app)/entry/flushing'
-                            : '/(app)/entry/material';
+                            : activeTab === 'INTERNAL_VEHICLE'
+                              ? '/(app)/entry/internal-vehicles'
+                              : '/(app)/entry/material';
                       router.push({ pathname: route as any, params: { id: entry.id } });
                     }}
                     className="mt-3 flex-row items-center justify-center bg-slate-900 py-3 rounded-xl active:bg-slate-800"

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/crossAlert';
-import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2, Search } from 'lucide-react-native';
+import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2, Search, Wrench } from 'lucide-react-native';
+import { FadeInUp } from '../../components/Animations';
 
 const SearchBox = ({ value, onChangeText, placeholder }: { value: string; onChangeText: (t: string) => void; placeholder: string }) => (
   <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 m-4">
@@ -28,20 +29,22 @@ export default function AdminSettings() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  const [activeTab, setActiveTab] = useState<'JOBS' | 'SUPPLIERS' | 'EQUIPMENT' | 'DESIGNATIONS'>('JOBS');
+  const [activeTab, setActiveTab] = useState<'JOBS' | 'SUPPLIERS' | 'EQUIPMENT' | 'DESIGNATIONS' | 'INTERNAL_VEHICLES'>('JOBS');
   const [loading, setLoading] = useState(true);
-  
+
   const [jobs, setJobs] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [equipment, setEquipment] = useState<any[]>([]);
   const [designations, setDesignations] = useState<any[]>([]);
+  const [internalVehicles, setInternalVehicles] = useState<any[]>([]);
 
   const [jobSearch, setJobSearch] = useState('');
   const [supplierSearch, setSupplierSearch] = useState('');
   const [equipSearch, setEquipSearch] = useState('');
   const [desigSearch, setDesigSearch] = useState('');
+  const [ivSearch, setIvSearch] = useState('');
 
-  const [counts, setCounts] = useState({ jobs: 0, suppliers: 0, equipment: 0, designations: 0 });
+  const [counts, setCounts] = useState({ jobs: 0, suppliers: 0, equipment: 0, designations: 0, internalVehicles: 0 });
 
   // Inline editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,12 +55,14 @@ export default function AdminSettings() {
   const [addSupplierModal, setAddSupplierModal] = useState(false);
   const [addEquipModal, setAddEquipModal] = useState(false);
   const [addDesigModal, setAddDesigModal] = useState(false);
+  const [addIVModal, setAddIVModal] = useState(false);
 
   // Form states
   const [jobForm, setJobForm] = useState({ job_number: '', job_name: '', location: '' });
   const [supplierForm, setSupplierForm] = useState({ supplier_name: '', contact_person: '', phone_number: '' });
   const [equipForm, setEquipForm] = useState({ equipment_category: 'Tankers', equipment_name: '' });
   const [desigForm, setDesigForm] = useState({ designation_name: '' });
+  const [ivForm, setIvForm] = useState({ vehicle_number: '', vehicle_type: '' });
 
   useEffect(() => {
     fetchData();
@@ -69,17 +74,19 @@ export default function AdminSettings() {
 
   const fetchCounts = async () => {
     try {
-      const [jobsRes, suppliersRes, equipmentRes, designationsRes] = await Promise.all([
+      const [jobsRes, suppliersRes, equipmentRes, designationsRes, internalVehiclesRes] = await Promise.all([
         supabase.from('jobs').select('*', { count: 'exact', head: true }),
         supabase.from('suppliers').select('*', { count: 'exact', head: true }),
         supabase.from('equipment_master').select('*', { count: 'exact', head: true }),
         supabase.from('labour_designations').select('*', { count: 'exact', head: true }),
+        supabase.from('internal_vehicles').select('*', { count: 'exact', head: true }),
       ]);
       setCounts({
         jobs: jobsRes.count || 0,
         suppliers: suppliersRes.count || 0,
         equipment: equipmentRes.count || 0,
         designations: designationsRes.count || 0,
+        internalVehicles: internalVehiclesRes.count || 0,
       });
     } catch (error) {
       console.error(error);
@@ -101,6 +108,9 @@ export default function AdminSettings() {
       } else if (activeTab === 'DESIGNATIONS') {
         const { data } = await supabase.from('labour_designations').select('*').order('designation_name');
         setDesignations(data || []);
+      } else if (activeTab === 'INTERNAL_VEHICLES') {
+        const { data } = await supabase.from('internal_vehicles').select('*').order('vehicle_number');
+        setInternalVehicles(data || []);
       }
     } catch (error) {
       console.error(error);
@@ -232,6 +242,19 @@ export default function AdminSettings() {
     }
   };
 
+  const submitInternalVehicle = async () => {
+    try {
+      const { error } = await supabase.from('internal_vehicles').insert(ivForm);
+      if (error) throw error;
+      setAddIVModal(false);
+      setIvForm({ vehicle_number: '', vehicle_type: '' });
+      fetchData();
+      fetchCounts();
+    } catch (error: any) {
+      showAlert('Error', error.message);
+    }
+  };
+
   const filteredJobs = jobSearch.trim()
     ? jobs.filter(j => j.job_number.toLowerCase().includes(jobSearch.trim().toLowerCase()) || j.job_name.toLowerCase().includes(jobSearch.trim().toLowerCase()))
     : jobs;
@@ -244,8 +267,12 @@ export default function AdminSettings() {
   const filteredDesignations = desigSearch.trim()
     ? designations.filter(d => d.designation_name.toLowerCase().includes(desigSearch.trim().toLowerCase()))
     : designations;
+  const filteredInternalVehicles = ivSearch.trim()
+    ? internalVehicles.filter(v => v.vehicle_number.toLowerCase().includes(ivSearch.trim().toLowerCase()) || v.vehicle_type.toLowerCase().includes(ivSearch.trim().toLowerCase()))
+    : internalVehicles;
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       <View className="flex-row justify-between items-center mb-6">
@@ -283,6 +310,13 @@ export default function AdminSettings() {
         >
           <Users size={16} color={activeTab === 'DESIGNATIONS' ? '#fff' : '#64748b'} />
           <Text className={`font-bold ml-2 text-sm ${activeTab === 'DESIGNATIONS' ? 'text-white' : 'text-slate-500'}`}>Roles ({counts.designations})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('INTERNAL_VEHICLES')}
+          className={`${isMobile ? 'w-[48%] mt-1' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'INTERNAL_VEHICLES' ? 'bg-slate-900' : 'bg-transparent'}`}
+        >
+          <Wrench size={16} color={activeTab === 'INTERNAL_VEHICLES' ? '#fff' : '#64748b'} />
+          <Text className={`font-bold ml-2 text-sm ${activeTab === 'INTERNAL_VEHICLES' ? 'text-white' : 'text-slate-500'}`}>Internal Vehicles ({counts.internalVehicles})</Text>
         </TouchableOpacity>
       </View>
 
@@ -610,6 +644,76 @@ export default function AdminSettings() {
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* INTERNAL VEHICLES TAB */}
+            {activeTab === 'INTERNAL_VEHICLES' && (
+              <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <SearchBox value={ivSearch} onChangeText={setIvSearch} placeholder="Search internal vehicles" />
+                {!isMobile && (
+                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
+                    <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Vehicle No</Text>
+                    <Text className="flex-[2] font-bold text-slate-500 text-xs uppercase">Vehicle Type</Text>
+                    <Text className="w-28 font-bold text-slate-500 text-xs uppercase text-center">Actions</Text>
+                  </View>
+                )}
+                {filteredInternalVehicles.length === 0 && (
+                  <Text className="text-slate-500 font-medium text-center py-6">No internal vehicles match "{ivSearch}".</Text>
+                )}
+                {filteredInternalVehicles.map((v) => (
+                  <View key={v.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
+                    {editingId === v.id ? (
+                      <>
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">VEHICLE NO</Text>}
+                        <TextInput
+                          className={`${isMobile ? 'mb-2' : 'flex-1 mr-2'} bg-slate-50 border border-slate-200 rounded p-2 text-slate-900`}
+                          value={editForm.vehicle_number}
+                          onChangeText={(t) => setEditForm({ ...editForm, vehicle_number: t })}
+                        />
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">VEHICLE TYPE</Text>}
+                        <TextInput
+                          className={`${isMobile ? 'mb-3' : 'flex-[2]'} bg-slate-50 border border-slate-200 rounded p-2 text-slate-900`}
+                          value={editForm.vehicle_type}
+                          onChangeText={(t) => setEditForm({ ...editForm, vehicle_type: t })}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">VEHICLE NO</Text>}
+                        <Text className={`${isMobile ? 'mb-2' : 'flex-1'} text-slate-900 font-bold`}>{v.vehicle_number}</Text>
+
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">VEHICLE TYPE</Text>}
+                        <Text className={`${isMobile ? 'mb-3' : 'flex-[2]'} text-slate-500`}>{v.vehicle_type}</Text>
+                      </>
+                    )}
+
+                    <View className={`${isMobile ? 'flex-row justify-between items-center border-t border-slate-100 pt-3' : 'w-28 flex-row items-center justify-end space-x-2 ml-2'}`}>
+                      {isMobile && <Text className="text-xs font-bold text-slate-400">ACTIONS</Text>}
+                      <View className="flex-row items-center space-x-3">
+                        {editingId === v.id ? (
+                          <TouchableOpacity onPress={() => saveEdit('internal_vehicles', v.id)} className="bg-blue-50 p-2 rounded-full">
+                            <Save size={20} color="#2563eb" />
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity onPress={() => startEdit(v)} className="p-2">
+                            <Edit2 size={18} color="#94a3b8" />
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => deleteRecord('internal_vehicles', v.id, v.vehicle_number)} className="p-2">
+                          <Trash2 size={18} color="#ef4444" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => toggleStatus('internal_vehicles', v.id, v.is_active)}>
+                          {v.is_active ? <ToggleRight size={32} color="#10b981" /> : <ToggleLeft size={32} color="#cbd5e1" />}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+                <TouchableOpacity onPress={() => setAddIVModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
+                  <Plus size={20} color="#0f172a" />
+                  <Text className="font-bold text-slate-900 ml-2">Add New Vehicle</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             </View>
         )}
       </View>
@@ -676,6 +780,22 @@ export default function AdminSettings() {
         </View>
       </Modal>
 
+      {/* Add Internal Vehicle Modal */}
+      <Modal visible={addIVModal} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center p-8">
+          <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold text-slate-900">Add New Vehicle</Text>
+              <TouchableOpacity onPress={() => setAddIVModal(false)}><X size={24} color="#64748b" /></TouchableOpacity>
+            </View>
+            <TextInput placeholder="Vehicle No (e.g. 71049)" value={ivForm.vehicle_number} onChangeText={t => setIvForm({...ivForm, vehicle_number: t})} className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3 text-slate-900" />
+            <TextInput placeholder="Vehicle Type (e.g. Excavator, Tipper)" value={ivForm.vehicle_type} onChangeText={t => setIvForm({...ivForm, vehicle_type: t})} className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6 text-slate-900" />
+            <TouchableOpacity onPress={submitInternalVehicle} className="bg-slate-900 py-4 rounded-xl items-center"><Text className="text-white font-bold">Save Vehicle</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
+    </FadeInUp>
   );
 }

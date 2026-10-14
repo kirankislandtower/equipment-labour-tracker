@@ -20,8 +20,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
         // Hide routes that shouldn't be in the tab bar (like entry forms)
         const hiddenRoutes = FLUSHING_ENABLED_FOR_FOREMEN
-          ? ['entry/select', 'history', 'missing-photos']
-          : ['entry/select', 'history', 'missing-photos', 'entry/flushing'];
+          ? ['entry/select', 'entry/internal-vehicles', 'history', 'missing-photos']
+          : ['entry/select', 'entry/internal-vehicles', 'history', 'missing-photos', 'entry/flushing'];
         if (hiddenRoutes.includes(route.name)) return null;
 
         const label =
@@ -137,6 +137,7 @@ export default function AppLayout() {
       
       {/* Hidden Screens inside the Tabs layout */}
       <Tabs.Screen name="entry/select" options={{ href: null }} />
+      <Tabs.Screen name="entry/internal-vehicles" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
       <Tabs.Screen name="missing-photos" options={{ href: null }} />
     </Tabs>

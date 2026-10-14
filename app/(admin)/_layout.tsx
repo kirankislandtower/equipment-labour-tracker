@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Modal, SafeAreaView, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
-import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell, Receipt, Droplets } from 'lucide-react-native';
+import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell, Receipt, Droplets, Wrench } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 
 export default function AdminLayout() {
@@ -110,6 +110,7 @@ export default function AdminLayout() {
         <NavItem icon={Users} label="Labour Entries" href="/(admin)/labour" />
         <NavItem icon={ArrowRightLeft} label="Material Transfers" href="/(admin)/materials" />
         <NavItem icon={Droplets} label="Flushing Entries" href="/(admin)/flushing" />
+        <NavItem icon={Wrench} label="Internal Vehicle Entries" href="/(admin)/internal-vehicles" />
         <NavItem icon={FileText} label="Foreman Reports" href="/(admin)/foremen" />
         <NavItem icon={BarChart3} label="Usage Reports" href="/(admin)/reports" />
         <NavItem icon={Calculator} label="Invoice Reconciler" href="/(admin)/invoices" />

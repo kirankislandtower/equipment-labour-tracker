@@ -5,7 +5,7 @@ import { compressImageToDataUri } from '../lib/imageUtils';
 
 interface WebCameraProps {
   onImageCaptured: (uri: string) => void;
-  colorTheme: 'blue' | 'green' | 'amber';
+  colorTheme: 'blue' | 'green' | 'amber' | 'violet';
 }
 
 export default function WebCamera({ onImageCaptured, colorTheme }: WebCameraProps) {
@@ -15,7 +15,8 @@ export default function WebCamera({ onImageCaptured, colorTheme }: WebCameraProp
   const styles = {
     blue: { bg: 'bg-blue-50', border: 'border-blue-200', icon: '#1d4ed8', text1: 'text-blue-900', text2: 'text-blue-600' },
     green: { bg: 'bg-green-50', border: 'border-green-200', icon: '#16a34a', text1: 'text-green-900', text2: 'text-green-600' },
-    amber: { bg: 'bg-amber-50', border: 'border-amber-200', icon: '#d97706', text1: 'text-amber-900', text2: 'text-amber-600' }
+    amber: { bg: 'bg-amber-50', border: 'border-amber-200', icon: '#d97706', text1: 'text-amber-900', text2: 'text-amber-600' },
+    violet: { bg: 'bg-violet-50', border: 'border-violet-200', icon: '#6d28d9', text1: 'text-violet-900', text2: 'text-violet-600' }
   };
 
   const theme = styles[colorTheme];
