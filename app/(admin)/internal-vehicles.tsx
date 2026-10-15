@@ -83,6 +83,7 @@ export default function AdminInternalVehicles() {
         .select(`
           *,
           internal_vehicles:internal_vehicle_id (vehicle_number, vehicle_type),
+          internal_vehicle_drivers:driver_id (name),
           jobs:job_id (job_number, job_name)
         `)
         .order('entry_date', { ascending: false });
@@ -161,7 +162,7 @@ export default function AdminInternalVehicles() {
         e.entry_date || '',
         COMPANY_LABELS[e.company] || e.company || '',
         e.requester_name || '',
-        e.driver_name || '',
+        e.internal_vehicle_drivers?.name || '',
         e.internal_vehicles?.vehicle_number || '',
         e.internal_vehicles?.vehicle_type || '',
         e.jobs?.job_number || '',
@@ -707,8 +708,8 @@ export default function AdminInternalVehicles() {
                     <Text className="text-slate-900 font-bold text-base">{selectedEntry.requester_name || 'N/A'}</Text>
                   </View>
                   <View className="flex-1 items-end">
-                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Driver Name</Text>
-                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.driver_name || 'N/A'}</Text>
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Driver / Operator</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.internal_vehicle_drivers?.name || 'N/A'}</Text>
                   </View>
                 </View>
 

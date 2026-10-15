@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/crossAlert';
-import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2, Search, Wrench } from 'lucide-react-native';
+import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2, Search, Wrench, UserCog } from 'lucide-react-native';
 import { FadeInUp } from '../../components/Animations';
 
 const SearchBox = ({ value, onChangeText, placeholder }: { value: string; onChangeText: (t: string) => void; placeholder: string }) => (
@@ -29,7 +29,7 @@ export default function AdminSettings() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  const [activeTab, setActiveTab] = useState<'JOBS' | 'SUPPLIERS' | 'EQUIPMENT' | 'DESIGNATIONS' | 'INTERNAL_VEHICLES'>('JOBS');
+  const [activeTab, setActiveTab] = useState<'JOBS' | 'SUPPLIERS' | 'EQUIPMENT' | 'DESIGNATIONS' | 'INTERNAL_VEHICLES' | 'DRIVERS'>('JOBS');
   const [loading, setLoading] = useState(true);
 
   const [jobs, setJobs] = useState<any[]>([]);
@@ -37,14 +37,16 @@ export default function AdminSettings() {
   const [equipment, setEquipment] = useState<any[]>([]);
   const [designations, setDesignations] = useState<any[]>([]);
   const [internalVehicles, setInternalVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
 
   const [jobSearch, setJobSearch] = useState('');
   const [supplierSearch, setSupplierSearch] = useState('');
   const [equipSearch, setEquipSearch] = useState('');
   const [desigSearch, setDesigSearch] = useState('');
   const [ivSearch, setIvSearch] = useState('');
+  const [driverSearch, setDriverSearch] = useState('');
 
-  const [counts, setCounts] = useState({ jobs: 0, suppliers: 0, equipment: 0, designations: 0, internalVehicles: 0 });
+  const [counts, setCounts] = useState({ jobs: 0, suppliers: 0, equipment: 0, designations: 0, internalVehicles: 0, drivers: 0 });
 
   // Inline editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function AdminSettings() {
   const [addEquipModal, setAddEquipModal] = useState(false);
   const [addDesigModal, setAddDesigModal] = useState(false);
   const [addIVModal, setAddIVModal] = useState(false);
+  const [addDriverModal, setAddDriverModal] = useState(false);
 
   // Form states
   const [jobForm, setJobForm] = useState({ job_number: '', job_name: '', location: '' });
@@ -63,6 +66,7 @@ export default function AdminSettings() {
   const [equipForm, setEquipForm] = useState({ equipment_category: 'Tankers', equipment_name: '' });
   const [desigForm, setDesigForm] = useState({ designation_name: '' });
   const [ivForm, setIvForm] = useState({ vehicle_number: '', vehicle_type: '' });
+  const [driverForm, setDriverForm] = useState({ name: '' });
 
   useEffect(() => {
     fetchData();
@@ -74,12 +78,13 @@ export default function AdminSettings() {
 
   const fetchCounts = async () => {
     try {
-      const [jobsRes, suppliersRes, equipmentRes, designationsRes, internalVehiclesRes] = await Promise.all([
+      const [jobsRes, suppliersRes, equipmentRes, designationsRes, internalVehiclesRes, driversRes] = await Promise.all([
         supabase.from('jobs').select('*', { count: 'exact', head: true }),
         supabase.from('suppliers').select('*', { count: 'exact', head: true }),
         supabase.from('equipment_master').select('*', { count: 'exact', head: true }),
         supabase.from('labour_designations').select('*', { count: 'exact', head: true }),
         supabase.from('internal_vehicles').select('*', { count: 'exact', head: true }),
+        supabase.from('internal_vehicle_drivers').select('*', { count: 'exact', head: true }),
       ]);
       setCounts({
         jobs: jobsRes.count || 0,
@@ -87,6 +92,7 @@ export default function AdminSettings() {
         equipment: equipmentRes.count || 0,
         designations: designationsRes.count || 0,
         internalVehicles: internalVehiclesRes.count || 0,
+        drivers: driversRes.count || 0,
       });
     } catch (error) {
       console.error(error);
@@ -111,6 +117,9 @@ export default function AdminSettings() {
       } else if (activeTab === 'INTERNAL_VEHICLES') {
         const { data } = await supabase.from('internal_vehicles').select('*').order('vehicle_number');
         setInternalVehicles(data || []);
+      } else if (activeTab === 'DRIVERS') {
+        const { data } = await supabase.from('internal_vehicle_drivers').select('*').order('name');
+        setDrivers(data || []);
       }
     } catch (error) {
       console.error(error);
@@ -255,6 +264,19 @@ export default function AdminSettings() {
     }
   };
 
+  const submitDriver = async () => {
+    try {
+      const { error } = await supabase.from('internal_vehicle_drivers').insert(driverForm);
+      if (error) throw error;
+      setAddDriverModal(false);
+      setDriverForm({ name: '' });
+      fetchData();
+      fetchCounts();
+    } catch (error: any) {
+      showAlert('Error', error.message);
+    }
+  };
+
   const filteredJobs = jobSearch.trim()
     ? jobs.filter(j => j.job_number.toLowerCase().includes(jobSearch.trim().toLowerCase()) || j.job_name.toLowerCase().includes(jobSearch.trim().toLowerCase()))
     : jobs;
@@ -270,6 +292,9 @@ export default function AdminSettings() {
   const filteredInternalVehicles = ivSearch.trim()
     ? internalVehicles.filter(v => v.vehicle_number.toLowerCase().includes(ivSearch.trim().toLowerCase()) || v.vehicle_type.toLowerCase().includes(ivSearch.trim().toLowerCase()))
     : internalVehicles;
+  const filteredDrivers = driverSearch.trim()
+    ? drivers.filter(d => d.name.toLowerCase().includes(driverSearch.trim().toLowerCase()))
+    : drivers;
 
   return (
     <FadeInUp style={{ flex: 1 }}>
@@ -282,42 +307,53 @@ export default function AdminSettings() {
         </View>
       </View>
 
-      <View className="flex-row flex-wrap bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-6">
-        <TouchableOpacity 
-          onPress={() => setActiveTab('JOBS')}
-          className={`${isMobile ? 'w-[48%] mb-1' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'JOBS' ? 'bg-slate-900' : 'bg-transparent'}`}
-        >
-          <Briefcase size={16} color={activeTab === 'JOBS' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'JOBS' ? 'text-white' : 'text-slate-500'}`}>Jobs ({counts.jobs})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('SUPPLIERS')}
-          className={`${isMobile ? 'w-[48%] mb-1' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'SUPPLIERS' ? 'bg-slate-900' : 'bg-transparent'}`}
-        >
-          <Building2 size={16} color={activeTab === 'SUPPLIERS' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'SUPPLIERS' ? 'text-white' : 'text-slate-500'}`}>Suppliers ({counts.suppliers})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('EQUIPMENT')}
-          className={`${isMobile ? 'w-[48%]' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'EQUIPMENT' ? 'bg-slate-900' : 'bg-transparent'}`}
-        >
-          <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'EQUIPMENT' ? 'text-white' : 'text-slate-500'}`}>Equipment ({counts.equipment})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('DESIGNATIONS')}
-          className={`${isMobile ? 'w-[48%]' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'DESIGNATIONS' ? 'bg-slate-900' : 'bg-transparent'}`}
-        >
-          <Users size={16} color={activeTab === 'DESIGNATIONS' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'DESIGNATIONS' ? 'text-white' : 'text-slate-500'}`}>Roles ({counts.designations})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('INTERNAL_VEHICLES')}
-          className={`${isMobile ? 'w-[48%] mt-1' : 'flex-1'} py-3 px-2 rounded-lg flex-row items-center justify-center ${activeTab === 'INTERNAL_VEHICLES' ? 'bg-slate-900' : 'bg-transparent'}`}
-        >
-          <Wrench size={16} color={activeTab === 'INTERNAL_VEHICLES' ? '#fff' : '#64748b'} />
-          <Text className={`font-bold ml-2 text-sm ${activeTab === 'INTERNAL_VEHICLES' ? 'text-white' : 'text-slate-500'}`}>Internal Vehicles ({counts.internalVehicles})</Text>
-        </TouchableOpacity>
+      <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-6">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View className="flex-row">
+            <TouchableOpacity
+              onPress={() => setActiveTab('JOBS')}
+              className={`py-3 px-4 rounded-lg flex-row items-center justify-center ${activeTab === 'JOBS' ? 'bg-slate-900' : 'bg-transparent'}`}
+            >
+              <Briefcase size={16} color={activeTab === 'JOBS' ? '#fff' : '#64748b'} />
+              <Text className={`font-bold ml-2 text-sm ${activeTab === 'JOBS' ? 'text-white' : 'text-slate-500'}`} numberOfLines={1}>Jobs ({counts.jobs})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('SUPPLIERS')}
+              className={`py-3 px-4 rounded-lg flex-row items-center justify-center ${activeTab === 'SUPPLIERS' ? 'bg-slate-900' : 'bg-transparent'}`}
+            >
+              <Building2 size={16} color={activeTab === 'SUPPLIERS' ? '#fff' : '#64748b'} />
+              <Text className={`font-bold ml-2 text-sm ${activeTab === 'SUPPLIERS' ? 'text-white' : 'text-slate-500'}`} numberOfLines={1}>Suppliers ({counts.suppliers})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('EQUIPMENT')}
+              className={`py-3 px-4 rounded-lg flex-row items-center justify-center ${activeTab === 'EQUIPMENT' ? 'bg-slate-900' : 'bg-transparent'}`}
+            >
+              <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#fff' : '#64748b'} />
+              <Text className={`font-bold ml-2 text-sm ${activeTab === 'EQUIPMENT' ? 'text-white' : 'text-slate-500'}`} numberOfLines={1}>Equipment ({counts.equipment})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('DESIGNATIONS')}
+              className={`py-3 px-4 rounded-lg flex-row items-center justify-center ${activeTab === 'DESIGNATIONS' ? 'bg-slate-900' : 'bg-transparent'}`}
+            >
+              <Users size={16} color={activeTab === 'DESIGNATIONS' ? '#fff' : '#64748b'} />
+              <Text className={`font-bold ml-2 text-sm ${activeTab === 'DESIGNATIONS' ? 'text-white' : 'text-slate-500'}`} numberOfLines={1}>Roles ({counts.designations})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('INTERNAL_VEHICLES')}
+              className={`py-3 px-4 rounded-lg flex-row items-center justify-center ${activeTab === 'INTERNAL_VEHICLES' ? 'bg-slate-900' : 'bg-transparent'}`}
+            >
+              <Wrench size={16} color={activeTab === 'INTERNAL_VEHICLES' ? '#fff' : '#64748b'} />
+              <Text className={`font-bold ml-2 text-sm ${activeTab === 'INTERNAL_VEHICLES' ? 'text-white' : 'text-slate-500'}`} numberOfLines={1}>Internal Vehicles ({counts.internalVehicles})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('DRIVERS')}
+              className={`py-3 px-4 rounded-lg flex-row items-center justify-center ${activeTab === 'DRIVERS' ? 'bg-slate-900' : 'bg-transparent'}`}
+            >
+              <UserCog size={16} color={activeTab === 'DRIVERS' ? '#fff' : '#64748b'} />
+              <Text className={`font-bold ml-2 text-sm ${activeTab === 'DRIVERS' ? 'text-white' : 'text-slate-500'}`} numberOfLines={1}>Drivers / Operators ({counts.drivers})</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
 
       <View className="bg-transparent overflow-hidden">
@@ -714,6 +750,66 @@ export default function AdminSettings() {
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* DRIVERS / OPERATORS TAB */}
+            {activeTab === 'DRIVERS' && (
+              <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <SearchBox value={driverSearch} onChangeText={setDriverSearch} placeholder="Search drivers / operators" />
+                {!isMobile && (
+                  <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
+                    <Text className="flex-1 font-bold text-slate-500 text-xs uppercase">Name</Text>
+                    <Text className="w-28 font-bold text-slate-500 text-xs uppercase text-center">Actions</Text>
+                  </View>
+                )}
+                {filteredDrivers.length === 0 && (
+                  <Text className="text-slate-500 font-medium text-center py-6">No drivers/operators match "{driverSearch}".</Text>
+                )}
+                {filteredDrivers.map((d) => (
+                  <View key={d.id} className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : 'flex-row items-center p-4 border-b border-slate-100'}`}>
+                    {editingId === d.id ? (
+                      <>
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">NAME</Text>}
+                        <TextInput
+                          className={`${isMobile ? 'mb-3' : 'flex-1'} bg-slate-50 border border-slate-200 rounded p-2 text-slate-900`}
+                          value={editForm.name}
+                          onChangeText={(t) => setEditForm({ ...editForm, name: t })}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {isMobile && <Text className="text-xs font-bold text-slate-400 mb-1">NAME</Text>}
+                        <Text className={`${isMobile ? 'mb-3' : 'flex-1'} text-slate-900 font-bold`}>{d.name}</Text>
+                      </>
+                    )}
+
+                    <View className={`${isMobile ? 'flex-row justify-between items-center border-t border-slate-100 pt-3' : 'w-28 flex-row items-center justify-end space-x-2 ml-2'}`}>
+                      {isMobile && <Text className="text-xs font-bold text-slate-400">ACTIONS</Text>}
+                      <View className="flex-row items-center space-x-3">
+                        {editingId === d.id ? (
+                          <TouchableOpacity onPress={() => saveEdit('internal_vehicle_drivers', d.id)} className="bg-blue-50 p-2 rounded-full">
+                            <Save size={20} color="#2563eb" />
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity onPress={() => startEdit(d)} className="p-2">
+                            <Edit2 size={18} color="#94a3b8" />
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => deleteRecord('internal_vehicle_drivers', d.id, d.name)} className="p-2">
+                          <Trash2 size={18} color="#ef4444" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => toggleStatus('internal_vehicle_drivers', d.id, d.is_active)}>
+                          {d.is_active ? <ToggleRight size={32} color="#10b981" /> : <ToggleLeft size={32} color="#cbd5e1" />}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+                <TouchableOpacity onPress={() => setAddDriverModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
+                  <Plus size={20} color="#0f172a" />
+                  <Text className="font-bold text-slate-900 ml-2">Add New Driver / Operator</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             </View>
         )}
       </View>
@@ -791,6 +887,20 @@ export default function AdminSettings() {
             <TextInput placeholder="Vehicle No (e.g. 71049)" value={ivForm.vehicle_number} onChangeText={t => setIvForm({...ivForm, vehicle_number: t})} className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3 text-slate-900" />
             <TextInput placeholder="Vehicle Type (e.g. Excavator, Tipper)" value={ivForm.vehicle_type} onChangeText={t => setIvForm({...ivForm, vehicle_type: t})} className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6 text-slate-900" />
             <TouchableOpacity onPress={submitInternalVehicle} className="bg-slate-900 py-4 rounded-xl items-center"><Text className="text-white font-bold">Save Vehicle</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Driver / Operator Modal */}
+      <Modal visible={addDriverModal} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center p-8">
+          <View className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold text-slate-900">Add New Driver / Operator</Text>
+              <TouchableOpacity onPress={() => setAddDriverModal(false)}><X size={24} color="#64748b" /></TouchableOpacity>
+            </View>
+            <TextInput placeholder="Name" value={driverForm.name} onChangeText={t => setDriverForm({...driverForm, name: t})} className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6 text-slate-900" />
+            <TouchableOpacity onPress={submitDriver} className="bg-slate-900 py-4 rounded-xl items-center"><Text className="text-white font-bold">Save Driver / Operator</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>

@@ -210,6 +210,7 @@ export default function InternalVehicleEntryScreen() {
   const [jobs, setJobs] = useState<{ label: string; value: string }[]>([]);
   const [vehicleOptions, setVehicleOptions] = useState<{ label: string; value: string }[]>([]);
   const [allVehicles, setAllVehicles] = useState<any[]>([]);
+  const [driverOptions, setDriverOptions] = useState<{ label: string; value: string }[]>([]);
 
   const [formData, setFormData] = useState({
     entry_date: getLocalDateString(),
@@ -226,7 +227,7 @@ export default function InternalVehicleEntryScreen() {
     working_hours: '9',
     number_of_trips: '',
     requester_name: '',
-    driver_name: '',
+    driver_id: '',
     rate_amount: '',
     ist_timesheet_number: '',
     remarks: '',
@@ -275,9 +276,10 @@ export default function InternalVehicleEntryScreen() {
 
   const fetchData = async () => {
     try {
-      const [jobsRes, vehiclesRes, { data: { user } }] = await Promise.all([
+      const [jobsRes, vehiclesRes, driversRes, { data: { user } }] = await Promise.all([
         fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name').eq('is_active', true).order('job_number')),
         fetchWithCache('internal_vehicles', () => supabase.from('internal_vehicles').select('id, vehicle_number, vehicle_type').eq('is_active', true).order('vehicle_number')),
+        fetchWithCache('internal_vehicle_drivers', () => supabase.from('internal_vehicle_drivers').select('id, name').eq('is_active', true).order('name')),
         supabase.auth.getUser(),
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
@@ -288,6 +290,9 @@ export default function InternalVehicleEntryScreen() {
       if (vehiclesRes.data) {
         setAllVehicles(vehiclesRes.data);
         setVehicleOptions(vehiclesRes.data.map((v: any) => ({ label: `${v.vehicle_number} - ${v.vehicle_type}`, value: v.id })));
+      }
+      if (driversRes.data) {
+        setDriverOptions(driversRes.data.map((d: any) => ({ label: d.name, value: d.id })));
       }
 
       if (user) {
@@ -331,7 +336,7 @@ export default function InternalVehicleEntryScreen() {
             working_hours: entryData.working_hours ? entryData.working_hours.toString() : '0',
             number_of_trips: entryData.number_of_trips !== null && entryData.number_of_trips !== undefined ? entryData.number_of_trips.toString() : '',
             requester_name: entryData.requester_name || '',
-            driver_name: entryData.driver_name || '',
+            driver_id: entryData.driver_id || '',
             rate_amount: entryData.rate_amount !== null && entryData.rate_amount !== undefined ? entryData.rate_amount.toString() : '',
             ist_timesheet_number: entryData.ist_timesheet_number || '',
             remarks: entryData.remarks || '',
@@ -357,7 +362,7 @@ export default function InternalVehicleEntryScreen() {
           break_hours: '1',
           working_hours: '9',
           number_of_trips: '',
-          driver_name: '',
+          driver_id: '',
           rate_amount: '',
           ist_timesheet_number: '',
           remarks: '',
@@ -381,6 +386,7 @@ export default function InternalVehicleEntryScreen() {
   };
 
   const selectedVehicle = allVehicles.find((v: any) => v.id === formData.vehicle_id);
+  const selectedDriver = driverOptions.find((d: any) => d.value === formData.driver_id);
 
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
@@ -390,7 +396,7 @@ export default function InternalVehicleEntryScreen() {
     if (!formData.section) newErrors.section = 'Section is required';
     if (!formData.number_of_trips) newErrors.number_of_trips = 'Number of trips is required';
     if (!formData.requester_name) newErrors.requester_name = 'Requester name is required';
-    if (!formData.driver_name) newErrors.driver_name = 'Driver name is required';
+    if (!formData.driver_id) newErrors.driver_id = 'Driver / Operator is required';
 
     const missingPhoto = !photoUri && !id;
 
@@ -452,7 +458,7 @@ export default function InternalVehicleEntryScreen() {
         working_hours: parseFloat(formData.working_hours) || 0,
         number_of_trips: parseInt(formData.number_of_trips) || 0,
         requester_name: formData.requester_name,
-        driver_name: formData.driver_name,
+        driver_id: formData.driver_id,
         rate_amount: formData.rate_amount ? (parseFloat(formData.rate_amount) || null) : null,
         ist_timesheet_number: formData.ist_timesheet_number.trim() || null,
         remarks: formData.remarks || null,
@@ -477,6 +483,7 @@ export default function InternalVehicleEntryScreen() {
             display: {
               company: basePayload.company,
               internal_vehicles: { vehicle_number: selectedVehicle?.vehicle_number || '', vehicle_type: selectedVehicle?.vehicle_type || 'Vehicle' },
+              internal_vehicle_drivers: { name: selectedDriver?.label || '' },
               jobs: { job_name: jobName },
               working_hours: basePayload.working_hours,
               number_of_trips: basePayload.number_of_trips,
@@ -664,7 +671,7 @@ export default function InternalVehicleEntryScreen() {
                     working_hours: '9',
                     number_of_trips: '',
                     requester_name: formData.requester_name,
-                    driver_name: '',
+                    driver_id: '',
                     rate_amount: '',
                     ist_timesheet_number: '',
                     remarks: '',
@@ -878,19 +885,15 @@ export default function InternalVehicleEntryScreen() {
           {errors.requester_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.requester_name}</Text> : null}
         </View>
 
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-slate-700 mb-1">
-            Driver Name <Text className="text-red-500">*</Text>
-          </Text>
-          <TextInput
-            value={formData.driver_name}
-            onChangeText={(t) => updateForm('driver_name', t)}
-            className={`bg-white border ${errors.driver_name ? 'border-red-500' : 'border-slate-300'} text-slate-900 rounded-lg px-4 py-3.5`}
-            placeholder="Name of Driver"
-            placeholderTextColor="#94a3b8"
-          />
-          {errors.driver_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.driver_name}</Text> : null}
-        </View>
+        <CustomPicker
+          label="Driver / Operator"
+          required={true}
+          value={formData.driver_id}
+          options={driverOptions}
+          onSelect={(v: string) => updateForm('driver_id', v)}
+          placeholder="Select Driver / Operator"
+          error={errors.driver_id}
+        />
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">Rate / Amount - AED (Optional)</Text>
