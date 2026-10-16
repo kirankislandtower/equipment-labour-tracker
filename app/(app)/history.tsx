@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
 import { getQueuedEntries, QueuedEntryType } from '../../lib/offlineQueue';
+import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../lib/foremanFlags';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -282,15 +283,17 @@ export default function HistoryScreen() {
                 Material
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setActiveTab('FLUSHING')}
-              className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'FLUSHING' ? 'bg-white shadow-sm' : ''}`}
-            >
-              <Droplets size={16} color={activeTab === 'FLUSHING' ? '#1e3a8a' : '#64748b'} />
-              <Text className={`ml-2 font-bold ${activeTab === 'FLUSHING' ? 'text-blue-900' : 'text-slate-500'}`}>
-                Flushing
-              </Text>
-            </TouchableOpacity>
+            {FLUSHING_ENABLED_FOR_FOREMEN && (
+              <TouchableOpacity
+                onPress={() => setActiveTab('FLUSHING')}
+                className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'FLUSHING' ? 'bg-white shadow-sm' : ''}`}
+              >
+                <Droplets size={16} color={activeTab === 'FLUSHING' ? '#1e3a8a' : '#64748b'} />
+                <Text className={`ml-2 font-bold ${activeTab === 'FLUSHING' ? 'text-blue-900' : 'text-slate-500'}`}>
+                  Flushing
+                </Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={() => setActiveTab('INTERNAL_VEHICLE')}
               className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'INTERNAL_VEHICLE' ? 'bg-white shadow-sm' : ''}`}

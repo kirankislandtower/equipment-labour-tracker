@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Home, Truck, Users, User, ArrowRightLeft, Droplets } from 'lucide-react-native';
+import { Home, Truck, Users, User, Droplets, Wrench } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import { processQueue } from '../../lib/offlineQueue';
@@ -20,8 +20,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
         // Hide routes that shouldn't be in the tab bar (like entry forms)
         const hiddenRoutes = FLUSHING_ENABLED_FOR_FOREMEN
-          ? ['entry/select', 'entry/internal-vehicles', 'history', 'missing-photos']
-          : ['entry/select', 'entry/internal-vehicles', 'history', 'missing-photos', 'entry/flushing'];
+          ? ['entry/select', 'entry/material', 'history', 'missing-photos']
+          : ['entry/select', 'entry/material', 'history', 'missing-photos', 'entry/flushing'];
         if (hiddenRoutes.includes(route.name)) return null;
 
         const label =
@@ -41,7 +41,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            if (route.name === 'entry/equipment' || route.name === 'entry/labour' || route.name === 'entry/material' || route.name === 'entry/flushing') {
+            if (route.name === 'entry/equipment' || route.name === 'entry/labour' || route.name === 'entry/internal-vehicles' || route.name === 'entry/flushing') {
               navigation.navigate(route.name, { ...route.params, id: undefined });
             } else {
               navigation.navigate(route.name, route.params);
@@ -114,10 +114,10 @@ export default function AppLayout() {
         }} 
       />
       <Tabs.Screen
-        name="entry/material"
+        name="entry/internal-vehicles"
         options={{
-          title: 'Material',
-          tabBarIcon: ({ color, size }) => <ArrowRightLeft color={color} size={size} />
+          title: 'Vehicles',
+          tabBarIcon: ({ color, size }) => <Wrench color={color} size={size} />
         }}
       />
       <Tabs.Screen
@@ -137,7 +137,7 @@ export default function AppLayout() {
       
       {/* Hidden Screens inside the Tabs layout */}
       <Tabs.Screen name="entry/select" options={{ href: null }} />
-      <Tabs.Screen name="entry/internal-vehicles" options={{ href: null }} />
+      <Tabs.Screen name="entry/material" options={{ href: null }} />
       <Tabs.Screen name="history" options={{ href: null }} />
       <Tabs.Screen name="missing-photos" options={{ href: null }} />
     </Tabs>
