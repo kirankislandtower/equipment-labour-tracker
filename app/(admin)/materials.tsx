@@ -10,6 +10,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { buildCSV } from '../../lib/csv';
 import { FadeInUp } from '../../components/Animations';
+import JobFilterSelect, { JobOption } from '../../components/JobFilterSelect';
 
 export default function AdminMaterials() {
   const { width } = useWindowDimensions();
@@ -27,6 +28,8 @@ export default function AdminMaterials() {
   );
   const [fromDate, setFromDate] = useState(firstOfMonth);
   const [toDate, setToDate] = useState(todayStr);
+  const [jobs, setJobs] = useState<JobOption[]>([]);
+  const [jobFilter, setJobFilter] = useState('ALL');
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
 
@@ -64,8 +67,14 @@ export default function AdminMaterials() {
   }, [filter]);
 
   useEffect(() => {
+    supabase.from('jobs').select('id, job_number, job_name').order('job_number').then(({ data }) => {
+      if (data) setJobs(data);
+    });
+  }, []);
+
+  useEffect(() => {
     fetchEntries();
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, jobFilter]);
 
   const fetchEntries = async () => {
     setLoading(true);
@@ -81,6 +90,8 @@ export default function AdminMaterials() {
 
       if (fromDate && fromDate.length === 10) query = query.gte('entry_date', fromDate);
       if (toDate && toDate.length === 10) query = query.lte('entry_date', toDate);
+      // Material moves between two jobs, so "filter by job" means either end matches.
+      if (jobFilter !== 'ALL') query = query.or(`from_job_id.eq.${jobFilter},to_job_id.eq.${jobFilter}`);
 
       // Status filter is applied client-side (see statusCounts/filteredEntries below)
       // so all status counts can be shown on the filter pills at once.
@@ -539,6 +550,8 @@ export default function AdminMaterials() {
                 </>
               )}
             </View>
+
+            <JobFilterSelect jobs={jobs} value={jobFilter} onChange={setJobFilter} className={isMobile ? undefined : 'w-56'} />
           </View>
         </View>
       </View>
