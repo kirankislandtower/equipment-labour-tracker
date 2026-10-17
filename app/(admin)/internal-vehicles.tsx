@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions, Alert } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions, Alert, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Check, X, Download, Image as ImageIcon, Calendar, AlertTriangle } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -11,6 +11,8 @@ import * as Sharing from 'expo-sharing';
 import { buildCSV } from '../../lib/csv';
 import { FadeInUp } from '../../components/Animations';
 import JobFilterSelect, { JobOption } from '../../components/JobFilterSelect';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import ScrollProgressBar from '../../components/ScrollProgressBar';
 
 const COMPANY_LABELS: Record<string, string> = {
   IST: 'Island Tower Electromechanical (IST)',
@@ -261,10 +263,15 @@ export default function AdminInternalVehicles() {
   };
   const filteredEntries = statusFilter === 'ALL' ? entries : entries.filter(e => e.status === statusFilter);
 
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [scrollContainerHeight, setScrollContainerHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
+
   return (
     <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
       <ConfirmModal
         visible={!!confirmApproveId}
@@ -344,6 +351,8 @@ export default function AdminInternalVehicles() {
         </View>
       </Modal>
 
+      {/* Fixed header: title, export, date/job filters, status pills never scroll away */}
+      <View style={{ paddingHorizontal: isMobile ? 16 : 32, paddingTop: isMobile ? 16 : 32 }}>
       <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
         <View>
           <Text className="text-slate-900 text-3xl font-black tracking-tight">Internal Vehicle Entries</Text>
@@ -442,7 +451,24 @@ export default function AdminInternalVehicles() {
           </TouchableOpacity>
         ))}
       </View>
+      </View>
 
+      <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#6d28d9" />
+
+      {/* Scrollable table body -- only this area scrolls, header/filters stay put */}
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: isMobile ? 16 : 32, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setScrollContentHeight(h)}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: (e: any) => setShowScrollTop(e.nativeEvent.contentOffset.y > 400) }
+        )}
+        scrollEventThrottle={16}
+      >
       <View className="bg-transparent overflow-hidden">
         <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-4`}>
           {!isMobile && (
@@ -620,6 +646,11 @@ export default function AdminInternalVehicles() {
         </View>
       </View>
       </ScrollView>
+
+      <ScrollToTopButton
+        visible={showScrollTop}
+        onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+      />
 
       {/* Details Modal */}
       <Modal visible={detailsModalVisible} transparent animationType="slide" onRequestClose={() => setDetailsModalVisible(false)}>

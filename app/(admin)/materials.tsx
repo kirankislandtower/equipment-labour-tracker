@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Modal, Image, TextInput, useWindowDimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Modal, Image, TextInput, useWindowDimensions, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Check, X, Download, Filter, Image as ImageIcon, Building2, Truck, HardHat, Calendar, Clock, AlertCircle } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -11,6 +11,8 @@ import * as Sharing from 'expo-sharing';
 import { buildCSV } from '../../lib/csv';
 import { FadeInUp } from '../../components/Animations';
 import JobFilterSelect, { JobOption } from '../../components/JobFilterSelect';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import ScrollProgressBar from '../../components/ScrollProgressBar';
 
 export default function AdminMaterials() {
   const { width } = useWindowDimensions();
@@ -224,10 +226,15 @@ export default function AdminMaterials() {
   };
   const filteredEntries = statusFilter === 'ALL' ? entries : entries.filter(e => e.status === statusFilter);
 
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [scrollContainerHeight, setScrollContainerHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
+
   return (
     <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
 
       <ConfirmModal
         visible={!!confirmApproveId}
@@ -447,6 +454,8 @@ export default function AdminMaterials() {
         </View>
       </Modal>
 
+      {/* Fixed header: title, export, date/job/status filters never scroll away */}
+      <View style={{ paddingHorizontal: isMobile ? 16 : 32, paddingTop: isMobile ? 16 : 32 }}>
       {/* Header and Filters */}
       <View className="flex-row flex-wrap items-center justify-between mb-8 gap-y-4">
         <View>
@@ -555,6 +564,7 @@ export default function AdminMaterials() {
           </View>
         </View>
       </View>
+      </View>
 
       {toastMessage && (
         <View className="absolute top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 px-6 py-3 rounded-full shadow-lg flex-row items-center">
@@ -563,6 +573,22 @@ export default function AdminMaterials() {
         </View>
       )}
 
+      <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#4f46e5" />
+
+      {/* Scrollable table body -- only this area scrolls, header/filters stay put */}
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: isMobile ? 16 : 32, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setScrollContentHeight(h)}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: (e: any) => setShowScrollTop(e.nativeEvent.contentOffset.y > 400) }
+        )}
+        scrollEventThrottle={16}
+      >
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#4f46e5" />
@@ -755,6 +781,11 @@ export default function AdminMaterials() {
         )
       )}
       </ScrollView>
+
+      <ScrollToTopButton
+        visible={showScrollTop}
+        onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+      />
     </View>
     </FadeInUp>
   );
