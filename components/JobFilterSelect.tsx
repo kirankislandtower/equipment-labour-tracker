@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, TextInput, FlatList } from 'react-native';
 import { Briefcase, ChevronDown, X, Search, Check } from 'lucide-react-native';
+import ScrollToTopButton from './ScrollToTopButton';
 
 export interface JobOption {
   id: string;
@@ -23,6 +24,8 @@ interface JobFilterSelectProps {
 export default function JobFilterSelect({ jobs, value, onChange, className = 'flex-1' }: JobFilterSelectProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [search, setSearch] = useState('');
+  const listRef = useRef<FlatList>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const selected = jobs.find(j => j.id === value);
   const label = selected ? `${selected.job_number} - ${selected.job_name}` : 'All Jobs';
@@ -43,7 +46,7 @@ export default function JobFilterSelect({ jobs, value, onChange, className = 'fl
         <ChevronDown size={16} color="#64748b" />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} transparent animationType="fade" onShow={() => setSearch('')} onRequestClose={() => setModalVisible(false)}>
+      <Modal visible={modalVisible} transparent animationType="fade" onShow={() => { setSearch(''); setShowScrollTop(false); }} onRequestClose={() => setModalVisible(false)}>
         <View className="flex-1 bg-black/50 justify-center items-center p-8">
           <View className="bg-white w-full max-w-2xl rounded-2xl shadow-xl" style={{ maxHeight: '80%' }}>
             <View className="flex-row items-center justify-between p-5 border-b border-slate-100">
@@ -70,6 +73,7 @@ export default function JobFilterSelect({ jobs, value, onChange, className = 'fl
               )}
             </View>
             <FlatList
+              ref={listRef}
               data={[{ id: 'ALL', job_number: 'All Jobs', job_name: '' }, ...filtered]}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
@@ -86,6 +90,12 @@ export default function JobFilterSelect({ jobs, value, onChange, className = 'fl
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingBottom: 12 }}
               style={{ flex: 1 }}
+              onScroll={(e) => setShowScrollTop(e.nativeEvent.contentOffset.y > 300)}
+              scrollEventThrottle={16}
+            />
+            <ScrollToTopButton
+              visible={showScrollTop}
+              onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
             />
           </View>
         </View>

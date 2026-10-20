@@ -454,8 +454,28 @@ export default function AdminMaterials() {
         </View>
       </Modal>
 
-      {/* Fixed header: title, export, date/job/status filters never scroll away */}
-      <View style={{ paddingHorizontal: isMobile ? 16 : 32, paddingTop: isMobile ? 16 : 32 }}>
+      {toastMessage && (
+        <View className="absolute top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 px-6 py-3 rounded-full shadow-lg flex-row items-center">
+          <Check size={18} color="#4ade80" />
+          <Text className="text-white font-semibold ml-2">{toastMessage}</Text>
+        </View>
+      )}
+
+      <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#4f46e5" />
+
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1"
+        contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setScrollContentHeight(h)}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: (e: any) => setShowScrollTop(e.nativeEvent.contentOffset.y > 400) }
+        )}
+        scrollEventThrottle={16}
+      >
       {/* Header and Filters */}
       <View className="flex-row flex-wrap items-center justify-between mb-8 gap-y-4">
         <View>
@@ -463,7 +483,7 @@ export default function AdminMaterials() {
           <Text className="text-slate-500 mt-1 font-medium text-base">Review and manage material shifting</Text>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={exportToCSV}
           className="bg-indigo-600 px-4 py-2.5 rounded-xl flex-row items-center active:bg-indigo-700 shadow-sm"
         >
@@ -472,9 +492,11 @@ export default function AdminMaterials() {
         </TouchableOpacity>
       </View>
 
-      <View className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
+      {/* Sticky: stays pinned at the top once scrolled past, while the table keeps scrolling underneath it */}
+      <View style={{ position: 'sticky' as any, top: 0, zIndex: 10, backgroundColor: '#f8fafc', paddingTop: 8, paddingBottom: 8 }}>
+      <View className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
         <View className={`flex-row ${isMobile ? 'flex-col gap-y-4' : 'items-center justify-between'}`}>
-          
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className={`flex-row ${isMobile ? '-mx-4 px-4' : ''}`}>
             <View className="flex-row items-center gap-x-2">
               {(['ALL', 'SUBMITTED', 'APPROVED', 'REJECTED'] as const).map(status => (
@@ -506,7 +528,7 @@ export default function AdminMaterials() {
                 </View>
               ) : (
                 <>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => setShowFromPicker(true)}
                     className={`bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex-row items-center ${isMobile ? 'flex-1 ml-2 justify-between' : ''}`}
                   >
@@ -540,7 +562,7 @@ export default function AdminMaterials() {
                 </View>
               ) : (
                 <>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => setShowToPicker(true)}
                     className={`bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex-row items-center ${isMobile ? 'flex-1 ml-2 justify-between' : ''}`}
                   >
@@ -566,29 +588,7 @@ export default function AdminMaterials() {
       </View>
       </View>
 
-      {toastMessage && (
-        <View className="absolute top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 px-6 py-3 rounded-full shadow-lg flex-row items-center">
-          <Check size={18} color="#4ade80" />
-          <Text className="text-white font-semibold ml-2">{toastMessage}</Text>
-        </View>
-      )}
-
-      <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#4f46e5" />
-
-      {/* Scrollable table body -- only this area scrolls, header/filters stay put */}
-      <ScrollView
-        ref={scrollViewRef}
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: isMobile ? 16 : 32, paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-        onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
-        onContentSizeChange={(w, h) => setScrollContentHeight(h)}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false, listener: (e: any) => setShowScrollTop(e.nativeEvent.contentOffset.y > 400) }
-        )}
-        scrollEventThrottle={16}
-      >
+      <View className="mt-6">
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#4f46e5" />
@@ -780,6 +780,7 @@ export default function AdminMaterials() {
           </View>
         )
       )}
+      </View>
       </ScrollView>
 
       <ScrollToTopButton

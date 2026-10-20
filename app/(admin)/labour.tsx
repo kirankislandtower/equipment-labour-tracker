@@ -337,103 +337,12 @@ export default function AdminLabour() {
         </View>
       </Modal>
 
-      {/* Fixed header: title, export, date/job filters, status pills never scroll away */}
-      <View style={{ paddingHorizontal: isMobile ? 16 : 32, paddingTop: isMobile ? 16 : 32 }}>
-      <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
-        <View>
-          <Text className="text-slate-900 text-3xl font-black tracking-tight">Labour Entries</Text>
-          <Text className="text-slate-500 text-base mt-2">Manage and review daily labour logs.</Text>
-        </View>
-        
-        <TouchableOpacity 
-          onPress={exportToCSV}
-          className="flex-row items-center bg-[#166534] px-5 py-3 rounded-xl active:bg-green-800 shadow-sm"
-        >
-          <Download size={20} color="#ffffff" />
-          <Text className="text-white font-bold ml-2">Export CSV</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Date Range Filter */}
-      <View className={`mb-5 ${isMobile ? 'flex-col gap-3' : 'flex-row items-center gap-3'}`}>
-        <TouchableOpacity 
-          className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3 flex-1"
-          onPress={() => Platform.OS !== 'web' && setShowFromPicker(true)}
-        >
-          <Calendar size={16} color="#64748b" />
-          <Text className="text-slate-500 text-xs font-bold ml-2 mr-3">FROM</Text>
-          {Platform.OS === 'web' ? (
-            // @ts-ignore
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e: any) => setFromDate(e.target.value)}
-              style={{ border: 'none', outline: 'none', flex: 1, fontWeight: 'bold', backgroundColor: 'transparent', color: '#0f172a', fontSize: '16px' }}
-            />
-          ) : (
-            <Text className="flex-1 text-slate-900 font-bold text-base h-6">{fromDate}</Text>
-          )}
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3 flex-1"
-          onPress={() => Platform.OS !== 'web' && setShowToPicker(true)}
-        >
-          <Calendar size={16} color="#64748b" />
-          <Text className="text-slate-500 text-xs font-bold ml-2 mr-3">TO</Text>
-          {Platform.OS === 'web' ? (
-            // @ts-ignore
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e: any) => setToDate(e.target.value)}
-              style={{ border: 'none', outline: 'none', flex: 1, fontWeight: 'bold', backgroundColor: 'transparent', color: '#0f172a', fontSize: '16px' }}
-            />
-          ) : (
-            <Text className="flex-1 text-slate-900 font-bold text-base h-6">{toDate}</Text>
-          )}
-        </TouchableOpacity>
-
-        <JobFilterSelect jobs={jobs} value={jobFilter} onChange={setJobFilter} />
-
-        {showFromPicker && (
-          <DateTimePicker
-            value={new Date(fromDate)}
-            mode="date"
-            display="default"
-            onChange={onFromDateChange}
-          />
-        )}
-        {showToPicker && (
-          <DateTimePicker
-            value={new Date(toDate)}
-            mode="date"
-            display="default"
-            onChange={onToDateChange}
-          />
-        )}
-      </View>
-
-      <View className={`flex-row mb-6 ${isMobile ? 'flex-wrap gap-2' : 'gap-x-2'}`}>
-        {['SUBMITTED', 'APPROVED', 'REJECTED', 'ALL'].map((filter) => (
-          <TouchableOpacity 
-            key={filter}
-            onPress={() => setStatusFilter(filter as any)}
-            className={`px-4 py-2 rounded-lg border ${statusFilter === filter ? 'bg-slate-800 border-slate-800' : 'bg-white border-slate-300'}`}
-          >
-            <Text className={`font-semibold ${statusFilter === filter ? 'text-white' : 'text-slate-600'}`}>{filter} ({statusCounts[filter as keyof typeof statusCounts]})</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      </View>
-
       <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#166534" />
 
-      {/* Scrollable table body -- only this area scrolls, header/filters stay put */}
       <ScrollView
         ref={scrollViewRef}
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: isMobile ? 16 : 32, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
         onContentSizeChange={(w, h) => setScrollContentHeight(h)}
@@ -443,7 +352,97 @@ export default function AdminLabour() {
         )}
         scrollEventThrottle={16}
       >
-      <View className="bg-transparent overflow-hidden">
+      <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
+        <View>
+          <Text className="text-slate-900 text-3xl font-black tracking-tight">Labour Entries</Text>
+          <Text className="text-slate-500 text-base mt-2">Manage and review daily labour logs.</Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={exportToCSV}
+          className="flex-row items-center bg-[#166534] px-5 py-3 rounded-xl active:bg-green-800 shadow-sm"
+        >
+          <Download size={20} color="#ffffff" />
+          <Text className="text-white font-bold ml-2">Export CSV</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Sticky: stays pinned at the top once scrolled past, while the table keeps scrolling underneath it */}
+      <View style={{ position: 'sticky' as any, top: 0, zIndex: 10, backgroundColor: '#f8fafc', paddingTop: 8, paddingBottom: 8 }}>
+        {/* Date Range Filter */}
+        <View className={`mb-5 ${isMobile ? 'flex-col gap-3' : 'flex-row items-center gap-3'}`}>
+          <TouchableOpacity
+            className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3 flex-1"
+            onPress={() => Platform.OS !== 'web' && setShowFromPicker(true)}
+          >
+            <Calendar size={16} color="#64748b" />
+            <Text className="text-slate-500 text-xs font-bold ml-2 mr-3">FROM</Text>
+            {Platform.OS === 'web' ? (
+              // @ts-ignore
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e: any) => setFromDate(e.target.value)}
+                style={{ border: 'none', outline: 'none', flex: 1, fontWeight: 'bold', backgroundColor: 'transparent', color: '#0f172a', fontSize: '16px' }}
+              />
+            ) : (
+              <Text className="flex-1 text-slate-900 font-bold text-base h-6">{fromDate}</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-3 flex-1"
+            onPress={() => Platform.OS !== 'web' && setShowToPicker(true)}
+          >
+            <Calendar size={16} color="#64748b" />
+            <Text className="text-slate-500 text-xs font-bold ml-2 mr-3">TO</Text>
+            {Platform.OS === 'web' ? (
+              // @ts-ignore
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e: any) => setToDate(e.target.value)}
+                style={{ border: 'none', outline: 'none', flex: 1, fontWeight: 'bold', backgroundColor: 'transparent', color: '#0f172a', fontSize: '16px' }}
+              />
+            ) : (
+              <Text className="flex-1 text-slate-900 font-bold text-base h-6">{toDate}</Text>
+            )}
+          </TouchableOpacity>
+
+          <JobFilterSelect jobs={jobs} value={jobFilter} onChange={setJobFilter} />
+
+          {showFromPicker && (
+            <DateTimePicker
+              value={new Date(fromDate)}
+              mode="date"
+              display="default"
+              onChange={onFromDateChange}
+            />
+          )}
+          {showToPicker && (
+            <DateTimePicker
+              value={new Date(toDate)}
+              mode="date"
+              display="default"
+              onChange={onToDateChange}
+            />
+          )}
+        </View>
+
+        <View className={`flex-row ${isMobile ? 'flex-wrap gap-2' : 'gap-x-2'}`}>
+          {['SUBMITTED', 'APPROVED', 'REJECTED', 'ALL'].map((filter) => (
+            <TouchableOpacity
+              key={filter}
+              onPress={() => setStatusFilter(filter as any)}
+              className={`px-4 py-2 rounded-lg border ${statusFilter === filter ? 'bg-slate-800 border-slate-800' : 'bg-white border-slate-300'}`}
+            >
+              <Text className={`font-semibold ${statusFilter === filter ? 'text-white' : 'text-slate-600'}`}>{filter} ({statusCounts[filter as keyof typeof statusCounts]})</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View className="bg-transparent overflow-hidden mt-6">
         <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-4`}>
           {!isMobile && (
             <View className="flex-row bg-slate-100 border-b border-slate-200 p-4 rounded-t-2xl">

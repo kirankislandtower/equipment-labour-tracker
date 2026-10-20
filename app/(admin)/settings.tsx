@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform, useWindowDimensions, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/crossAlert';
 import { Briefcase, Truck, Users, Plus, X, ToggleLeft, ToggleRight, Building2, Edit2, Save, Trash2, Search, Wrench, UserCog } from 'lucide-react-native';
 import { FadeInUp } from '../../components/Animations';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import ScrollProgressBar from '../../components/ScrollProgressBar';
 
 const SearchBox = ({ value, onChangeText, placeholder }: { value: string; onChangeText: (t: string) => void; placeholder: string }) => (
   <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 m-4">
@@ -47,6 +49,12 @@ export default function AdminSettings() {
   const [driverSearch, setDriverSearch] = useState('');
 
   const [counts, setCounts] = useState({ jobs: 0, suppliers: 0, equipment: 0, designations: 0, internalVehicles: 0, drivers: 0 });
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [scrollContainerHeight, setScrollContainerHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
 
   // Inline editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -299,7 +307,21 @@ export default function AdminSettings() {
   return (
     <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#0f172a" />
+
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1"
+        contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setScrollContentHeight(h)}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: (e: any) => setShowScrollTop(e.nativeEvent.contentOffset.y > 400) }
+        )}
+        scrollEventThrottle={16}
+      >
       <View className="flex-row justify-between items-center mb-6">
         <View>
           <Text className="text-slate-900 text-3xl font-black tracking-tight">Master Data</Text>
@@ -307,6 +329,8 @@ export default function AdminSettings() {
         </View>
       </View>
 
+      {/* Sticky: stays pinned at the top once scrolled past, while the list keeps scrolling underneath it */}
+      <View style={{ position: 'sticky' as any, top: 0, zIndex: 10, backgroundColor: '#f8fafc', paddingTop: 8, paddingBottom: 8 }}>
       <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-6">
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View className="flex-row">
@@ -355,6 +379,7 @@ export default function AdminSettings() {
           </View>
         </ScrollView>
       </View>
+      </View>
 
       <View className="bg-transparent overflow-hidden">
         {loading ? (
@@ -366,6 +391,12 @@ export default function AdminSettings() {
             {/* JOBS TAB */}
             {activeTab === 'JOBS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <View className="flex-row justify-end px-4 pt-4">
+                  <TouchableOpacity onPress={() => setAddJobModal(true)} className="flex-row items-center bg-slate-900 px-4 py-2.5 rounded-xl active:bg-slate-800">
+                    <Plus size={18} color="#fff" />
+                    <Text className="font-bold text-white ml-2 text-sm">Add New Job</Text>
+                  </TouchableOpacity>
+                </View>
                 <SearchBox value={jobSearch} onChangeText={setJobSearch} placeholder="Search jobs" />
                 {!isMobile && (
                   <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
@@ -436,16 +467,18 @@ export default function AdminSettings() {
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => setAddJobModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
-                  <Plus size={20} color="#0f172a" />
-                  <Text className="font-bold text-slate-900 ml-2">Add New Job</Text>
-                </TouchableOpacity>
               </View>
             )}
 
             {/* SUPPLIERS TAB */}
             {activeTab === 'SUPPLIERS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <View className="flex-row justify-end px-4 pt-4">
+                  <TouchableOpacity onPress={() => setAddSupplierModal(true)} className="flex-row items-center bg-slate-900 px-4 py-2.5 rounded-xl active:bg-slate-800">
+                    <Plus size={18} color="#fff" />
+                    <Text className="font-bold text-white ml-2 text-sm">Add New Supplier</Text>
+                  </TouchableOpacity>
+                </View>
                 <SearchBox value={supplierSearch} onChangeText={setSupplierSearch} placeholder="Search suppliers" />
                 {!isMobile && (
                   <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
@@ -547,16 +580,18 @@ export default function AdminSettings() {
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => setAddSupplierModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
-                  <Plus size={20} color="#0f172a" />
-                  <Text className="font-bold text-slate-900 ml-2">Add New Supplier</Text>
-                </TouchableOpacity>
               </View>
             )}
 
             {/* EQUIPMENT TAB */}
             {activeTab === 'EQUIPMENT' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <View className="flex-row justify-end px-4 pt-4">
+                  <TouchableOpacity onPress={() => setAddEquipModal(true)} className="flex-row items-center bg-slate-900 px-4 py-2.5 rounded-xl active:bg-slate-800">
+                    <Plus size={18} color="#fff" />
+                    <Text className="font-bold text-white ml-2 text-sm">Add New Equipment</Text>
+                  </TouchableOpacity>
+                </View>
                 <SearchBox value={equipSearch} onChangeText={setEquipSearch} placeholder="Search equipment" />
                 {!isMobile && (
                   <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
@@ -617,16 +652,18 @@ export default function AdminSettings() {
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => setAddEquipModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
-                  <Plus size={20} color="#0f172a" />
-                  <Text className="font-bold text-slate-900 ml-2">Add New Equipment</Text>
-                </TouchableOpacity>
               </View>
             )}
 
             {/* DESIGNATIONS TAB */}
             {activeTab === 'DESIGNATIONS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <View className="flex-row justify-end px-4 pt-4">
+                  <TouchableOpacity onPress={() => setAddDesigModal(true)} className="flex-row items-center bg-slate-900 px-4 py-2.5 rounded-xl active:bg-slate-800">
+                    <Plus size={18} color="#fff" />
+                    <Text className="font-bold text-white ml-2 text-sm">Add New Role</Text>
+                  </TouchableOpacity>
+                </View>
                 <SearchBox value={desigSearch} onChangeText={setDesigSearch} placeholder="Search designations" />
                 {!isMobile && (
                   <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
@@ -674,16 +711,18 @@ export default function AdminSettings() {
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => setAddDesigModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
-                  <Plus size={20} color="#0f172a" />
-                  <Text className="font-bold text-slate-900 ml-2">Add New Role</Text>
-                </TouchableOpacity>
               </View>
             )}
 
             {/* INTERNAL VEHICLES TAB */}
             {activeTab === 'INTERNAL_VEHICLES' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <View className="flex-row justify-end px-4 pt-4">
+                  <TouchableOpacity onPress={() => setAddIVModal(true)} className="flex-row items-center bg-slate-900 px-4 py-2.5 rounded-xl active:bg-slate-800">
+                    <Plus size={18} color="#fff" />
+                    <Text className="font-bold text-white ml-2 text-sm">Add New Vehicle</Text>
+                  </TouchableOpacity>
+                </View>
                 <SearchBox value={ivSearch} onChangeText={setIvSearch} placeholder="Search internal vehicles" />
                 {!isMobile && (
                   <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
@@ -744,16 +783,18 @@ export default function AdminSettings() {
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => setAddIVModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
-                  <Plus size={20} color="#0f172a" />
-                  <Text className="font-bold text-slate-900 ml-2">Add New Vehicle</Text>
-                </TouchableOpacity>
               </View>
             )}
 
             {/* DRIVERS / OPERATORS TAB */}
             {activeTab === 'DRIVERS' && (
               <View className={`${isMobile ? '' : 'bg-white rounded-2xl shadow-sm border border-slate-200'} pb-20`}>
+                <View className="flex-row justify-end px-4 pt-4">
+                  <TouchableOpacity onPress={() => setAddDriverModal(true)} className="flex-row items-center bg-slate-900 px-4 py-2.5 rounded-xl active:bg-slate-800">
+                    <Plus size={18} color="#fff" />
+                    <Text className="font-bold text-white ml-2 text-sm">Add New Driver / Operator</Text>
+                  </TouchableOpacity>
+                </View>
                 <SearchBox value={driverSearch} onChangeText={setDriverSearch} placeholder="Search drivers / operators" />
                 {!isMobile && (
                   <View className="flex-row items-center p-4 border-b border-slate-100 bg-slate-50">
@@ -804,16 +845,17 @@ export default function AdminSettings() {
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => setAddDriverModal(true)} className={`${isMobile ? 'bg-white rounded-xl shadow-sm border border-slate-200' : 'border-t border-slate-100'} p-4 flex-row items-center justify-center active:bg-slate-50`}>
-                  <Plus size={20} color="#0f172a" />
-                  <Text className="font-bold text-slate-900 ml-2">Add New Driver / Operator</Text>
-                </TouchableOpacity>
               </View>
             )}
             </View>
         )}
       </View>
       </ScrollView>
+
+      <ScrollToTopButton
+        visible={showScrollTop}
+        onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+      />
 
       {/* Add Job Modal */}
       <Modal visible={addJobModal} transparent animationType="fade">

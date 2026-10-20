@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, useWindowDimensions, Modal, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, useWindowDimensions, Modal, Platform, Animated } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { FileText, Search, X, Check, ChevronDown, CheckCircle2, RotateCcw, Download } from 'lucide-react-native';
+import { FadeInUp } from '../../components/Animations';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import ScrollProgressBar from '../../components/ScrollProgressBar';
 
 type Tab = 'PENDING' | 'VERIFIED';
 
@@ -13,6 +16,8 @@ type Tab = 'PENDING' | 'VERIFIED';
 const SupplierPicker = ({ value, options, onSelect }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const listRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const filtered = searchQuery.trim()
     ? options.filter((o: any) => o.label.toLowerCase().includes(searchQuery.trim().toLowerCase()))
     : options;
@@ -30,7 +35,7 @@ const SupplierPicker = ({ value, options, onSelect }: any) => {
         <ChevronDown size={18} color="#64748b" />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} transparent animationType="slide" onShow={() => setSearchQuery('')} onRequestClose={() => setModalVisible(false)}>
+      <Modal visible={modalVisible} transparent animationType="slide" onShow={() => { setSearchQuery(''); setShowScrollTop(false); }} onRequestClose={() => setModalVisible(false)}>
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl h-[70%] shadow-2xl">
             <View className="flex-row items-center justify-between p-5 border-b border-slate-100">
@@ -51,7 +56,12 @@ const SupplierPicker = ({ value, options, onSelect }: any) => {
                 style={{ outlineStyle: 'none' } as any}
               />
             </View>
-            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView
+              ref={listRef}
+              contentContainerStyle={{ paddingBottom: 40 }}
+              onScroll={(e) => setShowScrollTop(e.nativeEvent.contentOffset.y > 300)}
+              scrollEventThrottle={16}
+            >
               <TouchableOpacity
                 onPress={() => { onSelect(''); setModalVisible(false); }}
                 className="flex-row items-center justify-between p-4 border-b border-slate-50 active:bg-slate-50"
@@ -70,6 +80,10 @@ const SupplierPicker = ({ value, options, onSelect }: any) => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            <ScrollToTopButton
+              visible={showScrollTop}
+              onPress={() => listRef.current?.scrollTo({ y: 0, animated: true })}
+            />
           </View>
         </View>
       </Modal>
@@ -270,9 +284,29 @@ export default function InvoiceTracking() {
     }
   };
 
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [scrollContainerHeight, setScrollContainerHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
+
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#1e3a8a" />
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1"
+        contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setScrollContentHeight(h)}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: (e: any) => setShowScrollTop(e.nativeEvent.contentOffset.y > 400) }
+        )}
+        scrollEventThrottle={16}
+      >
         <View className="mb-6">
           <Text className="text-3xl font-black text-slate-900 tracking-tight mb-1">Invoice Tracking</Text>
           <Text className="text-slate-500 font-medium">Verify approved Equipment entries against the supplier's invoice.</Text>
@@ -321,27 +355,30 @@ export default function InvoiceTracking() {
           </TouchableOpacity>
         )}
 
-        <View className={isMobile ? 'flex-col mb-4' : 'flex-row items-start'} style={{ gap: 12 }}>
-          <View style={{ flex: isMobile ? undefined : 1 }}>
-            <SupplierPicker value={supplierId} options={suppliers} onSelect={setSupplierId} />
-          </View>
-          <View className={isMobile ? 'flex-row mb-4' : 'flex-row'} style={{ gap: 12, flex: isMobile ? undefined : 1 }}>
-            <TouchableOpacity onPress={() => setShowFromPicker(true)} disabled={Platform.OS === 'web'} className="flex-1 bg-white border border-slate-200 rounded-xl p-3.5">
-              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-1">From</Text>
-              {Platform.OS === 'web' ? (
-                <input type="date" value={fromDate} onChange={(e: any) => setFromDate(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontWeight: '700', backgroundColor: 'transparent', color: '#0f172a', fontSize: '15px', padding: 0 }} />
-              ) : (
-                <Text className="text-slate-900 font-bold">{fromDate}</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowToPicker(true)} disabled={Platform.OS === 'web'} className="flex-1 bg-white border border-slate-200 rounded-xl p-3.5">
-              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-1">To</Text>
-              {Platform.OS === 'web' ? (
-                <input type="date" value={toDate} onChange={(e: any) => setToDate(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontWeight: '700', backgroundColor: 'transparent', color: '#0f172a', fontSize: '15px', padding: 0 }} />
-              ) : (
-                <Text className="text-slate-900 font-bold">{toDate}</Text>
-              )}
-            </TouchableOpacity>
+        {/* Sticky: stays pinned at the top once scrolled past, while the list keeps scrolling underneath it */}
+        <View style={{ position: 'sticky' as any, top: 0, zIndex: 10, backgroundColor: '#f8fafc', paddingTop: 8, paddingBottom: 8 }}>
+          <View className={isMobile ? 'flex-col mb-4' : 'flex-row items-start'} style={{ gap: 12 }}>
+            <View style={{ flex: isMobile ? undefined : 1 }}>
+              <SupplierPicker value={supplierId} options={suppliers} onSelect={setSupplierId} />
+            </View>
+            <View className={isMobile ? 'flex-row mb-4' : 'flex-row'} style={{ gap: 12, flex: isMobile ? undefined : 1 }}>
+              <TouchableOpacity onPress={() => setShowFromPicker(true)} disabled={Platform.OS === 'web'} className="flex-1 bg-white border border-slate-200 rounded-xl p-3.5">
+                <Text className="text-slate-400 text-[10px] font-bold uppercase mb-1">From</Text>
+                {Platform.OS === 'web' ? (
+                  <input type="date" value={fromDate} onChange={(e: any) => setFromDate(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontWeight: '700', backgroundColor: 'transparent', color: '#0f172a', fontSize: '15px', padding: 0 }} />
+                ) : (
+                  <Text className="text-slate-900 font-bold">{fromDate}</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowToPicker(true)} disabled={Platform.OS === 'web'} className="flex-1 bg-white border border-slate-200 rounded-xl p-3.5">
+                <Text className="text-slate-400 text-[10px] font-bold uppercase mb-1">To</Text>
+                {Platform.OS === 'web' ? (
+                  <input type="date" value={toDate} onChange={(e: any) => setToDate(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontWeight: '700', backgroundColor: 'transparent', color: '#0f172a', fontSize: '15px', padding: 0 }} />
+                ) : (
+                  <Text className="text-slate-900 font-bold">{toDate}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -467,6 +504,11 @@ export default function InvoiceTracking() {
         )}
       </ScrollView>
 
+      <ScrollToTopButton
+        visible={showScrollTop}
+        onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+      />
+
       {tab === 'PENDING' && selectedIds.size > 0 && (
         <View
           className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-4 flex-row items-center justify-between"
@@ -493,6 +535,7 @@ export default function InvoiceTracking() {
         onVerify={handleBulkVerify}
       />
     </View>
+    </FadeInUp>
   );
 }
 
