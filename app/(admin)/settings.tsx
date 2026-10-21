@@ -32,6 +32,7 @@ export default function AdminSettings() {
   const isMobile = width < 768;
 
   const [activeTab, setActiveTab] = useState<'JOBS' | 'SUPPLIERS' | 'EQUIPMENT' | 'DESIGNATIONS' | 'INTERNAL_VEHICLES' | 'DRIVERS'>('JOBS');
+  const [activeCompany, setActiveCompany] = useState<'IST' | 'JAH' | 'HYDRO'>('IST');
   const [loading, setLoading] = useState(true);
 
   const [jobs, setJobs] = useState<any[]>([]);
@@ -78,21 +79,21 @@ export default function AdminSettings() {
 
   useEffect(() => {
     fetchData();
-  }, [activeTab]);
+  }, [activeTab, activeCompany]);
 
   useEffect(() => {
     fetchCounts();
-  }, []);
+  }, [activeCompany]);
 
   const fetchCounts = async () => {
     try {
       const [jobsRes, suppliersRes, equipmentRes, designationsRes, internalVehiclesRes, driversRes] = await Promise.all([
-        supabase.from('jobs').select('*', { count: 'exact', head: true }),
-        supabase.from('suppliers').select('*', { count: 'exact', head: true }),
-        supabase.from('equipment_master').select('*', { count: 'exact', head: true }),
-        supabase.from('labour_designations').select('*', { count: 'exact', head: true }),
-        supabase.from('internal_vehicles').select('*', { count: 'exact', head: true }),
-        supabase.from('internal_vehicle_drivers').select('*', { count: 'exact', head: true }),
+        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
+        supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
+        supabase.from('equipment_master').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
+        supabase.from('labour_designations').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
+        supabase.from('internal_vehicles').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
+        supabase.from('internal_vehicle_drivers').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
       ]);
       setCounts({
         jobs: jobsRes.count || 0,
@@ -111,22 +112,22 @@ export default function AdminSettings() {
     setLoading(true);
     try {
       if (activeTab === 'JOBS') {
-        const { data } = await supabase.from('jobs').select('*').order('job_number');
+        const { data } = await supabase.from('jobs').select('*').eq('company', activeCompany).order('job_number');
         setJobs(data || []);
       } else if (activeTab === 'SUPPLIERS') {
-        const { data } = await supabase.from('suppliers').select('*').order('supplier_name');
+        const { data } = await supabase.from('suppliers').select('*').eq('company', activeCompany).order('supplier_name');
         setSuppliers(data || []);
       } else if (activeTab === 'EQUIPMENT') {
-        const { data } = await supabase.from('equipment_master').select('*').order('equipment_category');
+        const { data } = await supabase.from('equipment_master').select('*').eq('company', activeCompany).order('equipment_category');
         setEquipment(data || []);
       } else if (activeTab === 'DESIGNATIONS') {
-        const { data } = await supabase.from('labour_designations').select('*').order('designation_name');
+        const { data } = await supabase.from('labour_designations').select('*').eq('company', activeCompany).order('designation_name');
         setDesignations(data || []);
       } else if (activeTab === 'INTERNAL_VEHICLES') {
-        const { data } = await supabase.from('internal_vehicles').select('*').order('vehicle_number');
+        const { data } = await supabase.from('internal_vehicles').select('*').eq('company', activeCompany).order('vehicle_number');
         setInternalVehicles(data || []);
       } else if (activeTab === 'DRIVERS') {
-        const { data } = await supabase.from('internal_vehicle_drivers').select('*').order('name');
+        const { data } = await supabase.from('internal_vehicle_drivers').select('*').eq('company', activeCompany).order('name');
         setDrivers(data || []);
       }
     } catch (error) {
@@ -209,7 +210,7 @@ export default function AdminSettings() {
 
   const submitJob = async () => {
     try {
-      const { error } = await supabase.from('jobs').insert(jobForm);
+      const { error } = await supabase.from('jobs').insert({ ...jobForm, company: activeCompany });
       if (error) throw error;
       setAddJobModal(false);
       setJobForm({ job_number: '', job_name: '', location: '' });
@@ -222,7 +223,7 @@ export default function AdminSettings() {
 
   const submitSupplier = async () => {
     try {
-      const { error } = await supabase.from('suppliers').insert(supplierForm);
+      const { error } = await supabase.from('suppliers').insert({ ...supplierForm, company: activeCompany });
       if (error) throw error;
       setAddSupplierModal(false);
       setSupplierForm({ supplier_name: '', contact_person: '', phone_number: '' });
@@ -235,7 +236,7 @@ export default function AdminSettings() {
 
   const submitEquipment = async () => {
     try {
-      const { error } = await supabase.from('equipment_master').insert(equipForm);
+      const { error } = await supabase.from('equipment_master').insert({ ...equipForm, company: activeCompany });
       if (error) throw error;
       setAddEquipModal(false);
       setEquipForm({ equipment_category: 'Tankers', equipment_name: '' });
@@ -248,7 +249,7 @@ export default function AdminSettings() {
 
   const submitDesignation = async () => {
     try {
-      const { error } = await supabase.from('labour_designations').insert(desigForm);
+      const { error } = await supabase.from('labour_designations').insert({ ...desigForm, company: activeCompany });
       if (error) throw error;
       setAddDesigModal(false);
       setDesigForm({ designation_name: '' });
@@ -261,7 +262,7 @@ export default function AdminSettings() {
 
   const submitInternalVehicle = async () => {
     try {
-      const { error } = await supabase.from('internal_vehicles').insert(ivForm);
+      const { error } = await supabase.from('internal_vehicles').insert({ ...ivForm, company: activeCompany });
       if (error) throw error;
       setAddIVModal(false);
       setIvForm({ vehicle_number: '', vehicle_type: '' });
@@ -274,7 +275,7 @@ export default function AdminSettings() {
 
   const submitDriver = async () => {
     try {
-      const { error } = await supabase.from('internal_vehicle_drivers').insert(driverForm);
+      const { error } = await supabase.from('internal_vehicle_drivers').insert({ ...driverForm, company: activeCompany });
       if (error) throw error;
       setAddDriverModal(false);
       setDriverForm({ name: '' });
@@ -331,6 +332,17 @@ export default function AdminSettings() {
 
       {/* Sticky: stays pinned at the top once scrolled past, while the list keeps scrolling underneath it */}
       <View style={{ position: 'sticky' as any, top: 0, zIndex: 10, backgroundColor: '#f8fafc', paddingTop: 8, paddingBottom: 8 }}>
+      <View className="flex-row items-center bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-3 self-start">
+        {(['IST', 'JAH', 'HYDRO'] as const).map((company) => (
+          <TouchableOpacity
+            key={company}
+            onPress={() => setActiveCompany(company)}
+            className={`py-2 px-5 rounded-lg ${activeCompany === company ? 'bg-slate-900' : 'bg-transparent'}`}
+          >
+            <Text className={`font-bold text-sm ${activeCompany === company ? 'text-white' : 'text-slate-500'}`}>{company}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
       <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-6">
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View className="flex-row">
