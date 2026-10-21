@@ -383,14 +383,14 @@ export default function InternalVehicleEntryScreen() {
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
 
-  // Jobs/Vehicles/Drivers are each tagged to a company in Master Data now --
-  // scope every picker here to whichever company is selected above so a
-  // foreman working under JAH only sees JAH's jobs, vehicles, and drivers.
+  // Jobs and Drivers are tagged to a company in Master Data, so those two
+  // pickers scope to whichever company is selected above. Vehicles are a
+  // shared fleet used across all three companies, so that list stays the
+  // same regardless of which company is selected.
   const jobs = allJobs
     .filter((j: any) => !formData.company || j.company === formData.company)
     .map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id }));
   const vehicleOptions = allVehicles
-    .filter((v: any) => !formData.company || v.company === formData.company)
     .map((v: any) => ({ label: `${v.vehicle_number} - ${v.vehicle_type}`, value: v.id }));
   const driverOptions = allDrivers
     .filter((d: any) => !formData.company || d.company === formData.company)
@@ -404,7 +404,7 @@ export default function InternalVehicleEntryScreen() {
     if (!formData.company) newErrors.company = 'Company is required';
     if (!formData.vehicle_id) newErrors.vehicle_id = 'Vehicle is required';
     if (!formData.job_id) newErrors.job_id = 'Job is required';
-    if (!formData.section) newErrors.section = 'Section is required';
+    if (formData.company === 'IST' && !formData.section) newErrors.section = 'Section is required';
     if (!formData.number_of_trips) newErrors.number_of_trips = 'Number of trips is required';
     if (!formData.requester_name) newErrors.requester_name = 'Requester name is required';
     if (!formData.driver_id) newErrors.driver_id = 'Driver / Operator is required';
@@ -753,10 +753,11 @@ export default function InternalVehicleEntryScreen() {
           value={formData.company}
           options={COMPANY_OPTIONS}
           onSelect={(v: string) => {
-            // Switching company can make the previously picked vehicle/job/driver
-            // invalid (they belong to a different company's Master Data), so clear
-            // them rather than leave a stale, now-hidden selection in place.
-            setFormData(prev => ({ ...prev, company: v, vehicle_id: '', job_id: '', driver_id: '' }));
+            // Switching company can make the previously picked job/driver invalid
+            // (they belong to a different company's Master Data), so clear them
+            // rather than leave a stale, now-hidden selection in place. Vehicles
+            // are a shared fleet across companies, so the vehicle pick carries over.
+            setFormData(prev => ({ ...prev, company: v, job_id: '', driver_id: '', section: v === 'IST' ? prev.section : '' }));
             if (errors.company) setErrors(prev => ({ ...prev, company: '' }));
           }}
           error={errors.company}
@@ -798,14 +799,16 @@ export default function InternalVehicleEntryScreen() {
           error={errors.job_id}
         />
 
-        <PillToggle
-          label="Section"
-          required={true}
-          value={formData.section}
-          options={SECTION_OPTIONS}
-          onSelect={(v: string) => updateForm('section', v)}
-          error={errors.section}
-        />
+        {formData.company === 'IST' && (
+          <PillToggle
+            label="Section"
+            required={true}
+            value={formData.section}
+            options={SECTION_OPTIONS}
+            onSelect={(v: string) => updateForm('section', v)}
+            error={errors.section}
+          />
+        )}
 
         <PillToggle
           label="Hourly / Trip Basis"
@@ -927,7 +930,9 @@ export default function InternalVehicleEntryScreen() {
         </View>
 
         <View className="mb-4">
-          <Text className="text-sm font-medium text-slate-700 mb-1">IST Timesheet Number (Optional)</Text>
+          <Text className="text-sm font-medium text-slate-700 mb-1">
+            {COMPANY_OPTIONS.find(o => o.value === formData.company)?.label || formData.company} Timesheet Number (Optional)
+          </Text>
           <TextInput
             value={formData.ist_timesheet_number}
             onChangeText={(t) => updateForm('ist_timesheet_number', t)}
