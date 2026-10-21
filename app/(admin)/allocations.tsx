@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Switch, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Switch, TextInput, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/crossAlert';
 import { Truck, ChevronDown, Check, X, Search, Save, MapPin, Users, Plus, UserPlus } from 'lucide-react-native';
+import { FadeInUp } from '../../components/Animations';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import ScrollProgressBar from '../../components/ScrollProgressBar';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => {
@@ -78,6 +81,12 @@ export default function SiteAllocationsScreen() {
   const [newEmployeeName, setNewEmployeeName] = useState('');
 
   const [saving, setSaving] = useState(false);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [scrollContainerHeight, setScrollContainerHeight] = useState(0);
+  const [scrollContentHeight, setScrollContentHeight] = useState(0);
 
   // New Add-ons State
   const [showAddEquipModal, setShowAddEquipModal] = useState(false);
@@ -333,9 +342,22 @@ export default function SiteAllocationsScreen() {
     : allSuppliers;
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
-      <ScrollView className="flex-1 p-4 md:p-8" showsVerticalScrollIndicator={false}>
-        
+      <ScrollProgressBar scrollY={scrollY} contentHeight={scrollContentHeight} containerHeight={scrollContainerHeight} color="#1e3a8a" />
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1 p-4 md:p-8"
+        showsVerticalScrollIndicator={true}
+        onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setScrollContentHeight(h)}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: (e: any) => setShowScrollTop(e.nativeEvent.contentOffset.y > 400) }
+        )}
+        scrollEventThrottle={16}
+      >
+
         <View className="mb-8">
           <Text className="text-3xl font-black text-slate-900 tracking-tight mb-2">Site Allocations</Text>
           <Text className="text-slate-500 font-medium">Assign specific equipment and suppliers to Job Sites so Foremen only see what's deployed there.</Text>
@@ -622,6 +644,11 @@ export default function SiteAllocationsScreen() {
         )}
       </ScrollView>
 
+      <ScrollToTopButton
+        visible={showScrollTop}
+        onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+      />
+
       {/* Add Equipment Modal */}
       <Modal visible={showAddEquipModal} transparent animationType="slide">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/50 justify-end">
@@ -695,5 +722,6 @@ export default function SiteAllocationsScreen() {
       </Modal>
 
     </View>
+    </FadeInUp>
   );
 }

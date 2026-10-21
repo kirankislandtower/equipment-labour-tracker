@@ -467,7 +467,7 @@ export default function AdminMaterials() {
         ref={scrollViewRef}
         className="flex-1"
         contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={!isMobile}
         onLayout={(e) => setScrollContainerHeight(e.nativeEvent.layout.height)}
         onContentSizeChange={(w, h) => setScrollContentHeight(h)}
         onScroll={Animated.event(
