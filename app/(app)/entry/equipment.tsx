@@ -501,19 +501,21 @@ export default function EquipmentEntryScreen() {
     // times in a single shift, so there's no single "end of work" time to check
     // against and this would just block legitimate rapid-fire trip logging.
     if (formData.rental_type !== 'TRIP_BASIS' && formData.entry_date === getLocalDateString()) {
-      const to24h = (time12: string, ampm: string) => {
+      const toMinutes = (time12: string, ampm: string) => {
         let [h, m] = (time12 || '').split(':').map(Number);
         if (isNaN(h) || isNaN(m)) return null;
         if (ampm === 'PM' && h !== 12) h += 12;
         if (ampm === 'AM' && h === 12) h = 0;
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        return h * 60 + m;
       };
-      const end24 = to24h(formData.end_time, formData.end_am_pm);
+      const endMinutes = toMinutes(formData.end_time, formData.end_am_pm);
       const now = new Date();
-      const nowHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
       const nowLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      if (end24 && nowHHMM < end24) {
+      // Foremen can submit up to 30 minutes before the claimed finish time --
+      // enough slack for wrapping up without blocking a legit on-time submit.
+      if (endMinutes !== null && nowMinutes < endMinutes - 30) {
         setMessageModal({
           title: 'Too Early to Submit',
           message: `You can submit this entry only at work finish time. This entry claims work until ${formData.end_time} ${formData.end_am_pm}, but it's only ${nowLabel} right now.`,

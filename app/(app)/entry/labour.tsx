@@ -408,10 +408,14 @@ export default function LabourEntryScreen() {
     // has to come back and save once the work is actually done.
     if (entryDate === getLocalDateString()) {
       const now = new Date();
-      const nowHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
       const nowLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const [endH, endM] = (endTime || '').split(':').map(Number);
+      const endMinutes = isNaN(endH) || isNaN(endM) ? null : endH * 60 + endM;
 
-      if (endTime && nowHHMM < endTime) {
+      // Foremen can submit up to 30 minutes before the claimed finish time --
+      // enough slack for wrapping up without blocking a legit on-time submit.
+      if (endMinutes !== null && nowMinutes < endMinutes - 30) {
         setMessageModal({
           title: 'Too Early to Submit',
           message: `You can submit this entry only at work finish time. This entry claims work until ${endTime}, but it's only ${nowLabel} right now.`,
