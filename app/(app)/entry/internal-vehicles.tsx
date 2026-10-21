@@ -207,10 +207,9 @@ export default function InternalVehicleEntryScreen() {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
-  const [jobs, setJobs] = useState<{ label: string; value: string }[]>([]);
-  const [vehicleOptions, setVehicleOptions] = useState<{ label: string; value: string }[]>([]);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
   const [allVehicles, setAllVehicles] = useState<any[]>([]);
-  const [driverOptions, setDriverOptions] = useState<{ label: string; value: string }[]>([]);
+  const [allDrivers, setAllDrivers] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     entry_date: getLocalDateString(),
@@ -277,22 +276,21 @@ export default function InternalVehicleEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, vehiclesRes, driversRes, { data: { user } }] = await Promise.all([
-        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name').eq('is_active', true).order('job_number')),
-        fetchWithCache('internal_vehicles', () => supabase.from('internal_vehicles').select('id, vehicle_number, vehicle_type').eq('is_active', true).order('vehicle_number')),
-        fetchWithCache('internal_vehicle_drivers', () => supabase.from('internal_vehicle_drivers').select('id, name').eq('is_active', true).order('name')),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, company').eq('is_active', true).order('job_number')),
+        fetchWithCache('internal_vehicles', () => supabase.from('internal_vehicles').select('id, vehicle_number, vehicle_type, company').eq('is_active', true).order('vehicle_number')),
+        fetchWithCache('internal_vehicle_drivers', () => supabase.from('internal_vehicle_drivers').select('id, name, company').eq('is_active', true).order('name')),
         supabase.auth.getUser(),
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
 
       if (jobsRes.data) {
-        setJobs(jobsRes.data.map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id })));
+        setAllJobs(jobsRes.data);
       }
       if (vehiclesRes.data) {
         setAllVehicles(vehiclesRes.data);
-        setVehicleOptions(vehiclesRes.data.map((v: any) => ({ label: `${v.vehicle_number} - ${v.vehicle_type}`, value: v.id })));
       }
       if (driversRes.data) {
-        setDriverOptions(driversRes.data.map((d: any) => ({ label: d.name, value: d.id })));
+        setAllDrivers(driversRes.data);
       }
 
       if (user) {
@@ -385,8 +383,21 @@ export default function InternalVehicleEntryScreen() {
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
 
+  // Jobs/Vehicles/Drivers are each tagged to a company in Master Data now --
+  // scope every picker here to whichever company is selected above so a
+  // foreman working under JAH only sees JAH's jobs, vehicles, and drivers.
+  const jobs = allJobs
+    .filter((j: any) => !formData.company || j.company === formData.company)
+    .map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id }));
+  const vehicleOptions = allVehicles
+    .filter((v: any) => !formData.company || v.company === formData.company)
+    .map((v: any) => ({ label: `${v.vehicle_number} - ${v.vehicle_type}`, value: v.id }));
+  const driverOptions = allDrivers
+    .filter((d: any) => !formData.company || d.company === formData.company)
+    .map((d: any) => ({ label: d.name, value: d.id }));
+
   const selectedVehicle = allVehicles.find((v: any) => v.id === formData.vehicle_id);
-  const selectedDriver = driverOptions.find((d: any) => d.value === formData.driver_id);
+  const selectedDriver = allDrivers.find((d: any) => d.id === formData.driver_id);
 
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
@@ -485,7 +496,7 @@ export default function InternalVehicleEntryScreen() {
             display: {
               company: basePayload.company,
               internal_vehicles: { vehicle_number: selectedVehicle?.vehicle_number || '', vehicle_type: selectedVehicle?.vehicle_type || 'Vehicle' },
-              internal_vehicle_drivers: { name: selectedDriver?.label || '' },
+              internal_vehicle_drivers: { name: selectedDriver?.name || '' },
               jobs: { job_name: jobName },
               working_hours: basePayload.working_hours,
               number_of_trips: basePayload.number_of_trips,
@@ -741,7 +752,13 @@ export default function InternalVehicleEntryScreen() {
           required={true}
           value={formData.company}
           options={COMPANY_OPTIONS}
-          onSelect={(v: string) => updateForm('company', v)}
+          onSelect={(v: string) => {
+            // Switching company can make the previously picked vehicle/job/driver
+            // invalid (they belong to a different company's Master Data), so clear
+            // them rather than leave a stale, now-hidden selection in place.
+            setFormData(prev => ({ ...prev, company: v, vehicle_id: '', job_id: '', driver_id: '' }));
+            if (errors.company) setErrors(prev => ({ ...prev, company: '' }));
+          }}
           error={errors.company}
         />
         {!!formData.company && (
