@@ -59,6 +59,7 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => 
 
 export default function SiteAllocationsScreen() {
   const [loading, setLoading] = useState(true);
+  const [activeCompany, setActiveCompany] = useState<'IST' | 'JAH' | 'HYDRO'>('IST');
   const [jobs, setJobs] = useState<any[]>([]);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
 
@@ -104,7 +105,8 @@ export default function SiteAllocationsScreen() {
     try {
       const { error } = await supabase.from('equipment_master').insert([{
         equipment_name: newEquipName.trim(),
-        equipment_category: newEquipCat
+        equipment_category: newEquipCat,
+        company: activeCompany
       }]);
       if (error) throw error;
       setNewEquipName('');
@@ -122,7 +124,8 @@ export default function SiteAllocationsScreen() {
     setIsAddingSupp(true);
     try {
       const { error } = await supabase.from('suppliers').insert([{
-        supplier_name: newSuppName.trim()
+        supplier_name: newSuppName.trim(),
+        company: activeCompany
       }]);
       if (error) throw error;
       setNewSuppName('');
@@ -137,7 +140,7 @@ export default function SiteAllocationsScreen() {
 
   useEffect(() => {
     fetchInitialData();
-  }, []);
+  }, [activeCompany]);
 
   useEffect(() => {
     setEquipmentScope('GENERAL');
@@ -155,19 +158,21 @@ export default function SiteAllocationsScreen() {
     setLoading(true);
     try {
       const [jobsRes, equipRes, suppRes] = await Promise.all([
-        supabase.from('jobs').select('id, job_number, job_name').order('job_number'),
-        supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name'),
-        supabase.from('suppliers').select('id, supplier_name, supplier_type').eq('is_active', true).order('supplier_name')
+        supabase.from('jobs').select('id, job_number, job_name').eq('company', activeCompany).order('job_number'),
+        supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).eq('company', activeCompany).order('equipment_category').order('equipment_name'),
+        supabase.from('suppliers').select('id, supplier_name, supplier_type').eq('is_active', true).eq('company', activeCompany).order('supplier_name')
       ]);
 
+      // Switching company means the previously selected job (and whatever it was
+      // pointing at) belongs to a different company's Master Data, so always land
+      // on the new company's first job rather than keeping a stale cross-company pick.
       if (jobsRes.data && jobsRes.data.length > 0) {
         const formattedJobs = jobsRes.data.map(j => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id }));
         setJobs(formattedJobs);
-        
-        // Auto-select the first job if nothing is selected yet
-        if (!selectedJob) {
-          setSelectedJob(formattedJobs[0].value);
-        }
+        setSelectedJob(formattedJobs[0].value);
+      } else {
+        setJobs([]);
+        setSelectedJob(null);
       }
       if (equipRes.data) {
         setAllEquipment(equipRes.data);
@@ -361,6 +366,18 @@ export default function SiteAllocationsScreen() {
         <View className="mb-8">
           <Text className="text-3xl font-black text-slate-900 tracking-tight mb-2">Site Allocations</Text>
           <Text className="text-slate-500 font-medium">Assign specific equipment and suppliers to Job Sites so Foremen only see what's deployed there.</Text>
+        </View>
+
+        <View className="flex-row items-center bg-white rounded-xl shadow-sm border border-slate-200 p-1 mb-6 self-start">
+          {(['IST', 'JAH', 'HYDRO'] as const).map((company) => (
+            <TouchableOpacity
+              key={company}
+              onPress={() => setActiveCompany(company)}
+              className={`py-2 px-5 rounded-lg ${activeCompany === company ? 'bg-slate-900' : 'bg-transparent'}`}
+            >
+              <Text className={`font-bold text-sm ${activeCompany === company ? 'text-white' : 'text-slate-500'}`}>{company}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <View className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-6 z-10">
