@@ -1,15 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, FlatList, ActivityIndicator, Platform, Image, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, FlatList, ActivityIndicator, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, Camera, Image as ImageIcon, X, Users, WifiOff, Search } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { ArrowLeft, ChevronDown, Clock, User, Briefcase, Calendar, Check, X, Users, WifiOff, Search } from 'lucide-react-native';
 import { getLocalDateString } from '../../../lib/dateUtils';
-import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
-import { compressImageToDataUri } from '../../../lib/imageUtils';
-import { downloadImageToDevice } from '../../../lib/download';
-import WebCamera from '../../../components/WebCamera';
 import TimePickerModal from '../../../components/TimePickerModal';
 import { resolveSupplierId } from '../../../lib/masterData';
 import { isStoreForeman } from '../../../lib/foremanFlags';
@@ -165,60 +160,10 @@ export default function LabourEntryScreen() {
   const [assignedJobModalVisible, setAssignedJobModalVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   const [messageModal, setMessageModal] = useState<MessageModalContent | null>(null);
-  const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
-  // The exact moment the photo was taken -- used for the watermark stamp instead of
-  // whenever the upload happens to complete, since those can differ by hours when an
-  // entry sits in the offline queue.
-  const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
   const [isStoreUser, setIsStoreUser] = useState(false);
 
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-
-  // viewShotRef removed
-
-  const pickImage = async (source: 'camera' | 'gallery' = 'camera') => {
-    try {
-      if (source === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'We need camera permissions to verify labour on-site!');
-          return;
-        }
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'We need photo library permission to choose a photo.');
-          return;
-        }
-      }
-
-      const result = source === 'camera'
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.7,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.7,
-          });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const compressedUri = await compressImageToDataUri(asset.uri, asset.width, asset.height);
-        setPhotoUri(compressedUri);
-        setPhotoCapturedAt(new Date());
-        if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
 
   useFocusEffect(
     useCallback(() => {
@@ -349,11 +294,6 @@ export default function LabourEntryScreen() {
           setRemarks(entryData.remarks || '');
           setRequestedBy(entryData.requested_by || '');
           if (jobsRes.data) setAssignedJob(jobsRes.data.find((j: any) => j.id === entryData.assigned_job_id) || null);
-
-          if (entryData.labour_photo_url && entryData.labour_photo_url !== 'pending' && entryData.labour_photo_url !== 'NOT_REQUIRED') {
-            setPhotoUri(entryData.labour_photo_url);
-            setInitialPhotoUri(entryData.labour_photo_url);
-          }
         }
       } else {
         // Tabs.Screen keeps this component mounted across tab switches, so a fresh
@@ -372,9 +312,6 @@ export default function LabourEntryScreen() {
         setRemarks('');
         setRequestedBy('');
         setAssignedJob(null);
-        setPhotoUri(null);
-        setPhotoCapturedAt(null);
-        setInitialPhotoUri(null);
         setErrors({});
       }
     } catch (error) {
@@ -420,11 +357,6 @@ export default function LabourEntryScreen() {
     if (!isStoreUser && !startTime) newErrors.start_time = 'Start Time is required';
     if (!isStoreUser && !endTime) newErrors.end_time = 'End Time is required';
     if (!foremanName) newErrors.foreman_name = 'Foreman Name is required';
-
-    // Photo is expected but no longer blocks submission -- a foreman who couldn't
-    // get a live photo at the time can still submit and attach it later by editing
-    // this entry. The Success screen tells them that's still needed.
-    const missingPhoto = !isStoreUser && !photoUri && !id;
 
     if (isStoreUser) {
       if (!requestedBy) newErrors.requested_by = 'Requested By is required';
@@ -501,9 +433,9 @@ export default function LabourEntryScreen() {
             type: 'labour',
             table: 'labour_entries',
             photoColumn: 'labour_photo_url',
-            payload: { ...basePayload, labour_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
-            photoDataUri: photoUri,
-            photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
+            payload: basePayload,
+            photoDataUri: null,
+            photoCapturedAt: null,
             watermarkJobLabel: jobName,
             downloadFilePrefix: 'Labour',
             displayDate: entryDate,
@@ -514,7 +446,6 @@ export default function LabourEntryScreen() {
               total_working_hours: basePayload.total_working_hours,
             },
           });
-          setPhotoPendingReason(missingPhoto ? 'missing' : null);
           setMessageModal({
             title: 'Saved Offline',
             message: 'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
@@ -549,30 +480,12 @@ export default function LabourEntryScreen() {
         }
       }
 
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
-      let photoUploadFailed = false;
-
-      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
-        try {
-          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
-          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName, photoCapturedAt || undefined);
-          downloadImageToDevice(uploadedPhotoUrl, `Labour_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
-        } catch (err: any) {
-          // Don't let a Cloudinary failure (quota, network) lose the whole entry --
-          // save it with the photo marked pending so it can be attached later on edit.
-          console.error('Cloudinary upload failed, saving entry without photo:', err);
-          photoUploadFailed = true;
-        }
-      }
-
-      const payload = { ...basePayload, labour_photo_url: uploadedPhotoUrl };
-
       let error;
       if (id) {
-        const { error: updateError } = await supabase.from('labour_entries').update(payload).eq('id', id).eq('created_by', userData?.user?.id);
+        const { error: updateError } = await supabase.from('labour_entries').update(basePayload).eq('id', id).eq('created_by', userData?.user?.id);
         error = updateError;
       } else {
-        const { error: insertError } = await supabase.from('labour_entries').insert(payload);
+        const { error: insertError } = await supabase.from('labour_entries').insert(basePayload);
         error = insertError;
       }
 
@@ -583,13 +496,6 @@ export default function LabourEntryScreen() {
         throw error;
       }
 
-      if (photoUploadFailed) {
-        setPhotoPendingReason('upload_failed');
-      } else if (missingPhoto) {
-        setPhotoPendingReason('missing');
-      } else {
-        setPhotoPendingReason(null);
-      }
       setSuccessVisible(true);
     } catch (error: any) {
       console.error(error);
@@ -664,24 +570,17 @@ export default function LabourEntryScreen() {
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white rounded-3xl p-8 items-center w-full max-w-sm border border-slate-200 shadow-2xl">
-            <View className={`p-4 rounded-full mb-4 ${photoPendingReason ? 'bg-amber-100' : 'bg-green-100'}`}>
-              {photoPendingReason ? <Camera size={64} color="#d97706" /> : <Users size={64} color="#10b981" />}
+            <View className="p-4 rounded-full mb-4 bg-green-100">
+              <Users size={64} color="#10b981" />
             </View>
-            <Text className="text-2xl font-black text-slate-900 mb-2">
-              {photoPendingReason ? 'Submitted — Photo Needed' : 'Success!'}
-            </Text>
+            <Text className="text-2xl font-black text-slate-900 mb-2">Success!</Text>
             <Text className="text-slate-500 text-center mb-8">
-              {photoPendingReason === 'missing'
-                ? `Your labour entry has been ${id ? 'updated' : 'submitted'}, but no live photo was attached. Please edit this entry later to upload it.`
-                : photoPendingReason === 'upload_failed'
-                ? `Your labour entry has been ${id ? 'updated' : 'submitted'}, but the photo could not be uploaded (connection issue or storage limit). Edit this entry later to attach it.`
-                : `Your labour entry has been ${id ? 'updated' : 'submitted'} successfully and is awaiting review.`}
+              Your labour entry has been {id ? 'updated' : 'submitted'} successfully and is awaiting review.
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               className="w-full bg-[#166534] rounded-xl py-4 items-center"
               onPress={() => {
                 setSuccessVisible(false);
-                setPhotoPendingReason(null);
                 router.replace('/(app)/home');
               }}
             >
@@ -1024,61 +923,6 @@ export default function LabourEntryScreen() {
             />
           </View>
         </View>
-
-        <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-            <Text className="text-slate-700 text-sm font-medium mb-3">Attach Timesheet Photo {!isStoreUser && <Text className="text-red-500">*</Text>}</Text>
-            {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
-
-            {photoUri ? (
-              <View className="mb-3">
-                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-
-                  {/* Watermark Overlay (Visual Preview) */}
-                  <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                    <Text className="text-white text-xs font-bold">
-                      {(photoCapturedAt || new Date()).toLocaleString()}
-                    </Text>
-                    <Text className="text-white text-xs font-semibold">
-                      {selectedJob ? `${selectedJob.job_number} - ${selectedJob.job_name}` : 'Unknown Site'}
-                    </Text>
-                    <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => { setPhotoUri(null); setPhotoCapturedAt(null); }}
-                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                  >
-                    <X size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : Platform.OS === 'web' ? (
-              <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); }} colorTheme="green" />
-            ) : (
-              <>
-                <View className="flex-row" style={{ gap: 12 }}>
-                  <TouchableOpacity
-                    onPress={() => pickImage('camera')}
-                    className="flex-1 bg-green-50 border-2 border-dashed border-green-200 rounded-lg py-8 items-center justify-center active:bg-green-100"
-                  >
-                    <Camera size={28} color="#16a34a" className="mb-2" />
-                    <Text className="text-green-900 font-bold text-sm text-center">Take Live Photo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => pickImage('gallery')}
-                    className="flex-1 bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg py-8 items-center justify-center active:bg-slate-100"
-                  >
-                    <ImageIcon size={28} color="#475569" className="mb-2" />
-                    <Text className="text-slate-700 font-bold text-sm text-center">Choose from Gallery</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text className="text-green-600 text-xs mt-2 text-center px-2">
-                  A live photo is preferred and gets time-stamped. Use Gallery only if you couldn't take one on-site.
-                </Text>
-              </>
-            )}
-          </View>
 
         <View className="mb-8">
           <Text className="text-sm font-medium text-slate-700 mb-1">Remarks (Optional)</Text>
