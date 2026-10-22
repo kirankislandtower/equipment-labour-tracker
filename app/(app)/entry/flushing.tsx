@@ -330,7 +330,7 @@ export default function FlushingEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, suppliersRes, equipmentRes, { data: { user } }] = await Promise.all([
-        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location, company').eq('is_active', true).order('job_number')),
         supabase.from('suppliers').select('id, supplier_name').eq('is_active', true).order('supplier_name'),
         fetchWithCache('equipment_master', () => supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name')),
         supabase.auth.getUser(),

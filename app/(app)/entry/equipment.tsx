@@ -22,6 +22,35 @@ import { fetchWithCache } from '../../../lib/dataCache';
 import MessageModal, { MessageModalContent } from '../../../components/MessageModal';
 import { logDuplicateAttempt } from '../../../lib/duplicateAttempts';
 
+const COMPANY_OPTIONS = [
+  { label: 'IST', value: 'IST', fullName: 'Island Tower Electromechanical' },
+  { label: 'JAH', value: 'JAH', fullName: 'Jazeerat Al Hadeed' },
+  { label: 'Hydro', value: 'HYDRO', fullName: 'Hydro' },
+];
+
+// Tap-once toggle for simple 2-3 option fields, instead of opening a modal picker.
+const PillToggle = ({ label, value, options, onSelect, required = false, error }: any) => (
+  <View className="mb-4">
+    <Text className="text-sm font-medium text-slate-700 mb-1">
+      {label} {required && <Text className="text-red-500">*</Text>}
+    </Text>
+    <View className={`flex-row bg-slate-100 p-1 rounded-xl border ${error ? 'border-red-500' : 'border-transparent'}`}>
+      {options.map((opt: any) => (
+        <TouchableOpacity
+          key={opt.value}
+          onPress={() => onSelect(opt.value)}
+          className={`flex-1 py-3 rounded-lg items-center ${value === opt.value ? 'bg-[#1e3a8a] shadow-sm' : ''}`}
+        >
+          <Text className={`font-bold text-sm ${value === opt.value ? 'text-white' : 'text-slate-500'}`}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+    {error ? <Text className="text-red-500 text-xs mt-1 ml-1">{error}</Text> : null}
+  </View>
+);
+
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -170,7 +199,6 @@ export default function EquipmentEntryScreen() {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
-  const [jobs, setJobs] = useState<{ label: string; value: string }[]>([]);
   const [allJobsData, setAllJobsData] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<{ label: string; value: string }[]>([]);
   const [allSuppliersList, setAllSuppliersList] = useState<any[]>([]);
@@ -179,6 +207,7 @@ export default function EquipmentEntryScreen() {
   
   const [formData, setFormData] = useState({
     entry_date: getLocalDateString(),
+    company: '',
     job_id: '',
     supplier_id: '',
     equipment_id: '',
@@ -323,7 +352,7 @@ export default function EquipmentEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, suppliersRes, equipmentRes, { data: { user } }] = await Promise.all([
-        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location, company').eq('is_active', true).order('job_number')),
         supabase.from('suppliers').select('id, supplier_name').eq('is_active', true).order('supplier_name'),
         fetchWithCache('equipment_master', () => supabase.from('equipment_master').select('id, equipment_category, equipment_name').eq('is_active', true).order('equipment_category').order('equipment_name')),
         supabase.auth.getUser(),
@@ -331,7 +360,6 @@ export default function EquipmentEntryScreen() {
       ]);
 
       if (jobsRes.data) {
-        setJobs(jobsRes.data.map((j: any) => ({ label: j.job_number, value: j.id })));
         setAllJobsData(jobsRes.data);
       }
       if (suppliersRes.data) {
@@ -372,6 +400,7 @@ export default function EquipmentEntryScreen() {
           setFormData(prev => ({
             ...prev,
             entry_date: entryData.entry_date,
+            company: entryData.company || '',
             job_id: entryData.job_id,
             supplier_id: entryData.supplier_id,
             equipment_id: entryData.equipment_master_id,
@@ -404,6 +433,7 @@ export default function EquipmentEntryScreen() {
         setFormData(prev => ({
           ...prev,
           entry_date: getLocalDateString(),
+          company: '',
           job_id: '',
           supplier_id: '',
           equipment_id: '',
@@ -444,6 +474,12 @@ export default function EquipmentEntryScreen() {
     setFormData(prev => {
       const newState = { ...prev, [key]: value };
       // Clear dependent fields
+      if (key === 'company') {
+        newState.job_id = '';
+        newState.location = '';
+        newState.supplier_id = '';
+        newState.equipment_id = '';
+      }
       if (key === 'job_id') {
         newState.location = '';
         newState.supplier_id = '';
@@ -457,8 +493,15 @@ export default function EquipmentEntryScreen() {
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
 
+  // Jobs are tagged to a company in Master Data -- scope the picker to
+  // whichever company is selected above.
+  const jobs = allJobsData
+    .filter((j: any) => !formData.company || j.company === formData.company)
+    .map((j: any) => ({ label: j.job_number, value: j.id }));
+
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
+    if (!formData.company) newErrors.company = 'Company is required';
     if (!formData.job_id) newErrors.job_id = 'Job is required';
     if (!formData.supplier_id) newErrors.supplier_id = 'Supplier is required';
     if (!formData.equipment_id) newErrors.equipment_id = 'Equipment is required';
@@ -550,6 +593,7 @@ export default function EquipmentEntryScreen() {
 
       const basePayload = {
         entry_date: formData.entry_date,
+        company: formData.company,
         job_id: formData.job_id,
         supplier_id: resolvedSupplierId,
         equipment_master_id: resolvedEquipmentId,
@@ -797,6 +841,7 @@ export default function EquipmentEntryScreen() {
                   setNavigating(false);
                   setFormData({
                     entry_date: getLocalDateString(),
+                    company: formData.company,
                     job_id: '',
                     supplier_id: '',
                     equipment_id: '',
@@ -876,7 +921,21 @@ export default function EquipmentEntryScreen() {
           </View>
         </View>
 
-        <CustomPicker 
+        <PillToggle
+          label="Company"
+          required={true}
+          value={formData.company}
+          options={COMPANY_OPTIONS}
+          onSelect={(v: string) => updateForm('company', v)}
+          error={errors.company}
+        />
+        {!!formData.company && (
+          <Text className="text-slate-400 text-xs -mt-3 mb-4 ml-1">
+            {COMPANY_OPTIONS.find(o => o.value === formData.company)?.fullName}
+          </Text>
+        )}
+
+        <CustomPicker
           label="Job Number"
           required={true}
           value={formData.job_id}

@@ -276,7 +276,7 @@ export default function InternalVehicleEntryScreen() {
   const fetchData = async () => {
     try {
       const [jobsRes, vehiclesRes, driversRes, { data: { user } }] = await Promise.all([
-        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, company').eq('is_active', true).order('job_number')),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location, company').eq('is_active', true).order('job_number')),
         fetchWithCache('internal_vehicles', () => supabase.from('internal_vehicles').select('id, vehicle_number, vehicle_type, company').eq('is_active', true).order('vehicle_number')),
         fetchWithCache('internal_vehicle_drivers', () => supabase.from('internal_vehicle_drivers').select('id, name, company').eq('is_active', true).order('name')),
         supabase.auth.getUser(),

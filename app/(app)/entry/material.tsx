@@ -21,6 +21,35 @@ import { logDuplicateAttempt } from '../../../lib/duplicateAttempts';
 import { isStoreForeman } from '../../../lib/foremanFlags';
 
 
+const COMPANY_OPTIONS = [
+  { label: 'IST', value: 'IST', fullName: 'Island Tower Electromechanical' },
+  { label: 'JAH', value: 'JAH', fullName: 'Jazeerat Al Hadeed' },
+  { label: 'Hydro', value: 'HYDRO', fullName: 'Hydro' },
+];
+
+// Tap-once toggle for simple 2-3 option fields, instead of opening a modal picker.
+const PillToggle = ({ label, value, options, onSelect, required = false, error }: any) => (
+  <View className="mb-4">
+    <Text className="text-sm font-medium text-slate-700 mb-1">
+      {label} {required && <Text className="text-red-500">*</Text>}
+    </Text>
+    <View className={`flex-row bg-slate-100 p-1 rounded-xl border ${error ? 'border-red-500' : 'border-transparent'}`}>
+      {options.map((opt: any) => (
+        <TouchableOpacity
+          key={opt.value}
+          onPress={() => onSelect(opt.value)}
+          className={`flex-1 py-3 rounded-lg items-center ${value === opt.value ? 'bg-[#d97706] shadow-sm' : ''}`}
+        >
+          <Text className={`font-bold text-sm ${value === opt.value ? 'text-white' : 'text-slate-500'}`}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+    {error ? <Text className="text-red-500 text-xs mt-1 ml-1">{error}</Text> : null}
+  </View>
+);
+
 const CustomPicker = ({ label, value, options, onSelect, placeholder, required = false, error }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,7 +153,7 @@ export default function MaterialTransferEntryScreen() {
 
   // viewShotRef removed
 
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
   
   const units = [
     { label: 'Tons', value: 'Tons' },
@@ -138,6 +167,7 @@ export default function MaterialTransferEntryScreen() {
   
   const [formData, setFormData] = useState({
     entry_date: getLocalDateString(),
+    company: '',
     from_job_id: '',
     to_job_id: '',
     material_description: '',
@@ -208,12 +238,12 @@ export default function MaterialTransferEntryScreen() {
       const [jobsRes, { data: { user } }] = await Promise.all([
         // Selects the same fields as equipment.tsx/labour.tsx's jobs fetch (location
         // included, even though unused here) so they can share one 'jobs' cache entry.
-        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location, company').eq('is_active', true).order('job_number')),
         supabase.auth.getUser()
       ]);
 
       if (jobsRes.data) {
-        setJobs(jobsRes.data.map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id })));
+        setAllJobs(jobsRes.data);
       }
       
       if (user) {
@@ -233,6 +263,7 @@ export default function MaterialTransferEntryScreen() {
         if (entryData) {
           setFormData({
             entry_date: entryData.entry_date,
+            company: entryData.company || '',
             from_job_id: entryData.from_job_id,
             to_job_id: entryData.to_job_id,
             material_description: entryData.material_description,
@@ -285,12 +316,27 @@ export default function MaterialTransferEntryScreen() {
       Alert.alert('Invalid Selection', 'Source and destination jobs cannot be the same.');
       return;
     }
+    if (key === 'company') {
+      // Switching company can make the previously picked From/To jobs invalid
+      // (they belong to a different company's Master Data), so clear them
+      // rather than leave a stale, now-hidden selection in place.
+      setFormData(prev => ({ ...prev, company: value, from_job_id: '', to_job_id: '' }));
+      if (errors.company) setErrors(prev => ({ ...prev, company: '' }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
   };
 
+  // Jobs are tagged to a company in Master Data -- scope both From/To pickers
+  // to whichever company is selected above.
+  const jobs = allJobs
+    .filter((j: any) => !formData.company || j.company === formData.company)
+    .map((j: any) => ({ label: `${j.job_number} - ${j.job_name}`, value: j.id }));
+
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
+    if (!formData.company) newErrors.company = 'Company is required';
     if (!formData.from_job_id) newErrors.from_job_id = 'Source job is required';
     if (!formData.to_job_id) newErrors.to_job_id = 'Destination job is required';
     if (!formData.material_description) newErrors.material_description = 'Description is required';
@@ -321,6 +367,7 @@ export default function MaterialTransferEntryScreen() {
 
       const basePayload = {
         entry_date: formData.entry_date,
+        company: formData.company,
         time: new Date().toISOString().split('T')[1].split('.')[0], // Added to bypass database constraint
         from_job_id: formData.from_job_id,
         to_job_id: formData.to_job_id,
@@ -562,7 +609,21 @@ export default function MaterialTransferEntryScreen() {
           </View>
         </View>
 
-        <CustomPicker 
+        <PillToggle
+          label="Company"
+          required={true}
+          value={formData.company}
+          options={COMPANY_OPTIONS}
+          onSelect={(v: string) => updateForm('company', v)}
+          error={errors.company}
+        />
+        {!!formData.company && (
+          <Text className="text-slate-400 text-xs -mt-3 mb-4 ml-1">
+            {COMPANY_OPTIONS.find(o => o.value === formData.company)?.fullName}
+          </Text>
+        )}
+
+        <CustomPicker
           label="From Job"
           required={true}
           value={formData.from_job_id}

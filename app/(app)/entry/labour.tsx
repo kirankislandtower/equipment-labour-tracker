@@ -19,13 +19,42 @@ import { fetchWithCache } from '../../../lib/dataCache';
 import MessageModal, { MessageModalContent } from '../../../components/MessageModal';
 import { logDuplicateAttempt } from '../../../lib/duplicateAttempts';
 
-type Job = { id: string; job_number: string; job_name: string; location?: string };
+type Job = { id: string; job_number: string; job_name: string; location?: string; company?: string };
 type Supplier = { id: string; supplier_name: string };
 type Designation = { id: string; designation_name: string };
 
 // These two always show up as employee options no matter which labour supplier is
 // picked, on top of whatever job-specific roster that supplier has.
 const UNIVERSAL_EMPLOYEES = ['Mozibur', 'Habibur'];
+
+// No Hydro tab for Labour -- only IST and JAH labour entries exist today.
+const COMPANY_OPTIONS = [
+  { label: 'IST', value: 'IST', fullName: 'Island Tower Electromechanical' },
+  { label: 'JAH', value: 'JAH', fullName: 'Jazeerat Al Hadeed' },
+];
+
+// Tap-once toggle for simple 2-3 option fields, instead of opening a modal picker.
+const PillToggle = ({ label, value, options, onSelect, required = false, error }: any) => (
+  <View className="mb-4">
+    <Text className="text-sm font-medium text-slate-700 mb-1">
+      {label} {required && <Text className="text-red-500">*</Text>}
+    </Text>
+    <View className={`flex-row bg-slate-100 p-1 rounded-xl border ${error ? 'border-red-500' : 'border-transparent'}`}>
+      {options.map((opt: any) => (
+        <TouchableOpacity
+          key={opt.value}
+          onPress={() => onSelect(opt.value)}
+          className={`flex-1 py-3 rounded-lg items-center ${value === opt.value ? 'bg-[#166534] shadow-sm' : ''}`}
+        >
+          <Text className={`font-bold text-sm ${value === opt.value ? 'text-white' : 'text-slate-500'}`}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+    {error ? <Text className="text-red-500 text-xs mt-1 ml-1">{error}</Text> : null}
+  </View>
+);
 
 const defaultGetLabel = (item: any) =>
   item.supplier_name || item.designation_name || item.location_name || item.job_number || item.employee_name || '';
@@ -104,13 +133,14 @@ export default function LabourEntryScreen() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
   const [designations, setDesignations] = useState<Designation[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [entryDate, setEntryDate] = useState(getLocalDateString());
+  const [selectedCompany, setSelectedCompany] = useState('');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -272,17 +302,18 @@ export default function LabourEntryScreen() {
     try {
       setFetching(true);
       const [jobsRes, suppliersRes, designationsRes, { data: { user } }] = await Promise.all([
-        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location').eq('is_active', true).order('job_number')),
+        fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location, company').eq('is_active', true).order('job_number')),
         supabase.from('suppliers').select('id, supplier_name').eq('is_active', true).order('supplier_name'),
         fetchWithCache('labour_designations', () => supabase.from('labour_designations').select('id, designation_name').order('designation_name')),
         supabase.auth.getUser()
       ]);
 
-      setJobs((jobsRes.data || []).map((j: any) => ({
+      setAllJobs((jobsRes.data || []).map((j: any) => ({
         id: j.id,
         job_number: j.job_number,
         job_name: j.job_name,
-        location: j.location
+        location: j.location,
+        company: j.company
       })));
       
       if (designationsRes.data) setDesignations(designationsRes.data);
@@ -304,6 +335,7 @@ export default function LabourEntryScreen() {
         const { data: entryData } = await supabase.from('labour_entries').select('*').eq('id', id).eq('created_by', user!.id).single();
         if (entryData) {
           setEntryDate(entryData.entry_date);
+          setSelectedCompany(entryData.company || '');
           if (jobsRes.data) setSelectedJob(jobsRes.data.find((j: any) => j.id === entryData.job_id) || null);
           if (suppliersRes.data) setSelectedSupplier(suppliersRes.data.find((s: any) => s.id === entryData.supplier_id) || null);
           setEmployeeName(entryData.employee_name);
@@ -374,8 +406,13 @@ export default function LabourEntryScreen() {
 
   const totalWorkingHours = calculateTotalHours();
 
+  // Jobs are tagged to a company in Master Data -- scope the picker to
+  // whichever company is selected above.
+  const jobs = allJobs.filter((j) => !selectedCompany || j.company === selectedCompany);
+
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
+    if (!selectedCompany) newErrors.company = 'Company is required';
     if (!selectedJob) newErrors.job = 'Job is required';
     if (!selectedSupplier) newErrors.supplier = 'Supplier is required';
     if (!employeeName) newErrors.employee_name = 'Employee Name is required';
@@ -436,6 +473,7 @@ export default function LabourEntryScreen() {
 
       const basePayload = {
         entry_date: entryDate,
+        company: selectedCompany,
         job_id: selectedJob!.id,
         supplier_id: resolvedSupplierId,
         employee_name: employeeName,
@@ -691,11 +729,33 @@ export default function LabourEntryScreen() {
           </View>
         </View>
 
+        <PillToggle
+          label="Company"
+          required={true}
+          value={selectedCompany}
+          options={COMPANY_OPTIONS}
+          onSelect={(v: string) => {
+            // Switching company can make the previously picked job/assigned-job
+            // invalid (they belong to a different company's Master Data), so clear
+            // them rather than leave a stale, now-hidden selection in place.
+            setSelectedCompany(v);
+            setSelectedJob(null);
+            setAssignedJob(null);
+            if (errors.company) setErrors(prev => ({ ...prev, company: '' }));
+          }}
+          error={errors.company}
+        />
+        {!!selectedCompany && (
+          <Text className="text-slate-400 text-xs -mt-3 mb-4 ml-1">
+            {COMPANY_OPTIONS.find(o => o.value === selectedCompany)?.fullName}
+          </Text>
+        )}
+
         <View className="mb-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">
             Job Number <Text className="text-red-500">*</Text>
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => setJobModalVisible(true)}
             className={`flex-row items-center bg-white border ${errors.job ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 py-3 h-14 active:opacity-70`}
           >
