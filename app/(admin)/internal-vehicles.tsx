@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, Image, TextInput, useWindowDimensions, Alert, Animated } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform, Modal, TextInput, useWindowDimensions, Alert, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Check, X, Download, Image as ImageIcon, Calendar, AlertTriangle } from 'lucide-react-native';
+import { Check, X, Download, Calendar, AlertTriangle } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -52,8 +52,6 @@ export default function AdminInternalVehicles() {
     if (selectedDate) setToDate(getLocalDateString(selectedDate));
   };
 
-  const [photoModalVisible, setPhotoModalVisible] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedRejectId, setSelectedRejectId] = useState<string | null>(null);
@@ -313,28 +311,6 @@ export default function AdminInternalVehicles() {
         isDestructive={false}
       />
 
-      {/* Photo Viewer Modal */}
-      <Modal visible={photoModalVisible} transparent animationType="fade" onRequestClose={() => setPhotoModalVisible(false)}>
-        <View className="flex-1 bg-black/95">
-          <View className="flex-row justify-end p-6 pt-12">
-            <TouchableOpacity
-              className="bg-white/20 p-3 rounded-full active:bg-white/30 z-10"
-              onPress={() => setPhotoModalVisible(false)}
-            >
-              <X size={24} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
-          <View className="flex-1 justify-center items-center px-4 pb-12">
-            {selectedPhoto && (
-              <Image
-                source={{ uri: selectedPhoto }}
-                style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
-
       {/* Reject Reason Modal */}
       <Modal visible={rejectModalVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center p-8">
@@ -561,23 +537,6 @@ export default function AdminInternalVehicles() {
                         </View>
 
                         <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
-                          {entry.internal_vehicle_photo_url && entry.internal_vehicle_photo_url !== 'pending' && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setSelectedPhoto(entry.internal_vehicle_photo_url);
-                                setPhotoModalVisible(true);
-                              }}
-                              className="bg-blue-100 p-2 rounded-lg border border-blue-200 active:bg-blue-200"
-                            >
-                              <ImageIcon size={18} color="#1e3a8a" />
-                            </TouchableOpacity>
-                          )}
-                          {entry.internal_vehicle_photo_url === 'pending' && (
-                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200 flex-row items-center px-3">
-                              <AlertTriangle size={16} color="#d97706" />
-                              <Text className="text-amber-700 font-bold ml-1 text-xs">Photo Pending</Text>
-                            </View>
-                          )}
                           {entry.status === 'SUBMITTED' && (
                             <TouchableOpacity
                               onPress={() => confirmApprove(entry.id)}
@@ -624,22 +583,6 @@ export default function AdminInternalVehicles() {
                           <EarlyFlagBadge entry={entry} />
                         </View>
                         <View className="flex-1 flex-row justify-end space-x-2">
-                          {entry.internal_vehicle_photo_url && entry.internal_vehicle_photo_url !== 'pending' && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setSelectedPhoto(entry.internal_vehicle_photo_url);
-                                setPhotoModalVisible(true);
-                              }}
-                              className="bg-blue-100 p-2 rounded-lg border border-blue-200 active:bg-blue-200"
-                            >
-                              <ImageIcon size={18} color="#1e3a8a" />
-                            </TouchableOpacity>
-                          )}
-                          {entry.internal_vehicle_photo_url === 'pending' && (
-                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200">
-                              <AlertTriangle size={18} color="#d97706" />
-                            </View>
-                          )}
                           {entry.status === 'SUBMITTED' && (
                             <TouchableOpacity
                               onPress={() => confirmApprove(entry.id)}
@@ -772,15 +715,6 @@ export default function AdminInternalVehicles() {
                     <Text className="text-amber-700 font-black text-2xl">{selectedEntry.number_of_trips ?? 0}</Text>
                   </View>
                 </View>
-
-                {selectedEntry.internal_vehicle_photo_url === 'pending' && (
-                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row items-center">
-                    <AlertTriangle size={18} color="#d97706" />
-                    <Text className="text-amber-800 font-medium ml-2 flex-1 text-sm">
-                      Photo upload didn't finish when this was submitted (likely a weak connection). The foreman needs to edit this entry to attach it.
-                    </Text>
-                  </View>
-                )}
 
                 <View className="flex-row justify-between mb-4">
                   <View className="flex-1">
