@@ -160,13 +160,14 @@ export default function AdminFlushing() {
 
   const exportToCSV = async () => {
     try {
-      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Hours', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
+      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Vehicle Number', 'Hours', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
       const rows = filteredEntries.map(e => [
         e.entry_date || '',
         e.jobs?.job_number || '',
         e.jobs?.job_name || '',
         e.suppliers?.supplier_name || '',
         e.equipment_master?.equipment_name || '',
+        e.vehicle_number || '',
         e.working_hours || 0,
         e.status || '',
         e.foreman_name || '',
