@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Truck, Users, ArrowLeft, ChevronRight, ArrowRightLeft, Droplets, Wrench } from 'lucide-react-native';
+import { Truck, Users, ArrowLeft, ChevronRight, ArrowRightLeft, Droplets } from 'lucide-react-native';
 import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../../lib/foremanFlags';
 
 export default function EntrySelectScreen() {
@@ -59,7 +59,7 @@ export default function EntrySelectScreen() {
         {/* Material Transfer Card */}
         <TouchableOpacity
           onPress={() => router.push('/(app)/entry/material')}
-          className="bg-white rounded-2xl p-5 mb-4 border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center"
+          className={`bg-white rounded-2xl p-5 ${FLUSHING_ENABLED_FOR_FOREMEN ? 'mb-4' : 'mb-10'} border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center`}
         >
           <View className="w-14 h-14 rounded-xl bg-amber-50 items-center justify-center mr-4 border border-amber-100">
             <ArrowRightLeft size={28} color="#d97706" />
@@ -71,20 +71,7 @@ export default function EntrySelectScreen() {
           <ChevronRight size={20} color="#cbd5e1" />
         </TouchableOpacity>
 
-        {/* Internal Vehicles Card */}
-        <TouchableOpacity
-          onPress={() => router.push('/(app)/entry/internal-vehicles')}
-          className={`bg-white rounded-2xl p-5 ${FLUSHING_ENABLED_FOR_FOREMEN ? 'mb-4' : 'mb-10'} border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center`}
-        >
-          <View className="w-14 h-14 rounded-xl bg-violet-50 items-center justify-center mr-4 border border-violet-100">
-            <Wrench size={28} color="#6d28d9" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">Internal Vehicles</Text>
-            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">Log usage of company-owned vehicles like excavators and tippers</Text>
-          </View>
-          <ChevronRight size={20} color="#cbd5e1" />
-        </TouchableOpacity>
+        {/* Internal Vehicles is Driver-login only now -- no card here for foremen. */}
 
         {/* Flushing Card -- temporarily paused, see FLUSHING_ENABLED_FOR_FOREMEN */}
         {FLUSHING_ENABLED_FOR_FOREMEN && (

@@ -31,10 +31,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           if (!DRIVER_ROUTES.includes(route.name)) return null;
         } else {
           // Hide routes that shouldn't be in the tab bar (like entry forms),
-          // plus the driver-only Home variant.
+          // plus the driver-only Home variant and Internal Vehicles, which is
+          // Driver-login only now.
           const hiddenRoutes = FLUSHING_ENABLED_FOR_FOREMEN
-            ? ['driver-home', 'entry/select', 'entry/material', 'history', 'missing-photos']
-            : ['driver-home', 'entry/select', 'entry/material', 'history', 'missing-photos', 'entry/flushing'];
+            ? ['driver-home', 'entry/select', 'entry/material', 'entry/internal-vehicles', 'history', 'missing-photos']
+            : ['driver-home', 'entry/select', 'entry/material', 'entry/internal-vehicles', 'history', 'missing-photos', 'entry/flushing'];
           if (hiddenRoutes.includes(route.name)) return null;
         }
 
@@ -113,6 +114,17 @@ export default function AppLayout() {
     }
   }, [role, segments]);
 
+  // Internal Vehicle Entry is Driver-login only -- bounce a Foreman away from
+  // it too (e.g. a bookmarked /entry/internal-vehicles URL on web), not just
+  // hide its tab bar button.
+  useEffect(() => {
+    if (!role || role === 'DRIVER') return;
+    const current = segments.slice(1).join('/');
+    if (current === 'entry/internal-vehicles') {
+      router.replace('/(app)/home');
+    }
+  }, [role, segments]);
+
   const content = (
     <Tabs 
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -164,18 +176,17 @@ export default function AppLayout() {
         } : { href: null }}
       />
       <Tabs.Screen
-        name="profile"
-        options={{ 
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />
-        }} 
-      />
-      
-      <Tabs.Screen
         name="history"
         options={{
           title: 'History',
           tabBarIcon: ({ color, size }) => <HistoryIcon color={color} size={size} />
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => <User color={color} size={size} />
         }}
       />
 

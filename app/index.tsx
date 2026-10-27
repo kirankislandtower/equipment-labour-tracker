@@ -66,16 +66,39 @@ export default function LoginScreen() {
 
       if (!userData) {
         if (selectedRole === 'FOREMAN') {
-          // Auto-create profile for foremen
-          const { error: insertError } = await supabase.from('users').upsert({
+          // Auto-create profile for foremen -- a genuinely new account whose
+          // signup trigger hasn't landed yet. Uses insert(), not upsert(): if
+          // a row for this id actually exists already (the SELECT above just
+          // failed to see it -- e.g. a brief RLS/replication race right after
+          // sign-in) an upsert would silently overwrite that real role with
+          // FOREMAN, letting anyone bypass the portal check below by racing
+          // it. insert() fails with 23505 instead, so that case falls through
+          // to re-fetch and validate for real.
+          const { error: insertError } = await supabase.from('users').insert({
             id: data.user.id,
             full_name: username,
             email: pseudoEmail,
             role: 'FOREMAN'
-          }, { onConflict: 'id' });
-          
+          });
+
           if (insertError && insertError.code !== '23505') {
             console.error('Auto-create profile failed:', insertError);
+          }
+
+          if (insertError?.code === '23505') {
+            const { data: realUserData } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', data.user.id)
+              .maybeSingle();
+
+            if (realUserData && realUserData.role !== selectedRole) {
+              await supabase.auth.signOut();
+              setMessageModal({ title: 'Incorrect Portal', message: `Your account is registered as an ${realUserData.role}. Please select the ${realUserData.role} portal.` });
+              setLoading(false);
+              return;
+            }
+            if (realUserData) finalRole = realUserData.role;
           }
         }
       } else {
