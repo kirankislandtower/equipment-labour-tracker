@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Modal, Image, TextInput, useWindowDimensions, Animated } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform, Modal, TextInput, useWindowDimensions, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { Download, ChevronDown, Check, X, Building2, Truck, HardHat, Calendar, Clock, AlertCircle, AlertTriangle, Image as ImageIcon } from 'lucide-react-native';
+import { Download, ChevronDown, Check, X, Building2, Truck, HardHat, Calendar, Clock, AlertTriangle } from 'lucide-react-native';
 import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -46,8 +46,6 @@ export default function AdminLabour() {
     if (selectedDate) setToDate(getLocalDateString(selectedDate));
   };
 
-  const [photoModalVisible, setPhotoModalVisible] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedRejectId, setSelectedRejectId] = useState<string | null>(null);
@@ -275,28 +273,6 @@ export default function AdminLabour() {
         isDestructive={false}
       />
 
-      {/* Photo Viewer Modal */}
-      <Modal visible={photoModalVisible} transparent animationType="fade" onRequestClose={() => setPhotoModalVisible(false)}>
-        <View className="flex-1 bg-black/95">
-          <View className="flex-row justify-end p-6 pt-12">
-            <TouchableOpacity 
-              className="bg-white/20 p-3 rounded-full active:bg-white/30 z-10"
-              onPress={() => setPhotoModalVisible(false)}
-            >
-              <X size={24} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
-          <View className="flex-1 justify-center items-center px-4 pb-12">
-            {selectedPhoto && (
-              <Image 
-                source={{ uri: selectedPhoto }} 
-                style={{ width: '100%', height: '100%', resizeMode: 'contain' }} 
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
-
       {/* Reject Reason Modal */}
       <Modal visible={rejectModalVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center p-8">
@@ -506,23 +482,6 @@ export default function AdminLabour() {
                         </View>
                         
                         <View className="flex-row justify-end space-x-3 pt-3 border-t border-slate-100">
-                          {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && entry.labour_photo_url !== 'NOT_REQUIRED' && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setSelectedPhoto(entry.labour_photo_url);
-                                setPhotoModalVisible(true);
-                              }}
-                              className="bg-blue-100 p-2 rounded-lg border border-blue-200 active:bg-blue-200"
-                            >
-                              <ImageIcon size={18} color="#1e3a8a" />
-                            </TouchableOpacity>
-                          )}
-                          {entry.labour_photo_url === 'pending' && (
-                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200 flex-row items-center px-3">
-                              <AlertCircle size={16} color="#d97706" />
-                              <Text className="text-amber-700 font-bold ml-1 text-xs">Photo Pending</Text>
-                            </View>
-                          )}
                           {entry.status === 'SUBMITTED' && (
                             <TouchableOpacity
                               onPress={() => confirmApprove(entry.id)}
@@ -564,24 +523,8 @@ export default function AdminLabour() {
                           <EarlyFlagBadge entry={entry} />
                         </View>
                         <View className="flex-1 flex-row justify-end space-x-2">
-                          {entry.labour_photo_url && entry.labour_photo_url !== 'pending' && entry.labour_photo_url !== 'NOT_REQUIRED' && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setSelectedPhoto(entry.labour_photo_url);
-                                setPhotoModalVisible(true);
-                              }}
-                              className="bg-blue-100 p-2 rounded-lg border border-blue-200 active:bg-blue-200"
-                            >
-                              <ImageIcon size={18} color="#1e3a8a" />
-                            </TouchableOpacity>
-                          )}
-                          {entry.labour_photo_url === 'pending' && (
-                            <View className="bg-amber-100 p-2 rounded-lg border border-amber-200">
-                              <AlertCircle size={18} color="#d97706" />
-                            </View>
-                          )}
                           {entry.status === 'SUBMITTED' && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                               onPress={() => confirmApprove(entry.id)}
                               className="bg-green-100 p-2 rounded-lg border border-green-200 active:bg-green-200"
                             >
@@ -675,15 +618,6 @@ export default function AdminLabour() {
                       </View>
                     </View>
                   </>
-                )}
-
-                {selectedEntry.labour_photo_url === 'pending' && (
-                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row items-center">
-                    <AlertCircle size={18} color="#d97706" />
-                    <Text className="text-amber-800 font-medium ml-2 flex-1 text-sm">
-                      Photo upload didn't finish when this was submitted (likely a weak connection). The foreman needs to edit this entry to attach it.
-                    </Text>
-                  </View>
                 )}
 
                 {!!selectedEntry.requested_by && (
