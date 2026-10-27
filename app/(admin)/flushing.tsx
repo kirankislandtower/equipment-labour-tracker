@@ -726,18 +726,18 @@ export default function AdminFlushing() {
                   </View>
                 )}
 
-                {selectedEntry.fuel_provided && (
-                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row justify-between items-center">
-                    <View>
-                      <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Fuel Provided</Text>
-                      <Text className="text-amber-800 font-bold">Yes</Text>
-                    </View>
+                <View className={`mb-4 p-4 rounded-2xl border flex-row justify-between items-center ${selectedEntry.fuel_provided ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                  <View>
+                    <Text className={`text-xs font-bold uppercase mb-1 ${selectedEntry.fuel_provided ? 'text-amber-600' : 'text-slate-500'}`}>Fuel Provided</Text>
+                    <Text className={`font-bold ${selectedEntry.fuel_provided ? 'text-amber-800' : 'text-slate-700'}`}>{selectedEntry.fuel_provided ? 'Yes' : 'No'}</Text>
+                  </View>
+                  {selectedEntry.fuel_provided && (
                     <View className="items-end">
                       <Text className="text-xs font-bold text-amber-600 uppercase mb-1">Quantity</Text>
                       <Text className="text-amber-800 font-bold">{selectedEntry.fuel_quantity} {selectedEntry.fuel_unit}</Text>
                     </View>
-                  </View>
-                )}
+                  )}
+                </View>
 
                 {!!selectedEntry.remarks && (
                   <View className="mb-4">
