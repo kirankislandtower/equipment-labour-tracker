@@ -14,7 +14,7 @@ import {
 } from '../../lib/pwaInstall';
 
 export default function ProfileScreen() {
-  const { user } = useAuth();
+  const { user, role: accountRole } = useAuth();
   const router = useRouter();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -80,7 +80,7 @@ export default function ProfileScreen() {
   };
 
   const username = user?.email?.split('@')[0] || 'Foreman';
-  const role = user?.email?.includes('admin') ? 'Administrator' : 'Foreman';
+  const role = accountRole === 'DRIVER' ? 'Driver' : accountRole === 'ADMIN' ? 'Administrator' : 'Foreman';
   const displayName = fullName || (username.charAt(0).toUpperCase() + username.slice(1));
 
   if (isTransitioning) {

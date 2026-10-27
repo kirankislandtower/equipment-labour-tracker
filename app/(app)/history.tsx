@@ -11,17 +11,26 @@ import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../lib/foremanFlags';
 
 export default function HistoryScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { date, type, status } = useLocalSearchParams<{ date?: string, type?: string, status?: string }>();
-  
+
   const [activeTab, setActiveTab] = useState(type || 'EQUIPMENT');
   const [statusFilter, setStatusFilter] = useState(status || 'ALL');
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<any[]>([]);
-  
+
   // Initialize date from URL param if available, otherwise today
   const initialDate = date ? new Date(date) : new Date();
   const [selectedDate, setSelectedDate] = useState(initialDate);
+
+  // A Driver only ever has Internal Vehicle entries -- lock the tab regardless
+  // of what the URL param or initial guess said (role resolves async, after
+  // the state above has already picked a default).
+  useEffect(() => {
+    if (role === 'DRIVER' && activeTab !== 'INTERNAL_VEHICLE') {
+      setActiveTab('INTERNAL_VEHICLE');
+    }
+  }, [role]);
 
   useEffect(() => {
     fetchHistory();
@@ -252,7 +261,9 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      {/* Custom Segmented Control */}
+      {/* Custom Segmented Control -- Drivers only ever have Internal Vehicle entries,
+          so there's nothing to switch between; the control is skipped entirely. */}
+      {role !== 'DRIVER' && (
       <View className="mb-4">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
           <View className="flex-row bg-slate-100 p-1 rounded-xl">
@@ -306,6 +317,7 @@ export default function HistoryScreen() {
           </View>
         </ScrollView>
       </View>
+      )}
 
       {/* Status Filters */}
       <View className="px-4 mb-2">

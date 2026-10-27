@@ -11,11 +11,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'FOREMAN' | 'ADMIN'>('FOREMAN');
+  const [selectedRole, setSelectedRole] = useState<'FOREMAN' | 'DRIVER' | 'ADMIN'>('FOREMAN');
   const [roleLoading, setRoleLoading] = useState(false);
   const [messageModal, setMessageModal] = useState<MessageModalContent | null>(null);
 
-  const handleRoleToggle = (role: 'FOREMAN' | 'ADMIN') => {
+  const handleRoleToggle = (role: 'FOREMAN' | 'DRIVER' | 'ADMIN') => {
     if (role === selectedRole) return;
     setRoleLoading(true);
     setTimeout(() => {
@@ -132,7 +132,7 @@ export default function LoginScreen() {
             ISLAND TOWER
           </Text>
           <Text className="text-slate-500 mt-2 text-center font-medium">
-            {selectedRole === 'ADMIN' ? 'Admin Portal' : 'Foreman Portal'}
+            {selectedRole === 'ADMIN' ? 'Admin Portal' : selectedRole === 'DRIVER' ? 'Driver Portal' : 'Foreman Portal'}
           </Text>
         </View>
 
@@ -150,7 +150,19 @@ export default function LoginScreen() {
                 <Text className={`font-bold ${selectedRole === 'FOREMAN' ? 'text-slate-900' : 'text-slate-500'}`}>Foreman</Text>
               )}
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
+              className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${selectedRole === 'DRIVER' ? 'bg-white' : ''}`}
+              style={selectedRole === 'DRIVER' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 } : {}}
+              onPress={() => handleRoleToggle('DRIVER')}
+              disabled={roleLoading}
+            >
+              {roleLoading && selectedRole !== 'DRIVER' ? (
+                <ActivityIndicator size="small" color="#64748b" />
+              ) : (
+                <Text className={`font-bold ${selectedRole === 'DRIVER' ? 'text-slate-900' : 'text-slate-500'}`}>Driver</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${selectedRole === 'ADMIN' ? 'bg-white' : ''}`}
               style={selectedRole === 'ADMIN' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 } : {}}
               onPress={() => handleRoleToggle('ADMIN')}

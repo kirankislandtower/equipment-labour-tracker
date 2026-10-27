@@ -1,23 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StatusBar, Modal, FlatList, ActivityIndicator, Alert, Platform, Image
+  StatusBar, Modal, FlatList, ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, Wrench, Calendar, Clock, WifiOff, Search, Truck, Users } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Check, X, Wrench, Calendar, Clock, WifiOff, Search, Truck, Users } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
-import * as ImagePicker from 'expo-image-picker';
 import { getLocalDateString } from '../../../lib/dateUtils';
-import WebCamera from '../../../components/WebCamera';
-import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
-import { compressImageToDataUri } from '../../../lib/imageUtils';
-import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
 import { fetchWithCache } from '../../../lib/dataCache';
 import MessageModal, { MessageModalContent } from '../../../components/MessageModal';
+import { useAuth } from '../../../lib/auth';
 
 const SECTION_OPTIONS = [
   { label: 'Civil', value: 'Civil' },
@@ -151,58 +147,14 @@ const SectionHeader = ({ icon: Icon, label }: { icon: any; label: string }) => (
 export default function InternalVehicleEntryScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { role, user: authUser } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successVisible, setSuccessVisible] = useState(false);
   const [messageModal, setMessageModal] = useState<MessageModalContent | null>(null);
-  const [photoPendingReason, setPhotoPendingReason] = useState<'missing' | 'upload_failed' | null>(null);
   const [navigating, setNavigating] = useState(false);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [initialPhotoUri, setInitialPhotoUri] = useState<string | null>(null);
-  const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
-
-  const pickImage = async (source: 'camera' | 'gallery' = 'camera') => {
-    try {
-      if (source === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'We need camera permissions to verify the vehicle on-site!');
-          return;
-        }
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'We need photo library permission to choose a photo.');
-          return;
-        }
-      }
-
-      const result = source === 'camera'
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.7,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.7,
-          });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const compressedUri = await compressImageToDataUri(asset.uri, asset.width, asset.height);
-        setPhotoUri(compressedUri);
-        setPhotoCapturedAt(new Date());
-        if (errors.photo) setErrors(prev => ({ ...prev, photo: '' }));
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
 
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
@@ -210,12 +162,19 @@ export default function InternalVehicleEntryScreen() {
   const [allJobs, setAllJobs] = useState<any[]>([]);
   const [allVehicles, setAllVehicles] = useState<any[]>([]);
   const [allDrivers, setAllDrivers] = useState<any[]>([]);
+  // A Driver's own Drivers/Operators record, fetched directly by user_id --
+  // deliberately not sourced from allDrivers, which is filtered to is_active
+  // records only and could miss this one (e.g. toggled off, or a stale cache
+  // read), silently stranding a driver with no name to lock the field to.
+  const [myDriverRecord, setMyDriverRecord] = useState<{ id: string; name: string; company: string } | null>(null);
 
   const [formData, setFormData] = useState({
     entry_date: getLocalDateString(),
     company: '',
     vehicle_id: '',
     job_id: '',
+    from_location: '',
+    to_location: '',
     section: '',
     basis: 'HOURLY',
     start_time: '08:00',
@@ -227,16 +186,50 @@ export default function InternalVehicleEntryScreen() {
     number_of_trips: '',
     requester_name: '',
     driver_id: '',
-    rate_amount: '',
+    rate_amount: '0',
     ist_timesheet_number: '',
     remarks: '',
   });
 
+  // role starts out null and resolves async from a separate auth-context
+  // fetch; including it here means fetchData gets re-invoked with a fresh
+  // closure once the real value lands, instead of staying stuck forever on
+  // the null it saw at mount (fetchData's own `role === 'DRIVER'` checks
+  // would otherwise never see the real value).
   useFocusEffect(
     useCallback(() => {
       fetchData();
-    }, [id])
+    }, [id, role])
   );
+
+  // A Driver account is tied to one Drivers/Operators record -- lock the
+  // Driver/Operator field to it instead of letting them pick anyone else's
+  // name (a driver can be dispatched to a job under a different company than
+  // their own Master Data record, so Company itself stays a normal, freely
+  // editable picker -- this only supplies its starting default).
+  // Queried directly by user_id (not looked up in allDrivers, which only
+  // holds is_active records and can miss this one) so the lock works even
+  // if this driver happens to be toggled inactive, and kept as its own
+  // effect (rather than inline in fetchData) because `role` resolves
+  // asynchronously from a separate auth-context fetch.
+  useEffect(() => {
+    if (role !== 'DRIVER' || !authUser?.id) return;
+    supabase
+      .from('internal_vehicle_drivers')
+      .select('id, name, company')
+      .eq('user_id', authUser.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load own driver record:', error);
+          return;
+        }
+        if (data) {
+          setMyDriverRecord(data);
+          setFormData(prev => ({ ...prev, driver_id: data.id, company: prev.company || data.company || prev.company }));
+        }
+      });
+  }, [role, authUser?.id]);
 
   const [isOffline, setIsOffline] = useState(false);
   useEffect(() => {
@@ -278,7 +271,7 @@ export default function InternalVehicleEntryScreen() {
       const [jobsRes, vehiclesRes, driversRes, { data: { user } }] = await Promise.all([
         fetchWithCache('jobs', () => supabase.from('jobs').select('id, job_number, job_name, location, company').eq('is_active', true).order('job_number')),
         fetchWithCache('internal_vehicles', () => supabase.from('internal_vehicles').select('id, vehicle_number, vehicle_type, company').eq('is_active', true).order('vehicle_number')),
-        fetchWithCache('internal_vehicle_drivers', () => supabase.from('internal_vehicle_drivers').select('id, name, company').eq('is_active', true).order('name')),
+        fetchWithCache('internal_vehicle_drivers', () => supabase.from('internal_vehicle_drivers').select('id, name, company, user_id').eq('is_active', true).order('name')),
         supabase.auth.getUser(),
         new Promise(resolve => setTimeout(resolve, 300))
       ]);
@@ -324,6 +317,8 @@ export default function InternalVehicleEntryScreen() {
             company: entryData.company || '',
             vehicle_id: entryData.internal_vehicle_id || '',
             job_id: entryData.job_id || '',
+            from_location: entryData.from_location || '',
+            to_location: entryData.to_location || '',
             section: entryData.section || '',
             basis: entryData.basis || 'HOURLY',
             start_time: startParts.time || '08:00',
@@ -339,18 +334,22 @@ export default function InternalVehicleEntryScreen() {
             ist_timesheet_number: entryData.ist_timesheet_number || '',
             remarks: entryData.remarks || '',
           }));
-          if (entryData.internal_vehicle_photo_url && entryData.internal_vehicle_photo_url !== 'pending') {
-            setPhotoUri(entryData.internal_vehicle_photo_url);
-            setInitialPhotoUri(entryData.internal_vehicle_photo_url);
-          }
         }
       } else {
         setFormData(prev => ({
           ...prev,
           entry_date: getLocalDateString(),
-          company: '',
+          // A Driver's company/driver_id are locked to their own record by a
+          // separate effect that can resolve before or after this reset runs
+          // (it depends on the auth role loading, which races this fetch) --
+          // blanking them here for a Driver would risk wiping out a value
+          // that effect already set first. Left untouched for Drivers; a
+          // Foreman still gets a clean blank company/driver_id as before.
+          company: role === 'DRIVER' ? prev.company : '',
           vehicle_id: '',
           job_id: '',
+          from_location: '',
+          to_location: '',
           section: '',
           basis: 'HOURLY',
           start_time: '08:00',
@@ -360,14 +359,11 @@ export default function InternalVehicleEntryScreen() {
           break_hours: '1',
           working_hours: '9',
           number_of_trips: '',
-          driver_id: '',
-          rate_amount: '',
+          driver_id: role === 'DRIVER' ? prev.driver_id : '',
+          rate_amount: '0',
           ist_timesheet_number: '',
           remarks: '',
         }));
-        setPhotoUri(null);
-        setPhotoCapturedAt(null);
-        setInitialPhotoUri(null);
         setErrors({});
       }
     } catch (error) {
@@ -408,8 +404,6 @@ export default function InternalVehicleEntryScreen() {
     if (!formData.number_of_trips) newErrors.number_of_trips = 'Number of trips is required';
     if (!formData.requester_name) newErrors.requester_name = 'Requester name is required';
     if (!formData.driver_id) newErrors.driver_id = 'Driver / Operator is required';
-
-    const missingPhoto = !photoUri && !id;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -463,6 +457,8 @@ export default function InternalVehicleEntryScreen() {
         company: formData.company,
         internal_vehicle_id: formData.vehicle_id,
         job_id: formData.job_id,
+        from_location: formData.from_location.trim() || null,
+        to_location: formData.to_location.trim() || null,
         section: formData.section,
         basis: formData.basis,
         start_time: convertTo24h(formData.start_time, formData.start_am_pm),
@@ -472,7 +468,9 @@ export default function InternalVehicleEntryScreen() {
         number_of_trips: parseInt(formData.number_of_trips) || 0,
         requester_name: formData.requester_name,
         driver_id: formData.driver_id,
-        rate_amount: formData.rate_amount ? (parseFloat(formData.rate_amount) || null) : null,
+        // Drivers can't type here (field is locked at 0 on this form) -- parseFloat's
+        // fallback only matters for an edited entry loaded with a non-numeric value.
+        rate_amount: formData.rate_amount === '' ? null : (parseFloat(formData.rate_amount) || 0),
         ist_timesheet_number: formData.ist_timesheet_number.trim() || null,
         remarks: formData.remarks || null,
         created_by: user?.id || null,
@@ -487,9 +485,12 @@ export default function InternalVehicleEntryScreen() {
             type: 'internal_vehicle',
             table: 'internal_vehicle_entries',
             photoColumn: 'internal_vehicle_photo_url',
-            payload: { ...basePayload, internal_vehicle_photo_url: 'pending' },
-            photoDataUri: photoUri,
-            photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
+            // Column is NOT NULL with no photo step anymore -- always a fixed placeholder.
+            // Only reached for new entries (this offline path is skipped when editing), so
+            // there's never an existing photo on the row this could overwrite.
+            payload: { ...basePayload, internal_vehicle_photo_url: 'NOT_REQUIRED' },
+            photoDataUri: null,
+            photoCapturedAt: null,
             watermarkJobLabel: jobName,
             downloadFilePrefix: 'InternalVehicle',
             displayDate: formData.entry_date,
@@ -502,7 +503,6 @@ export default function InternalVehicleEntryScreen() {
               number_of_trips: basePayload.number_of_trips,
             },
           });
-          setPhotoPendingReason(missingPhoto ? 'missing' : null);
           setMessageModal({
             title: 'Saved Offline',
             message: 'No internet connection right now. This entry is saved on your device and will upload automatically once you\'re back online.',
@@ -512,28 +512,15 @@ export default function InternalVehicleEntryScreen() {
         }
       }
 
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (!photoUri ? 'pending' : 'pending');
-      let photoUploadFailed = false;
-
-      if (photoUri && (!id || photoUri !== initialPhotoUri)) {
-        try {
-          const rawCloudinaryUrl = await uploadToCloudinary(photoUri);
-          uploadedPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName, photoCapturedAt || undefined);
-          downloadImageToDevice(uploadedPhotoUrl, `InternalVehicle_${jobName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`);
-        } catch (err: any) {
-          console.error('Cloudinary upload failed, saving entry without photo:', err);
-          photoUploadFailed = true;
-        }
-      }
-
-      const payload = { ...basePayload, internal_vehicle_photo_url: uploadedPhotoUrl };
-
       let error;
       if (id) {
-        const { error: updateError } = await supabase.from('internal_vehicle_entries').update(payload).eq('id', id).eq('created_by', user?.id);
+        // Leave internal_vehicle_photo_url untouched -- an entry created before this
+        // removal may already have a real uploaded photo, which an edit must not erase.
+        const { error: updateError } = await supabase.from('internal_vehicle_entries').update(basePayload).eq('id', id).eq('created_by', user?.id);
         error = updateError;
       } else {
-        const { error: insertError } = await supabase.from('internal_vehicle_entries').insert(payload);
+        // Column is NOT NULL with no photo step anymore -- always a fixed placeholder.
+        const { error: insertError } = await supabase.from('internal_vehicle_entries').insert({ ...basePayload, internal_vehicle_photo_url: 'NOT_REQUIRED' });
         error = insertError;
       }
 
@@ -544,13 +531,6 @@ export default function InternalVehicleEntryScreen() {
         throw error;
       }
 
-      if (photoUploadFailed) {
-        setPhotoPendingReason('upload_failed');
-      } else if (missingPhoto) {
-        setPhotoPendingReason('missing');
-      } else {
-        setPhotoPendingReason(null);
-      }
       setSuccessVisible(true);
     } catch (error: any) {
       console.error('Submit error:', error);
@@ -647,18 +627,12 @@ export default function InternalVehicleEntryScreen() {
       <Modal visible={successVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white rounded-3xl p-8 items-center w-full max-w-sm border border-slate-200 shadow-2xl">
-            <View className={`p-4 rounded-full mb-4 ${photoPendingReason ? 'bg-amber-100' : 'bg-green-100'}`}>
-              {photoPendingReason ? <Camera size={64} color="#d97706" /> : <Wrench size={64} color="#10b981" />}
+            <View className="p-4 rounded-full mb-4 bg-green-100">
+              <Wrench size={64} color="#10b981" />
             </View>
-            <Text className="text-2xl font-black text-slate-900 mb-2">
-              {photoPendingReason ? 'Submitted — Photo Needed' : 'Success!'}
-            </Text>
+            <Text className="text-2xl font-black text-slate-900 mb-2">Success!</Text>
             <Text className="text-slate-500 text-center mb-8">
-              {photoPendingReason === 'missing'
-                ? `Your entry has been ${id ? 'updated' : 'submitted'}, but no live photo was attached. Please edit this entry later to upload it.`
-                : photoPendingReason === 'upload_failed'
-                ? `Your entry has been ${id ? 'updated' : 'submitted'}, but the photo could not be uploaded (connection issue or storage limit). Edit this entry later to attach it.`
-                : `Your entry has been ${id ? 'updated' : 'submitted'} successfully and is awaiting review.`}
+              Your entry has been {id ? 'updated' : 'submitted'} successfully and is awaiting review.
             </Text>
             <TouchableOpacity
               className={`w-full bg-[#6d28d9] rounded-xl py-4 flex-row justify-center items-center ${navigating ? 'opacity-80' : ''}`}
@@ -667,13 +641,14 @@ export default function InternalVehicleEntryScreen() {
                 setNavigating(true);
                 setTimeout(() => {
                   setSuccessVisible(false);
-                  setPhotoPendingReason(null);
                   setNavigating(false);
                   setFormData({
                     entry_date: getLocalDateString(),
                     company: formData.company,
                     vehicle_id: '',
                     job_id: '',
+                    from_location: '',
+                    to_location: '',
                     section: '',
                     basis: 'HOURLY',
                     start_time: '08:00',
@@ -685,12 +660,10 @@ export default function InternalVehicleEntryScreen() {
                     number_of_trips: '',
                     requester_name: formData.requester_name,
                     driver_id: '',
-                    rate_amount: '',
+                    rate_amount: '0',
                     ist_timesheet_number: '',
                     remarks: '',
                   });
-                  setPhotoUri(null);
-                  setPhotoCapturedAt(null);
                   router.setParams({ id: '' });
                   router.replace('/(app)/home');
                 }, 600);
@@ -753,11 +726,19 @@ export default function InternalVehicleEntryScreen() {
           value={formData.company}
           options={COMPANY_OPTIONS}
           onSelect={(v: string) => {
-            // Switching company can make the previously picked job/driver invalid
-            // (they belong to a different company's Master Data), so clear them
-            // rather than leave a stale, now-hidden selection in place. Vehicles
-            // are a shared fleet across companies, so the vehicle pick carries over.
-            setFormData(prev => ({ ...prev, company: v, job_id: '', driver_id: '', section: v === 'IST' ? prev.section : '' }));
+            // Switching company can make the previously picked job invalid (it
+            // belongs to a different company's Master Data), so clear it rather
+            // than leave a stale, now-hidden selection in place. Vehicles are a
+            // shared fleet across companies, so the vehicle pick carries over.
+            // A Driver's own driver_id is locked to their own record regardless
+            // of which company this particular trip is under, so it's left alone.
+            setFormData(prev => ({
+              ...prev,
+              company: v,
+              job_id: '',
+              driver_id: role === 'DRIVER' ? prev.driver_id : '',
+              section: v === 'IST' ? prev.section : '',
+            }));
             if (errors.company) setErrors(prev => ({ ...prev, company: '' }));
           }}
           error={errors.company}
@@ -798,6 +779,28 @@ export default function InternalVehicleEntryScreen() {
           placeholder="Select Job"
           error={errors.job_id}
         />
+
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-slate-700 mb-1">From Location (Optional)</Text>
+          <TextInput
+            value={formData.from_location}
+            onChangeText={(t) => updateForm('from_location', t)}
+            className="bg-white border border-slate-300 text-slate-900 rounded-lg px-4 py-3.5"
+            placeholder="e.g. Main Gate, Plot 12"
+            placeholderTextColor="#94a3b8"
+          />
+        </View>
+
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-slate-700 mb-1">To Location (Optional)</Text>
+          <TextInput
+            value={formData.to_location}
+            onChangeText={(t) => updateForm('to_location', t)}
+            className="bg-white border border-slate-300 text-slate-900 rounded-lg px-4 py-3.5"
+            placeholder="e.g. Storage Yard, Plot 7"
+            placeholderTextColor="#94a3b8"
+          />
+        </View>
 
         {formData.company === 'IST' && (
           <PillToggle
@@ -907,6 +910,16 @@ export default function InternalVehicleEntryScreen() {
           {errors.requester_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.requester_name}</Text> : null}
         </View>
 
+        {role === 'DRIVER' ? (
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-slate-700 mb-1">Driver / Operator</Text>
+            <View className="bg-slate-100 border border-slate-200 rounded-lg px-4 py-3.5">
+              <Text className="text-slate-500">
+                {myDriverRecord?.name || 'Not linked to a driver record yet -- contact your admin'}
+              </Text>
+            </View>
+          </View>
+        ) : (
         <CustomPicker
           label="Driver / Operator"
           required={true}
@@ -916,17 +929,18 @@ export default function InternalVehicleEntryScreen() {
           placeholder="Select Driver / Operator"
           error={errors.driver_id}
         />
+        )}
 
         <View className="mb-4">
-          <Text className="text-sm font-medium text-slate-700 mb-1">Rate / Amount - AED (Optional)</Text>
+          <Text className="text-sm font-medium text-slate-700 mb-1">Rate / Amount - AED</Text>
           <TextInput
             value={formData.rate_amount}
-            onChangeText={(t) => updateForm('rate_amount', t)}
-            className="bg-white border border-slate-300 text-slate-900 rounded-lg px-4 py-3.5"
+            editable={false}
+            className="bg-slate-100 border border-slate-200 text-slate-500 rounded-lg px-4 py-3.5"
             placeholder="0.00"
             placeholderTextColor="#94a3b8"
-            keyboardType="numeric"
           />
+          <Text className="text-slate-400 text-xs mt-1">Set by the admin only -- not editable here.</Text>
         </View>
 
         <View className="mb-4">
@@ -941,60 +955,6 @@ export default function InternalVehicleEntryScreen() {
             placeholderTextColor="#94a3b8"
           />
         </View>
-
-        <View className={`mb-6 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-            <Text className="text-slate-700 text-sm font-medium mb-3">
-              Vehicle Photo <Text className="text-red-500">*</Text>
-            </Text>
-            {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
-
-            {photoUri ? (
-                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
-                  <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
-
-                  <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
-                    <Text className="text-white text-xs font-bold">
-                      {(photoCapturedAt || new Date()).toLocaleString()}
-                    </Text>
-                    <Text className="text-white text-xs font-semibold">
-                      {jobs.find((j: any) => j.value === formData.job_id)?.label || 'Unknown Site'}
-                    </Text>
-                    <Text className="text-white text-[10px] opacity-80">Verified Entry</Text>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => { setPhotoUri(null); setPhotoCapturedAt(null); }}
-                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
-                  >
-                    <X size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-        ) : Platform.OS === 'web' ? (
-          <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); }} colorTheme="violet" />
-        ) : (
-          <>
-            <View className="flex-row" style={{ gap: 12 }}>
-              <TouchableOpacity
-                onPress={() => pickImage('camera')}
-                className="flex-1 bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg py-8 items-center justify-center active:bg-slate-200"
-              >
-                <Camera size={28} color="#6d28d9" className="mb-2" />
-                <Text className="text-slate-900 font-bold text-sm text-center">Take Live Photo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => pickImage('gallery')}
-                className="flex-1 bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg py-8 items-center justify-center active:bg-slate-100"
-              >
-                <ImageIcon size={28} color="#475569" className="mb-2" />
-                <Text className="text-slate-700 font-bold text-sm text-center">Choose from Gallery</Text>
-              </TouchableOpacity>
-            </View>
-            <Text className="text-slate-500 text-xs mt-2 text-center px-2">
-              A live photo is preferred and gets time-stamped. Use Gallery only if you couldn't take one on-site.
-            </Text>
-          </>
-        )}
-      </View>
 
         <View className="mb-8">
           <Text className="text-sm font-medium text-slate-700 mb-1">Remarks (Optional)</Text>

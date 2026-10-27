@@ -1,14 +1,22 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
-import { Tabs } from 'expo-router';
-import { Home, Truck, Users, User, Droplets, Wrench } from 'lucide-react-native';
+import { Tabs, useRouter, useSegments } from 'expo-router';
+import { Home, Truck, Users, User, Droplets, Wrench, History as HistoryIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import { processQueue } from '../../lib/offlineQueue';
 import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../lib/foremanFlags';
+import { useAuth } from '../../lib/auth';
+
+// Screens a Driver account can reach -- everything else in this group
+// (Equipment/Labour/Flushing entries, the foreman Home dashboard, etc.) is
+// off-limits, enforced both here (tab bar) and in the route guard below.
+const DRIVER_ROUTES = ['driver-home', 'entry/internal-vehicles', 'history', 'profile'];
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { role } = useAuth();
+  const isDriver = role === 'DRIVER';
 
   return (
     <View
@@ -18,11 +26,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
 
-        // Hide routes that shouldn't be in the tab bar (like entry forms)
-        const hiddenRoutes = FLUSHING_ENABLED_FOR_FOREMEN
-          ? ['entry/select', 'entry/material', 'history', 'missing-photos']
-          : ['entry/select', 'entry/material', 'history', 'missing-photos', 'entry/flushing'];
-        if (hiddenRoutes.includes(route.name)) return null;
+        if (isDriver) {
+          // Four stops only: Home, Vehicle, History, Profile.
+          if (!DRIVER_ROUTES.includes(route.name)) return null;
+        } else {
+          // Hide routes that shouldn't be in the tab bar (like entry forms),
+          // plus the driver-only Home variant.
+          const hiddenRoutes = FLUSHING_ENABLED_FOR_FOREMEN
+            ? ['driver-home', 'entry/select', 'entry/material', 'history', 'missing-photos']
+            : ['driver-home', 'entry/select', 'entry/material', 'history', 'missing-photos', 'entry/flushing'];
+          if (hiddenRoutes.includes(route.name)) return null;
+        }
 
         const label =
           options.tabBarLabel !== undefined
@@ -73,6 +87,10 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function AppLayout() {
+  const { role } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
   // Drains any offline-queued entries as soon as this layout mounts (covers reopening
   // the app while already back online) and again whenever connectivity is restored,
   // regardless of which tab the foreman is on.
@@ -84,6 +102,17 @@ export default function AppLayout() {
     return unsubscribe;
   }, []);
 
+  // A Driver account is scoped to its own Home, Vehicle Entry, History and
+  // Profile -- bounce away from every other screen in this group (e.g. a
+  // bookmarked /entry/equipment URL on web).
+  useEffect(() => {
+    if (role !== 'DRIVER') return;
+    const current = segments.slice(1).join('/'); // drop the '(app)' group segment
+    if (!DRIVER_ROUTES.includes(current)) {
+      router.replace('/(app)/driver-home');
+    }
+  }, [role, segments]);
+
   const content = (
     <Tabs 
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -92,15 +121,22 @@ export default function AppLayout() {
         tabBarHideOnKeyboard: true, // Prevents footer from floating above keyboard
       }}
     >
-      <Tabs.Screen 
-        name="home" 
-        options={{ 
+      <Tabs.Screen
+        name="home"
+        options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />
-        }} 
+        }}
       />
-      <Tabs.Screen 
-        name="entry/equipment" 
+      <Tabs.Screen
+        name="driver-home"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />
+        }}
+      />
+      <Tabs.Screen
+        name="entry/equipment"
         options={{ 
           title: 'Equipment',
           tabBarIcon: ({ color, size }) => <Truck color={color} size={size} />
@@ -135,10 +171,17 @@ export default function AppLayout() {
         }} 
       />
       
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color, size }) => <HistoryIcon color={color} size={size} />
+        }}
+      />
+
       {/* Hidden Screens inside the Tabs layout */}
       <Tabs.Screen name="entry/select" options={{ href: null }} />
       <Tabs.Screen name="entry/material" options={{ href: null }} />
-      <Tabs.Screen name="history" options={{ href: null }} />
       <Tabs.Screen name="missing-photos" options={{ href: null }} />
     </Tabs>
   );

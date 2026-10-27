@@ -63,6 +63,28 @@ export default function AdminInternalVehicles() {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  // Drivers don't know the rate, so the foreman-side input is locked at 0 --
+  // only an admin can set it, here in the detail view.
+  const [rateAmountInput, setRateAmountInput] = useState('');
+  const [savingRate, setSavingRate] = useState(false);
+
+  const handleSaveRate = async () => {
+    if (!selectedEntry) return;
+    const parsed = parseFloat(rateAmountInput);
+    const newRate = isNaN(parsed) ? 0 : parsed;
+    setSavingRate(true);
+    try {
+      const { error } = await supabase.from('internal_vehicle_entries').update({ rate_amount: newRate }).eq('id', selectedEntry.id);
+      if (error) throw error;
+      setSelectedEntry((prev: any) => prev ? { ...prev, rate_amount: newRate } : prev);
+      setEntries(prev => prev.map(e => e.id === selectedEntry.id ? { ...e, rate_amount: newRate } : e));
+      showToast('Rate updated');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not update rate');
+    } finally {
+      setSavingRate(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -169,7 +191,7 @@ export default function AdminInternalVehicles() {
 
   const exportToCSV = async () => {
     try {
-      const headers = ['Date', 'Company', 'Requester Name', 'Driver Name', 'Vehicle No', 'Vehicle Type', 'Job Number', 'Job Name', 'Section', 'Basis', 'Start', 'End', 'Total Working Hours', 'Trip', 'Rate / Amount - AED', 'IST Timesheet Number', 'Status', 'Remarks'];
+      const headers = ['Date', 'Company', 'Requester Name', 'Driver Name', 'Vehicle No', 'Vehicle Type', 'Job Number', 'Job Name', 'From Location', 'To Location', 'Section', 'Basis', 'Start', 'End', 'Total Working Hours', 'Trip', 'Rate / Amount - AED', 'IST Timesheet Number', 'Status', 'Remarks'];
       const rows = filteredEntries.map(e => [
         e.entry_date || '',
         COMPANY_LABELS[e.company] || e.company || '',
@@ -179,6 +201,8 @@ export default function AdminInternalVehicles() {
         e.internal_vehicles?.vehicle_type || '',
         e.jobs?.job_number || '',
         e.jobs?.job_name || '',
+        e.from_location || '',
+        e.to_location || '',
         e.section || '',
         e.basis === 'TRIP_BASIS' ? 'Trip Basis' : 'Hourly',
         e.start_time || '',
@@ -499,6 +523,7 @@ export default function AdminInternalVehicles() {
                     activeOpacity={0.7}
                     onPress={() => {
                       setSelectedEntry(entry);
+                      setRateAmountInput(entry.rate_amount != null ? String(entry.rate_amount) : '0');
                       setDetailsModalVisible(true);
                     }}
                     className={`${isMobile ? 'bg-white mb-3 p-4 rounded-xl shadow-sm border border-slate-100 flex-col' : `flex-row items-center p-4 border-b border-slate-100 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}`}
@@ -698,6 +723,19 @@ export default function AdminInternalVehicles() {
                   </View>
                 </View>
 
+                {(selectedEntry.from_location || selectedEntry.to_location) && (
+                  <View className="flex-row justify-between mb-4">
+                    <View className="flex-1">
+                      <Text className="text-xs font-bold text-slate-400 uppercase mb-1">From Location</Text>
+                      <Text className="text-slate-900 font-bold text-base">{selectedEntry.from_location || 'N/A'}</Text>
+                    </View>
+                    <View className="flex-1 items-end">
+                      <Text className="text-xs font-bold text-slate-400 uppercase mb-1">To Location</Text>
+                      <Text className="text-slate-900 font-bold text-base">{selectedEntry.to_location || 'N/A'}</Text>
+                    </View>
+                  </View>
+                )}
+
                 <View className="flex-row justify-between mb-4">
                   <View className="flex-1">
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Section</Text>
@@ -755,22 +793,34 @@ export default function AdminInternalVehicles() {
                   </View>
                 </View>
 
-                {(selectedEntry.rate_amount != null || !!selectedEntry.ist_timesheet_number) && (
-                  <View className="flex-row justify-between mb-4">
-                    {selectedEntry.rate_amount != null && (
-                      <View className="flex-1">
-                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Rate / Amount (AED)</Text>
-                        <Text className="text-slate-900 font-bold text-base">{selectedEntry.rate_amount}</Text>
-                      </View>
-                    )}
-                    {!!selectedEntry.ist_timesheet_number && (
-                      <View className="flex-1 items-end">
-                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">IST Timesheet Number</Text>
-                        <Text className="text-slate-900 font-bold text-base">{selectedEntry.ist_timesheet_number}</Text>
-                      </View>
-                    )}
+                <View className="flex-row justify-between mb-4">
+                  <View className="flex-1 mr-3">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Rate / Amount (AED)</Text>
+                    <Text className="text-slate-400 text-xs mb-2">Drivers can't set this -- admin only.</Text>
+                    <View className="flex-row items-center">
+                      <TextInput
+                        value={rateAmountInput}
+                        onChangeText={setRateAmountInput}
+                        keyboardType="numeric"
+                        placeholder="0.00"
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold mr-2"
+                      />
+                      <TouchableOpacity
+                        onPress={handleSaveRate}
+                        disabled={savingRate}
+                        className={`px-3 py-2.5 rounded-xl ${savingRate ? 'bg-slate-200' : 'bg-slate-900 active:bg-slate-800'}`}
+                      >
+                        {savingRate ? <ActivityIndicator size="small" color="#64748b" /> : <Text className="text-white font-bold text-sm">Save</Text>}
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                )}
+                  {!!selectedEntry.ist_timesheet_number && (
+                    <View className="flex-1 items-end">
+                      <Text className="text-xs font-bold text-slate-400 uppercase mb-1">IST Timesheet Number</Text>
+                      <Text className="text-slate-900 font-bold text-base">{selectedEntry.ist_timesheet_number}</Text>
+                    </View>
+                  )}
+                </View>
 
                 {!!selectedEntry.remarks && (
                   <View className="mb-4">
