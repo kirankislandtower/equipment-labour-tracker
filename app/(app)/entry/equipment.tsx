@@ -417,7 +417,7 @@ export default function EquipmentEntryScreen() {
             engineer_name: entryData.engineer_name || '',
             remarks: entryData.remarks || '',
             fuel_provided: entryData.fuel_provided || false,
-            fuel_quantity: entryData.fuel_quantity ? entryData.fuel_quantity.toString() : '',
+            fuel_quantity: entryData.fuel_quantity !== null && entryData.fuel_quantity !== undefined ? entryData.fuel_quantity.toString() : '',
             fuel_unit: entryData.fuel_unit || 'Gallons',
             supplier_timesheet_number: entryData.supplier_timesheet_number || '',
             requested_by: entryData.requested_by || '',
@@ -519,7 +519,10 @@ export default function EquipmentEntryScreen() {
     }
 
     if (formData.fuel_provided) {
-      if (!formData.fuel_quantity) newErrors.fuel_quantity = 'Quantity is required';
+      // !formData.fuel_quantity alone treats the string "0" as present (it's
+      // truthy), so a quantity of zero would slip past this as if Fuel
+      // Provided were "No" -- catches that explicitly instead of just empty.
+      if (!formData.fuel_quantity || parseFloat(formData.fuel_quantity) <= 0) newErrors.fuel_quantity = 'Quantity is required';
       if (!formData.fuel_unit) newErrors.fuel_unit = 'Unit is required';
     }
 
