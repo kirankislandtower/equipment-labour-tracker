@@ -1,14 +1,25 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
 import { Truck, Users, FileCheck2, Clock, Plus, ChevronLeft, ChevronRight, Camera } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
+import { setAppLanguage, AppLanguage } from '../../lib/i18n';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+  const [changingLanguage, setChangingLanguage] = useState(false);
+
+  const handleLanguageChange = async (lang: AppLanguage) => {
+    if (lang === i18n.language || changingLanguage) return;
+    setChangingLanguage(true);
+    await setAppLanguage(lang);
+    setChangingLanguage(false);
+  };
   const [loadingStats, setLoadingStats] = useState(true);
   const [missingPhotoCount, setMissingPhotoCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -113,16 +124,27 @@ export default function HomeScreen() {
       <View className="bg-white px-6 pt-16 pb-8 rounded-b-[32px] shadow-sm border-b border-slate-200">
         <View className="flex-row justify-between items-center">
           <View className="flex-1 pr-4">
-            <Text className="text-slate-500 font-outfit-bold tracking-wider text-[10px] uppercase">Welcome back,</Text>
+            <Text className="text-slate-500 font-outfit-bold tracking-wider text-[10px] uppercase">{t('home.welcomeBack')}</Text>
             <Text className="text-slate-900 text-3xl font-outfit-black tracking-tight mt-1" numberOfLines={1}>
               {capitalizedUsername}
             </Text>
-            <Text className="text-slate-400 font-outfit-medium text-xs mt-1">Foreman Dashboard</Text>
+            <Text className="text-slate-400 font-outfit-medium text-xs mt-1">{t('home.foremanDashboard')}</Text>
           </View>
-          <View className="flex-row items-center">
-            <View className="w-12 h-12 bg-indigo-50 rounded-xl items-center justify-center border border-indigo-100 shadow-sm">
-              <Text className="text-indigo-600 text-xl font-outfit-black">{capitalizedUsername.charAt(0)}</Text>
-            </View>
+          <View className="flex-row bg-slate-100 p-1 rounded-full">
+            <TouchableOpacity
+              onPress={() => handleLanguageChange('en')}
+              disabled={changingLanguage}
+              className={`px-3 py-1.5 rounded-full items-center ${i18n.language === 'en' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`font-outfit-bold text-xs ${i18n.language === 'en' ? 'text-slate-900' : 'text-slate-500'}`}>EN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleLanguageChange('hi')}
+              disabled={changingLanguage}
+              className={`px-3 py-1.5 rounded-full items-center ${i18n.language === 'hi' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`font-outfit-bold text-xs ${i18n.language === 'hi' ? 'text-slate-900' : 'text-slate-500'}`}>हिं</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -138,9 +160,9 @@ export default function HomeScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-amber-900 font-outfit-bold text-[15px]">
-                {missingPhotoCount} {missingPhotoCount === 1 ? 'entry needs' : 'entries need'} a photo
+                {t('home.entryNeedsPhoto', { count: missingPhotoCount })}
               </Text>
-              <Text className="text-amber-700 font-outfit-medium text-xs mt-0.5">Tap to see which ones and add them</Text>
+              <Text className="text-amber-700 font-outfit-medium text-xs mt-0.5">{t('home.tapToSeeWhichOnes')}</Text>
             </View>
             <ChevronRight size={20} color="#d97706" />
           </TouchableOpacity>
@@ -149,7 +171,7 @@ export default function HomeScreen() {
         {/* Date Navigator */}
         <View className="flex-row justify-between items-center mb-4">
           <Text className="text-lg font-outfit-black text-slate-900 tracking-tight">
-            {isToday ? "Today's Summary" : 'Summary'}
+            {isToday ? t('home.todaysSummary') : t('home.summary')}
           </Text>
         </View>
 
@@ -160,7 +182,7 @@ export default function HomeScreen() {
           <TouchableOpacity onPress={goToToday} className="items-center px-4 active:opacity-70">
             <Text className="text-slate-900 font-outfit-bold text-base tracking-tight">{formatDate(selectedDate)}</Text>
             {!isToday && (
-              <Text className="text-indigo-600 font-outfit-semibold text-[10px] uppercase mt-1 tracking-widest">Tap to go to Today</Text>
+              <Text className="text-indigo-600 font-outfit-semibold text-[10px] uppercase mt-1 tracking-widest">{t('common.tapToGoToToday')}</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity 
@@ -182,7 +204,7 @@ export default function HomeScreen() {
               <Truck size={20} color="#4f46e5" />
             </View>
             <Text className="text-4xl font-mono-bold text-slate-900 tracking-tighter">{stats.equipment}</Text>
-            <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Equipment</Text>
+            <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">{t('home.equipment')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -193,7 +215,7 @@ export default function HomeScreen() {
               <Users size={20} color="#10b981" />
             </View>
             <Text className="text-4xl font-mono-bold text-slate-900 tracking-tighter">{stats.labour}</Text>
-            <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Labour</Text>
+            <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">{t('home.labour')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -206,7 +228,7 @@ export default function HomeScreen() {
               <Clock size={16} color="#d97706" />
             </View>
             <Text className="text-2xl font-mono-bold text-slate-900 tracking-tighter">{stats.pending}</Text>
-            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Pending</Text>
+            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">{t('home.pending')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -217,7 +239,7 @@ export default function HomeScreen() {
               <FileCheck2 size={16} color="#10b981" />
             </View>
             <Text className="text-2xl font-mono-bold text-slate-900 tracking-tighter">{stats.approved}</Text>
-            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Approved</Text>
+            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">{t('home.approved')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -228,27 +250,27 @@ export default function HomeScreen() {
               <FileCheck2 size={16} color="#ef4444" />
             </View>
             <Text className="text-2xl font-mono-bold text-slate-900 tracking-tighter">{stats.rejected}</Text>
-            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">Rejected</Text>
+            <Text className="text-[9px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">{t('home.rejected')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Quick Actions */}
-        <Text className="text-slate-500 font-outfit-bold text-[10px] uppercase tracking-widest mt-6 mb-4">Quick Actions</Text>
-        
-        <TouchableOpacity 
+        <Text className="text-slate-500 font-outfit-bold text-[10px] uppercase tracking-widest mt-6 mb-4">{t('home.quickActions')}</Text>
+
+        <TouchableOpacity
           className="bg-indigo-600 flex-row items-center justify-center py-4 rounded-2xl shadow-sm mb-3 active:scale-[0.98] transition-transform"
           onPress={() => router.push('/(app)/entry/select')}
         >
           <Plus size={20} color="white" />
-          <Text className="text-white font-outfit-bold text-[15px] ml-2 tracking-wide">New Daily Entry</Text>
+          <Text className="text-white font-outfit-bold text-[15px] ml-2 tracking-wide">{t('home.newDailyEntry')}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           className="bg-white border border-slate-200 shadow-sm flex-row items-center justify-center py-4 rounded-2xl active:scale-[0.98] transition-transform"
           onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate) } })}
         >
           <Clock size={20} color="#64748b" />
-          <Text className="text-slate-700 font-outfit-bold text-[15px] ml-2 tracking-wide">View History</Text>
+          <Text className="text-slate-700 font-outfit-bold text-[15px] ml-2 tracking-wide">{t('home.viewHistory')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

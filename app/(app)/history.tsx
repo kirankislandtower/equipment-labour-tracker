@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRight, ArrowRightLeft, Droplets, Wrench } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
@@ -12,6 +13,7 @@ import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../lib/foremanFlags';
 export default function HistoryScreen() {
   const router = useRouter();
   const { user, role } = useAuth();
+  const { t } = useTranslation();
   const { date, type, status } = useLocalSearchParams<{ date?: string, type?: string, status?: string }>();
 
   const [activeTab, setActiveTab] = useState(type || 'EQUIPMENT');
@@ -213,7 +215,7 @@ export default function HistoryScreen() {
     }
   };
 
-  const getStatusLabel = (status: string) => status === 'QUEUED' ? 'Pending Upload' : (status || 'SUBMITTED');
+  const getStatusLabel = (status: string) => status === 'QUEUED' ? t('history.pendingUpload') : (status || 'SUBMITTED');
 
   const counts = {
     ALL: entries.length,
@@ -236,7 +238,7 @@ export default function HistoryScreen() {
         >
           <ArrowLeft size={24} color="#0f172a" />
         </TouchableOpacity>
-        <Text className="text-slate-900 text-2xl font-black tracking-tight ml-3">Entry History</Text>
+        <Text className="text-slate-900 text-2xl font-black tracking-tight ml-3">{t('history.title')}</Text>
       </View>
 
       {/* Date Navigator */}
@@ -248,7 +250,7 @@ export default function HistoryScreen() {
           <TouchableOpacity onPress={goToToday} className="items-center px-4">
             <Text className="text-slate-900 font-black text-base tracking-tight">{formatDate(selectedDate)}</Text>
             {!isToday && (
-              <Text className="text-blue-600 font-bold text-xs mt-1">Tap to go to Today</Text>
+              <Text className="text-blue-600 font-bold text-xs mt-1">{t('common.tapToGoToToday')}</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity 
@@ -273,7 +275,7 @@ export default function HistoryScreen() {
             >
               <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#1e3a8a' : '#64748b'} />
               <Text className={`ml-2 font-bold ${activeTab === 'EQUIPMENT' ? 'text-blue-900' : 'text-slate-500'}`}>
-                Equipment
+                {t('history.equipment')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -282,7 +284,7 @@ export default function HistoryScreen() {
             >
               <Users size={16} color={activeTab === 'LABOUR' ? '#1e3a8a' : '#64748b'} />
               <Text className={`ml-2 font-bold ${activeTab === 'LABOUR' ? 'text-blue-900' : 'text-slate-500'}`}>
-                Labour
+                {t('history.labour')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -291,7 +293,7 @@ export default function HistoryScreen() {
             >
               <ArrowRightLeft size={16} color={activeTab === 'MATERIAL' ? '#1e3a8a' : '#64748b'} />
               <Text className={`ml-2 font-bold ${activeTab === 'MATERIAL' ? 'text-blue-900' : 'text-slate-500'}`}>
-                Material
+                {t('history.material')}
               </Text>
             </TouchableOpacity>
             {FLUSHING_ENABLED_FOR_FOREMEN && (
@@ -301,7 +303,7 @@ export default function HistoryScreen() {
               >
                 <Droplets size={16} color={activeTab === 'FLUSHING' ? '#1e3a8a' : '#64748b'} />
                 <Text className={`ml-2 font-bold ${activeTab === 'FLUSHING' ? 'text-blue-900' : 'text-slate-500'}`}>
-                  Flushing
+                  {t('history.flushing')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -311,7 +313,7 @@ export default function HistoryScreen() {
             >
               <Wrench size={16} color={activeTab === 'INTERNAL_VEHICLE' ? '#1e3a8a' : '#64748b'} />
               <Text className={`ml-2 font-bold ${activeTab === 'INTERNAL_VEHICLE' ? 'text-blue-900' : 'text-slate-500'}`}>
-                Internal Vehicles
+                {t('history.internalVehicles')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -326,7 +328,7 @@ export default function HistoryScreen() {
             onPress={() => setStatusFilter('ALL')}
             className={`px-4 py-2 rounded-full border mr-2 flex-row items-center ${statusFilter === 'ALL' ? 'bg-slate-800 border-slate-800' : 'bg-white border-slate-200'}`}
           >
-            <Text className={`font-bold ${statusFilter === 'ALL' ? 'text-white' : 'text-slate-600'}`}>All</Text>
+            <Text className={`font-bold ${statusFilter === 'ALL' ? 'text-white' : 'text-slate-600'}`}>{t('history.all')}</Text>
             <View className={`ml-2 px-1.5 py-0.5 rounded-full ${statusFilter === 'ALL' ? 'bg-white/20' : 'bg-slate-100'}`}>
               <Text className={`text-[10px] font-black ${statusFilter === 'ALL' ? 'text-white' : 'text-slate-500'}`}>{counts.ALL}</Text>
             </View>
@@ -336,7 +338,7 @@ export default function HistoryScreen() {
             onPress={() => setStatusFilter('SUBMITTED')}
             className={`px-4 py-2 rounded-full border mr-2 flex-row items-center ${statusFilter === 'SUBMITTED' ? 'bg-amber-100 border-amber-200' : 'bg-white border-slate-200'}`}
           >
-            <Text className={`font-bold ${statusFilter === 'SUBMITTED' ? 'text-amber-700' : 'text-slate-600'}`}>Pending</Text>
+            <Text className={`font-bold ${statusFilter === 'SUBMITTED' ? 'text-amber-700' : 'text-slate-600'}`}>{t('history.pending')}</Text>
             <View className={`ml-2 px-1.5 py-0.5 rounded-full ${statusFilter === 'SUBMITTED' ? 'bg-amber-200/50' : 'bg-slate-100'}`}>
               <Text className={`text-[10px] font-black ${statusFilter === 'SUBMITTED' ? 'text-amber-800' : 'text-slate-500'}`}>{counts.SUBMITTED}</Text>
             </View>
@@ -346,7 +348,7 @@ export default function HistoryScreen() {
             onPress={() => setStatusFilter('APPROVED')}
             className={`px-4 py-2 rounded-full border mr-2 flex-row items-center ${statusFilter === 'APPROVED' ? 'bg-green-100 border-green-200' : 'bg-white border-slate-200'}`}
           >
-            <Text className={`font-bold ${statusFilter === 'APPROVED' ? 'text-green-700' : 'text-slate-600'}`}>Approved</Text>
+            <Text className={`font-bold ${statusFilter === 'APPROVED' ? 'text-green-700' : 'text-slate-600'}`}>{t('history.approved')}</Text>
             <View className={`ml-2 px-1.5 py-0.5 rounded-full ${statusFilter === 'APPROVED' ? 'bg-green-200/50' : 'bg-slate-100'}`}>
               <Text className={`text-[10px] font-black ${statusFilter === 'APPROVED' ? 'text-green-800' : 'text-slate-500'}`}>{counts.APPROVED}</Text>
             </View>
@@ -356,7 +358,7 @@ export default function HistoryScreen() {
             onPress={() => setStatusFilter('REJECTED')}
             className={`px-4 py-2 rounded-full border flex-row items-center ${statusFilter === 'REJECTED' ? 'bg-red-100 border-red-200' : 'bg-white border-slate-200'}`}
           >
-            <Text className={`font-bold ${statusFilter === 'REJECTED' ? 'text-red-700' : 'text-slate-600'}`}>Rejected</Text>
+            <Text className={`font-bold ${statusFilter === 'REJECTED' ? 'text-red-700' : 'text-slate-600'}`}>{t('history.rejected')}</Text>
             <View className={`ml-2 px-1.5 py-0.5 rounded-full ${statusFilter === 'REJECTED' ? 'bg-red-200/50' : 'bg-slate-100'}`}>
               <Text className={`text-[10px] font-black ${statusFilter === 'REJECTED' ? 'text-red-800' : 'text-slate-500'}`}>{counts.REJECTED}</Text>
             </View>
@@ -369,15 +371,19 @@ export default function HistoryScreen() {
         {loading ? (
           <View className="py-20 items-center">
             <ActivityIndicator size="large" color="#1e3a8a" />
-            <Text className="text-slate-500 mt-4 font-medium">Loading history...</Text>
+            <Text className="text-slate-500 mt-4 font-medium">{t('history.loadingHistory')}</Text>
           </View>
         ) : filteredEntries.length === 0 ? (
           <View className="py-20 items-center">
             <View className="bg-slate-100 p-4 rounded-full mb-4">
               <Calendar size={32} color="#94a3b8" />
             </View>
-            <Text className="text-slate-900 font-bold text-lg">No {statusFilter !== 'ALL' ? statusFilter.toLowerCase() : ''} entries.</Text>
-            <Text className="text-slate-500 mt-1">Try changing your filters.</Text>
+            <Text className="text-slate-900 font-bold text-lg">
+              {statusFilter !== 'ALL'
+                ? t('history.noEntries', { filter: t(`history.${statusFilter === 'SUBMITTED' ? 'pending' : statusFilter.toLowerCase()}`) })
+                : t('history.noEntriesAll')}
+            </Text>
+            <Text className="text-slate-500 mt-1">{t('history.tryChangingFilters')}</Text>
           </View>
         ) : (
           <View className="mb-6">
@@ -385,7 +391,10 @@ export default function HistoryScreen() {
             <View className="flex-row items-center mb-4">
               <View className="bg-slate-800 px-3 py-1.5 rounded-lg">
                 <Text className="text-white font-black text-xs tracking-wide">
-                  {filteredEntries.length} {activeTab === 'EQUIPMENT' ? 'Equipment' : activeTab === 'LABOUR' ? 'Labour' : activeTab === 'FLUSHING' ? 'Flushing' : activeTab === 'INTERNAL_VEHICLE' ? 'Internal Vehicle' : 'Material'} {filteredEntries.length === 1 ? 'Entry' : 'Entries'}
+                  {t('history.entryCount', {
+                    count: filteredEntries.length,
+                    type: activeTab === 'EQUIPMENT' ? t('history.equipment') : activeTab === 'LABOUR' ? t('history.labour') : activeTab === 'FLUSHING' ? t('history.flushing') : activeTab === 'INTERNAL_VEHICLE' ? t('history.internalVehicles') : t('history.material'),
+                  })}
                 </Text>
               </View>
               <View className="flex-1 h-px bg-slate-200 ml-3" />
@@ -403,12 +412,12 @@ export default function HistoryScreen() {
                 <View className="flex-row justify-between items-start mb-2">
                   <Text className="font-black tracking-tight text-slate-900 flex-1 text-lg" numberOfLines={1}>
                     {activeTab === 'EQUIPMENT' || activeTab === 'FLUSHING'
-                      ? entry.equipment_master?.equipment_name || 'Unknown Equipment'
+                      ? entry.equipment_master?.equipment_name || t('history.unknownEquipment')
                       : activeTab === 'LABOUR'
-                        ? entry.employee_name || 'Unknown Employee'
+                        ? entry.employee_name || t('history.unknownEmployee')
                         : activeTab === 'INTERNAL_VEHICLE'
-                          ? `${entry.internal_vehicles?.vehicle_number || 'Unknown'} - ${entry.internal_vehicles?.vehicle_type || 'Vehicle'}`
-                          : entry.material_description || 'Unknown Material'}
+                          ? `${entry.internal_vehicles?.vehicle_number || t('history.unknownVehicle')} - ${entry.internal_vehicles?.vehicle_type || t('history.vehicle')}`
+                          : entry.material_description || t('history.unknownMaterial')}
                   </Text>
                   <Text className={`font-bold tracking-wide text-[10px] px-2 py-1 border rounded uppercase ${getStatusColor(entry.status)} ${getStatusBg(entry.status)}`}>
                     {getStatusLabel(entry.status)}
@@ -431,14 +440,14 @@ export default function HistoryScreen() {
 
                 {entry.status === 'REJECTED' && !!entry.rejection_reason && (
                   <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                    <Text className="text-red-800 font-bold text-xs uppercase mb-1">Reason for Rejection</Text>
+                    <Text className="text-red-800 font-bold text-xs uppercase mb-1">{t('history.reasonForRejection')}</Text>
                     <Text className="text-red-600 text-sm">{entry.rejection_reason}</Text>
                   </View>
                 )}
 
                 {!!entry.remarks && (
                   <View className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-3">
-                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider mb-1">Remarks</Text>
+                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider mb-1">{t('history.remarks')}</Text>
                     <Text className="text-slate-700 text-sm leading-tight italic">"{entry.remarks}"</Text>
                   </View>
                 )}
@@ -456,17 +465,17 @@ export default function HistoryScreen() {
                       <>
                         <Clock size={14} color="#94a3b8" />
                         <Text className="text-slate-500 text-xs font-medium ml-1.5">
-                          <Text className="text-slate-900 font-bold">{entry.working_hours}</Text> Hours
+                          <Text className="text-slate-900 font-bold">{entry.working_hours}</Text> {t('history.hours')}
                         </Text>
                         <Text className="text-slate-500 text-xs font-medium ml-3">
-                          <Text className="text-slate-900 font-bold">{entry.number_of_trips}</Text> Trips
+                          <Text className="text-slate-900 font-bold">{entry.number_of_trips}</Text> {t('history.trips')}
                         </Text>
                       </>
                     ) : (
                       <>
                         <Clock size={14} color="#94a3b8" />
                         <Text className="text-slate-500 text-xs font-medium ml-1.5">
-                          <Text className="text-slate-900 font-bold">{(activeTab === 'EQUIPMENT' || activeTab === 'FLUSHING') ? entry.working_hours : entry.total_working_hours}</Text> Hours
+                          <Text className="text-slate-900 font-bold">{(activeTab === 'EQUIPMENT' || activeTab === 'FLUSHING') ? entry.working_hours : entry.total_working_hours}</Text> {t('history.hours')}
                         </Text>
                       </>
                     )}
@@ -491,7 +500,7 @@ export default function HistoryScreen() {
                   >
                     <Edit2 size={16} color="#ffffff" />
                     <Text className="text-white font-bold ml-2">
-                      {entry.status === 'REJECTED' ? 'Edit & Resubmit' : 'Edit Entry'}
+                      {entry.status === 'REJECTED' ? t('history.editAndResubmit') : t('history.editEntry')}
                     </Text>
                   </TouchableOpacity>
                 )}

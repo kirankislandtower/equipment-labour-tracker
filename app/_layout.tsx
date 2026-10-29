@@ -5,6 +5,8 @@ import { View, ActivityIndicator } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { injectPwaMetaTags } from '../lib/pwaMeta';
 import { initPwaInstallListener } from '../lib/pwaInstall';
+import '../lib/i18n';
+import { loadSavedLanguage } from '../lib/i18n';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -68,6 +70,7 @@ export default function RootLayout() {
     SplashScreen.hideAsync();
     injectPwaMetaTags();
     initPwaInstallListener();
+    loadSavedLanguage();
   }, []);
 
   return (

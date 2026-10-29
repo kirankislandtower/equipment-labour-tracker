@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Animated, Easing } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
-import { Plus, ChevronRight, Truck } from 'lucide-react-native';
+import { Plus, ChevronRight } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
+import { setAppLanguage, AppLanguage } from '../../lib/i18n';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   SUBMITTED: { bg: 'bg-amber-50', text: 'text-amber-700' },
@@ -49,6 +51,15 @@ function PressableScale({ onPress, children, className }: { onPress: () => void;
 export default function DriverHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+  const [changingLanguage, setChangingLanguage] = useState(false);
+
+  const handleLanguageChange = async (lang: AppLanguage) => {
+    if (lang === i18n.language || changingLanguage) return;
+    setChangingLanguage(true);
+    await setAppLanguage(lang);
+    setChangingLanguage(false);
+  };
   const [loading, setLoading] = useState(true);
   const [fullName, setFullName] = useState('');
   const [todayCount, setTodayCount] = useState(0);
@@ -93,8 +104,8 @@ export default function DriverHomeScreen() {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const todayLabel = `${days[today.getDay()]}, ${months[today.getMonth()]} ${today.getDate()}`;
   const todayFact = todayCount > 0
-    ? `${todayCount} ${todayCount === 1 ? 'trip' : 'trips'} logged today.`
-    : 'No trips logged yet today.';
+    ? t('driverHome.tripsLoggedToday', { count: todayCount })
+    : t('driverHome.noTripsToday');
 
   if (loading) {
     return (
@@ -114,8 +125,21 @@ export default function DriverHomeScreen() {
               <Text className="text-white text-[26px] font-bold mt-1">{firstName}</Text>
               <Text className="text-violet-100 text-sm mt-1">{todayFact}</Text>
             </View>
-            <View className="bg-white/15 rounded-full w-12 h-12 items-center justify-center">
-              <Truck size={22} color="#fff" />
+            <View className="flex-row bg-white/15 p-1 rounded-full">
+              <TouchableOpacity
+                onPress={() => handleLanguageChange('en')}
+                disabled={changingLanguage}
+                className={`px-3 py-1.5 rounded-full items-center ${i18n.language === 'en' ? 'bg-white' : ''}`}
+              >
+                <Text className={`font-bold text-xs ${i18n.language === 'en' ? 'text-[#6d28d9]' : 'text-white'}`}>EN</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleLanguageChange('hi')}
+                disabled={changingLanguage}
+                className={`px-3 py-1.5 rounded-full items-center ${i18n.language === 'hi' ? 'bg-white' : ''}`}
+              >
+                <Text className={`font-bold text-xs ${i18n.language === 'hi' ? 'text-[#6d28d9]' : 'text-white'}`}>हिं</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Reveal>
@@ -125,14 +149,14 @@ export default function DriverHomeScreen() {
         <Reveal delay={80}>
           <View className="bg-white rounded-2xl border border-slate-100 flex-row">
             <View className="flex-1 p-4 border-r border-slate-100">
-              <Text className="text-slate-400 text-[11px] font-semibold uppercase">Today</Text>
+              <Text className="text-slate-400 text-[11px] font-semibold uppercase">{t('driverHome.today')}</Text>
               <Text className="text-slate-900 text-[28px] font-semibold mt-1">{todayCount}</Text>
-              <Text className="text-slate-400 text-xs mt-0.5">{todayCount === 1 ? 'entry' : 'entries'}</Text>
+              <Text className="text-slate-400 text-xs mt-0.5">{t('driverHome.entry', { count: todayCount })}</Text>
             </View>
             <View className="flex-1 p-4">
-              <Text className="text-slate-400 text-[11px] font-semibold uppercase">This month</Text>
+              <Text className="text-slate-400 text-[11px] font-semibold uppercase">{t('driverHome.thisMonth')}</Text>
               <Text className="text-slate-900 text-[28px] font-semibold mt-1">{monthCount}</Text>
-              <Text className="text-slate-400 text-xs mt-0.5">{monthCount === 1 ? 'entry' : 'entries'}</Text>
+              <Text className="text-slate-400 text-xs mt-0.5">{t('driverHome.entry', { count: monthCount })}</Text>
             </View>
           </View>
         </Reveal>
@@ -144,7 +168,7 @@ export default function DriverHomeScreen() {
             onPress={() => router.push({ pathname: '/(app)/entry/internal-vehicles', params: { id: undefined } })}
             className="bg-[#6d28d9] rounded-2xl py-4 px-5 flex-row items-center justify-between"
           >
-            <Text className="text-white font-semibold text-base">New Vehicle Entry</Text>
+            <Text className="text-white font-semibold text-base">{t('driverHome.newVehicleEntry')}</Text>
             <View className="bg-white/15 rounded-full p-1.5">
               <Plus size={16} color="#fff" />
             </View>
@@ -157,7 +181,7 @@ export default function DriverHomeScreen() {
           <View className="bg-white rounded-2xl border border-slate-100 p-4">
             <View className="flex-row items-center justify-between mb-3">
               <View className="flex-row items-center">
-                <Text className="text-slate-900 font-semibold text-sm">Recent entries</Text>
+                <Text className="text-slate-900 font-semibold text-sm">{t('driverHome.recentEntries')}</Text>
                 {recentEntries.length > 0 && (
                   <View className="bg-slate-100 rounded-full px-2 py-0.5 ml-2">
                     <Text className="text-slate-500 text-[11px] font-semibold">{recentEntries.length}</Text>
@@ -165,14 +189,14 @@ export default function DriverHomeScreen() {
                 )}
               </View>
               <TouchableOpacity onPress={() => router.push('/(app)/history')} activeOpacity={0.7} className="flex-row items-center">
-                <Text className="text-[#6d28d9] font-semibold text-xs mr-0.5">View all</Text>
+                <Text className="text-[#6d28d9] font-semibold text-xs mr-0.5">{t('driverHome.viewAll')}</Text>
                 <ChevronRight size={14} color="#6d28d9" />
               </TouchableOpacity>
             </View>
 
             {recentEntries.length === 0 ? (
               <View className="py-6 items-center">
-                <Text className="text-slate-400 text-sm text-center">No trips logged yet. Use the button above to log your first one.</Text>
+                <Text className="text-slate-400 text-sm text-center">{t('driverHome.noTripsYet')}</Text>
               </View>
             ) : (
               recentEntries.map((entry, index) => {

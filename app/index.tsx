@@ -1,12 +1,14 @@
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Building2, Eye, EyeOff } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import MessageModal, { MessageModalContent } from '../components/MessageModal';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (loading) return;
     if (!username || !password) {
-      setMessageModal({ title: 'Missing Details', message: 'Please enter username and password.' });
+      setMessageModal({ title: t('login.missingDetailsTitle'), message: t('login.missingDetailsMessage') });
       return;
     }
 
@@ -57,7 +59,7 @@ export default function LoginScreen() {
 
       if (userData?.deleted_at) {
         await supabase.auth.signOut();
-        setMessageModal({ title: 'Account Deactivated', message: 'Your account has been deactivated. Please contact your admin.' });
+        setMessageModal({ title: t('login.deactivatedTitle'), message: t('login.deactivatedMessage') });
         setLoading(false);
         return;
       }
@@ -94,7 +96,7 @@ export default function LoginScreen() {
 
             if (realUserData && realUserData.role !== selectedRole) {
               await supabase.auth.signOut();
-              setMessageModal({ title: 'Incorrect Portal', message: `Your account is registered as an ${realUserData.role}. Please select the ${realUserData.role} portal.` });
+              setMessageModal({ title: t('login.incorrectPortalTitle'), message: t('login.incorrectPortalMessage', { role: realUserData.role }) });
               setLoading(false);
               return;
             }
@@ -105,7 +107,7 @@ export default function LoginScreen() {
         // Validate that they selected the correct portal
         if (userData.role !== selectedRole) {
           await supabase.auth.signOut();
-          setMessageModal({ title: 'Incorrect Portal', message: `Your account is registered as an ${userData.role}. Please select the ${userData.role} portal.` });
+          setMessageModal({ title: t('login.incorrectPortalTitle'), message: t('login.incorrectPortalMessage', { role: userData.role }) });
           setLoading(false);
           return;
         }
@@ -128,7 +130,7 @@ export default function LoginScreen() {
       
     } catch (error: any) {
       console.error(error);
-      setMessageModal({ title: 'Login Failed', message: 'Invalid username or password.' });
+      setMessageModal({ title: t('login.loginFailedTitle'), message: t('login.loginFailedMessage') });
     } finally {
       setLoading(false);
     }
@@ -155,7 +157,7 @@ export default function LoginScreen() {
             ISLAND TOWER
           </Text>
           <Text className="text-slate-500 mt-2 text-center font-medium">
-            {selectedRole === 'ADMIN' ? 'Admin Portal' : selectedRole === 'DRIVER' ? 'Driver Portal' : 'Foreman Portal'}
+            {selectedRole === 'ADMIN' ? t('login.portalLabel_admin') : selectedRole === 'DRIVER' ? t('login.portalLabel_driver') : t('login.portalLabel_foreman')}
           </Text>
         </View>
 
@@ -170,7 +172,7 @@ export default function LoginScreen() {
               {roleLoading && selectedRole !== 'FOREMAN' ? (
                 <ActivityIndicator size="small" color="#64748b" />
               ) : (
-                <Text className={`font-bold ${selectedRole === 'FOREMAN' ? 'text-slate-900' : 'text-slate-500'}`}>Foreman</Text>
+                <Text className={`font-bold ${selectedRole === 'FOREMAN' ? 'text-slate-900' : 'text-slate-500'}`}>{t('login.roleForeman')}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -182,7 +184,7 @@ export default function LoginScreen() {
               {roleLoading && selectedRole !== 'DRIVER' ? (
                 <ActivityIndicator size="small" color="#64748b" />
               ) : (
-                <Text className={`font-bold ${selectedRole === 'DRIVER' ? 'text-slate-900' : 'text-slate-500'}`}>Driver</Text>
+                <Text className={`font-bold ${selectedRole === 'DRIVER' ? 'text-slate-900' : 'text-slate-500'}`}>{t('login.roleDriver')}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -194,16 +196,16 @@ export default function LoginScreen() {
               {roleLoading && selectedRole !== 'ADMIN' ? (
                 <ActivityIndicator size="small" color="#64748b" />
               ) : (
-                <Text className={`font-bold ${selectedRole === 'ADMIN' ? 'text-slate-900' : 'text-slate-500'}`}>Admin</Text>
+                <Text className={`font-bold ${selectedRole === 'ADMIN' ? 'text-slate-900' : 'text-slate-500'}`}>{t('login.roleAdmin')}</Text>
               )}
             </TouchableOpacity>
           </View>
 
           <View>
-            <Text className="text-slate-500 mb-2 font-semibold text-xs uppercase tracking-wider">Username</Text>
+            <Text className="text-slate-500 mb-2 font-semibold text-xs uppercase tracking-wider">{t('login.username')}</Text>
             <TextInput
               className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-slate-900 placeholder:text-slate-400 font-medium"
-              placeholder="Enter your username"
+              placeholder={t('login.usernamePlaceholder')}
               placeholderTextColor="#94a3b8"
               value={username}
               onChangeText={setUsername}
@@ -213,11 +215,11 @@ export default function LoginScreen() {
           </View>
           
           <View className="mt-4">
-            <Text className="text-slate-500 mb-2 font-semibold text-xs uppercase tracking-wider">Password</Text>
+            <Text className="text-slate-500 mb-2 font-semibold text-xs uppercase tracking-wider">{t('login.password')}</Text>
             <View className="w-full bg-white border border-slate-200 rounded-2xl flex-row items-center pr-4">
               <TextInput
                 className="flex-1 p-4 text-slate-900 placeholder:text-slate-400 font-medium"
-                placeholder="Enter your password"
+                placeholder={t('login.passwordPlaceholder')}
                 placeholderTextColor="#94a3b8"
                 value={password}
                 onChangeText={setPassword}
@@ -246,14 +248,14 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-white font-bold text-lg">Sign In</Text>
+              <Text className="text-white font-bold text-lg">{t('login.signIn')}</Text>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
       <View className="items-center mt-6">
-        <Text className="text-slate-400 text-xs font-medium">Need help logging in?</Text>
+        <Text className="text-slate-400 text-xs font-medium">{t('login.needHelp')}</Text>
         <View className="flex-row items-center mt-1.5">
           <TouchableOpacity onPress={() => Linking.openURL('tel:+971526605909')}>
             <Text className="text-[#1e3a8a] font-bold text-xs">+971 52 660 5909</Text>

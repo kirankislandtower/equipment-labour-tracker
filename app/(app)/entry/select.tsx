@@ -1,11 +1,13 @@
 import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Truck, Users, ArrowLeft, ChevronRight, ArrowRightLeft, Droplets } from 'lucide-react-native';
 import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../../lib/foremanFlags';
 
 export default function EntrySelectScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
@@ -19,12 +21,12 @@ export default function EntrySelectScreen() {
         >
           <ArrowLeft size={24} color="#0f172a" />
         </TouchableOpacity>
-        <Text className="text-slate-900 text-2xl font-outfit-black tracking-tight ml-3">New Daily Entry</Text>
+        <Text className="text-slate-900 text-2xl font-outfit-black tracking-tight ml-3">{t('entrySelect.title')}</Text>
       </View>
 
       {/* Content */}
       <ScrollView className="flex-1 px-6 py-8">
-        <Text className="text-slate-500 font-outfit-bold text-[10px] uppercase tracking-widest mb-6">Select Entry Type</Text>
+        <Text className="text-slate-500 font-outfit-bold text-[10px] uppercase tracking-widest mb-6">{t('entrySelect.selectType')}</Text>
 
         {/* Equipment Card */}
         <TouchableOpacity 
@@ -35,8 +37,8 @@ export default function EntrySelectScreen() {
             <Truck size={28} color="#4f46e5" />
           </View>
           <View className="flex-1">
-            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">Equipment</Text>
-            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">Log daily equipment usage, working hours, and rental details</Text>
+            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">{t('entrySelect.equipmentTitle')}</Text>
+            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">{t('entrySelect.equipmentDesc')}</Text>
           </View>
           <ChevronRight size={20} color="#cbd5e1" />
         </TouchableOpacity>
@@ -50,8 +52,8 @@ export default function EntrySelectScreen() {
             <Users size={28} color="#10b981" />
           </View>
           <View className="flex-1">
-            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">Labour</Text>
-            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">Log daily labour attendance, overtime, and work categories</Text>
+            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">{t('entrySelect.labourTitle')}</Text>
+            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">{t('entrySelect.labourDesc')}</Text>
           </View>
           <ChevronRight size={20} color="#cbd5e1" />
         </TouchableOpacity>
@@ -65,8 +67,8 @@ export default function EntrySelectScreen() {
             <ArrowRightLeft size={28} color="#d97706" />
           </View>
           <View className="flex-1">
-            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">Material Transfer</Text>
-            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">Log material shifted from one site to another, capture photo</Text>
+            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">{t('entrySelect.materialTitle')}</Text>
+            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">{t('entrySelect.materialDesc')}</Text>
           </View>
           <ChevronRight size={20} color="#cbd5e1" />
         </TouchableOpacity>
@@ -83,8 +85,8 @@ export default function EntrySelectScreen() {
               <Droplets size={28} color="#0369a1" />
             </View>
             <View className="flex-1">
-              <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">Flushing</Text>
-              <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">Log tanker water supply/removal for flushing work</Text>
+              <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">{t('entrySelect.flushingTitle')}</Text>
+              <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">{t('entrySelect.flushingDesc')}</Text>
             </View>
             <ChevronRight size={20} color="#cbd5e1" />
           </TouchableOpacity>

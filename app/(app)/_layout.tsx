@@ -4,6 +4,7 @@ import { Tabs, useRouter, useSegments } from 'expo-router';
 import { Home, Truck, Users, User, Droplets, Wrench, History as HistoryIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
+import { useTranslation } from 'react-i18next';
 import { processQueue } from '../../lib/offlineQueue';
 import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../lib/foremanFlags';
 import { useAuth } from '../../lib/auth';
@@ -91,6 +92,7 @@ export default function AppLayout() {
   const { role } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const { t } = useTranslation();
 
   // Drains any offline-queued entries as soon as this layout mounts (covers reopening
   // the app while already back online) and again whenever connectivity is restored,
@@ -136,56 +138,56 @@ export default function AppLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />
         }}
       />
       <Tabs.Screen
         name="driver-home"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />
         }}
       />
       <Tabs.Screen
         name="entry/equipment"
-        options={{ 
-          title: 'Equipment',
+        options={{
+          title: t('tabs.equipment'),
           tabBarIcon: ({ color, size }) => <Truck color={color} size={size} />
-        }} 
+        }}
       />
-      <Tabs.Screen 
-        name="entry/labour" 
-        options={{ 
-          title: 'Labour',
+      <Tabs.Screen
+        name="entry/labour"
+        options={{
+          title: t('tabs.labour'),
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} />
-        }} 
+        }}
       />
       <Tabs.Screen
         name="entry/internal-vehicles"
         options={{
-          title: 'Vehicles',
+          title: t('tabs.vehicles'),
           tabBarIcon: ({ color, size }) => <Wrench color={color} size={size} />
         }}
       />
       <Tabs.Screen
         name="entry/flushing"
         options={FLUSHING_ENABLED_FOR_FOREMEN ? {
-          title: 'Flushing',
+          title: t('tabs.flushing'),
           tabBarIcon: ({ color, size }) => <Droplets color={color} size={size} />
         } : { href: null }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
+          title: t('tabs.history'),
           tabBarIcon: ({ color, size }) => <HistoryIcon color={color} size={size} />
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />
         }}
       />

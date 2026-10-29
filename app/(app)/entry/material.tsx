@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, ArrowRightLeft, Calendar, WifiOff, Search } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -135,7 +136,8 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder, required =
 export default function MaterialTransferEntryScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  
+  const { t } = useTranslation();
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -777,7 +779,7 @@ export default function MaterialTransferEntryScreen() {
             </TouchableOpacity>
           </View>
           <Text className="text-amber-600 text-xs mt-2 text-center px-2">
-            A live photo is preferred and gets time-stamped. Use Gallery only if you couldn't take one on-site.
+            {t('entryCommon.livePhotoHint')}
           </Text>
         </>
       )}
