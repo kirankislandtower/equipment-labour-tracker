@@ -6,7 +6,45 @@
 // Reads Cloudinary's real account usage and hands the admin dashboard back just the
 // numbers it needs to show a live "how close to the free/paid plan ceiling are we"
 // indicator -- see https://cloudinary.com/documentation/admin_api#usage.
+//
+// This endpoint had no auth check at all until this fix -- anyone who found the
+// URL could call it and read the account's Cloudinary usage, no login required.
+// Low-sensitivity data, but still verifies the caller is a logged-in Admin now,
+// same as every other admin-only screen in the app.
+const { createClient } = require('@supabase/supabase-js');
+
 module.exports = async function handler(req, res) {
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    res.status(500).json({ error: 'EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY are not set in this deployment\'s environment variables.' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Missing Authorization header.' });
+    return;
+  }
+
+  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+  const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+  if (userError || !user) {
+    res.status(401).json({ error: 'Invalid or expired session.' });
+    return;
+  }
+
+  const { data: profile, error: profileError } = await supabaseAuth
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (profileError || profile?.role !== 'ADMIN') {
+    res.status(403).json({ error: 'Admin access required.' });
+    return;
+  }
+
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'kmkkthdk';
   const apiKey = process.env.CLOUDINARY_API_KEY;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;

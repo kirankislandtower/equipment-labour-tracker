@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Modal, SafeAreaView, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
 import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell, Receipt, Droplets, Wrench, UserCog } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/auth';
 
 export default function AdminLayout() {
   const router = useRouter();
@@ -12,6 +13,28 @@ export default function AdminLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { role, initialized } = useAuth();
+  const isAdmin = initialized && role === 'ADMIN';
+
+  // Nothing in this layout previously checked that the logged-in account is
+  // actually an Admin -- a Foreman or Driver who simply typed an /(admin)/...
+  // URL would get the full admin UI. Bounce anyone else to their own home,
+  // and render nothing admin-related until the role is confirmed (fail
+  // closed, not open, while it's still loading).
+  useEffect(() => {
+    if (!initialized) return;
+    if (role && role !== 'ADMIN') {
+      router.replace('/(app)/home');
+    }
+  }, [role, initialized]);
+
+  if (!isAdmin) {
+    return (
+      <View className="flex-1 justify-center items-center bg-slate-950">
+        <ActivityIndicator size="large" color="#6366f1" />
+      </View>
+    );
+  }
 
   const confirmLogout = async () => {
     if (isLoggingOut) return;
