@@ -160,7 +160,12 @@ export default function AdminFlushing() {
 
   const exportToCSV = async () => {
     try {
-      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Vehicle Number', 'Hours', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
+      // "Hours" only makes sense for Hourly/Daily/Weekly/Monthly rows; Trip Basis
+      // rows (e.g. water tankers) are logged by how many trips, not hours, so
+      // those get their own column instead -- each row fills only the one that
+      // actually applies to it and leaves the other blank.
+      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Vehicle Number', 'Basis', 'Hours', 'No. of Trips', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
+      const rentalTypeLabels: Record<string, string> = { HOURLY: 'Hourly', DAILY: 'Daily', WEEKLY: 'Weekly', MONTHLY: 'Monthly', TRIP_BASIS: 'Trip Basis' };
       const rows = filteredEntries.map(e => [
         e.entry_date || '',
         e.jobs?.job_number || '',
@@ -168,7 +173,9 @@ export default function AdminFlushing() {
         e.suppliers?.supplier_name || '',
         e.equipment_master?.equipment_name || '',
         e.vehicle_number || '',
-        e.working_hours || 0,
+        rentalTypeLabels[e.rental_type] || e.rental_type || '',
+        e.rental_type === 'TRIP_BASIS' ? '' : (e.working_hours || 0),
+        e.rental_type === 'TRIP_BASIS' ? (e.number_of_trips ?? '') : '',
         e.status || '',
         e.foreman_name || '',
         e.remarks || '',
@@ -753,6 +760,30 @@ export default function AdminFlushing() {
                   <View className="mb-4">
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Supplier Timesheet Number</Text>
                     <Text className="text-slate-900 font-bold text-base">{selectedEntry.supplier_timesheet_number}</Text>
+                  </View>
+                )}
+
+                {selectedEntry.supplier_timesheet_photo_url && selectedEntry.supplier_timesheet_photo_url !== 'pending' && selectedEntry.supplier_timesheet_photo_url !== 'NOT_REQUIRED' && (
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Supplier Timesheet/DO Photo</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedPhoto(selectedEntry.supplier_timesheet_photo_url);
+                        setPhotoModalVisible(true);
+                      }}
+                      className="flex-row items-center bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 self-start"
+                    >
+                      <ImageIcon size={18} color="#b45309" />
+                      <Text className="text-amber-800 font-bold ml-2">View Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {selectedEntry.supplier_timesheet_photo_url === 'pending' && (
+                  <View className="mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 flex-row items-center">
+                    <AlertTriangle size={18} color="#d97706" />
+                    <Text className="text-amber-800 font-medium ml-2 flex-1 text-sm">
+                      The supplier timesheet/DO photo didn't finish uploading when this was submitted. The foreman needs to edit this entry to attach it.
+                    </Text>
                   </View>
                 )}
 

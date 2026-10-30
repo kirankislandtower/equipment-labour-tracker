@@ -135,6 +135,13 @@ export default function FlushingEntryScreen() {
   const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
   const [isStoreUser, setIsStoreUser] = useState(false);
 
+  // Supplier Timesheet/DO photo -- a second, required photo separate from the
+  // vehicle/equipment photo above, so admin can visually check it against the
+  // typed Supplier Timesheet Number instead of just trusting the number.
+  const [timesheetPhotoUri, setTimesheetPhotoUri] = useState<string | null>(null);
+  const [initialTimesheetPhotoUri, setInitialTimesheetPhotoUri] = useState<string | null>(null);
+  const [timesheetPhotoCapturedAt, setTimesheetPhotoCapturedAt] = useState<Date | null>(null);
+
   const pickImage = async (source: 'camera' | 'gallery' = 'camera') => {
     try {
       if (source === 'camera') {
@@ -172,6 +179,47 @@ export default function FlushingEntryScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const pickTimesheetPhoto = async (source: 'camera' | 'gallery' = 'camera') => {
+    try {
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'We need camera permissions to photograph the supplier timesheet!');
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'We need photo library permission to choose a photo.');
+          return;
+        }
+      }
+
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+          });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const compressedUri = await compressImageToDataUri(asset.uri, asset.width, asset.height);
+        setTimesheetPhotoUri(compressedUri);
+        setTimesheetPhotoCapturedAt(new Date());
+        if (errors.timesheet_photo) setErrors(prev => ({ ...prev, timesheet_photo: '' }));
+      }
+    } catch (error) {
+      console.error('Error picking timesheet photo:', error);
       Alert.alert('Error', 'Failed to pick image');
     }
   };
@@ -407,6 +455,10 @@ export default function FlushingEntryScreen() {
             setPhotoUri(entryData.flushing_photo_url);
             setInitialPhotoUri(entryData.flushing_photo_url);
           }
+          if (entryData.supplier_timesheet_photo_url && entryData.supplier_timesheet_photo_url !== 'pending' && entryData.supplier_timesheet_photo_url !== 'NOT_REQUIRED') {
+            setTimesheetPhotoUri(entryData.supplier_timesheet_photo_url);
+            setInitialTimesheetPhotoUri(entryData.supplier_timesheet_photo_url);
+          }
         }
       } else {
         // Reset form for a new entry
@@ -438,6 +490,9 @@ export default function FlushingEntryScreen() {
         setPhotoUri(null);
         setPhotoCapturedAt(null);
         setInitialPhotoUri(null);
+        setTimesheetPhotoUri(null);
+        setTimesheetPhotoCapturedAt(null);
+        setInitialTimesheetPhotoUri(null);
         setErrors({});
       }
 
@@ -490,6 +545,14 @@ export default function FlushingEntryScreen() {
       // Provided were "No" -- catches that explicitly instead of just empty.
       if (!formData.fuel_quantity || parseFloat(formData.fuel_quantity) <= 0) newErrors.fuel_quantity = 'Quantity is required';
       if (!formData.fuel_unit) newErrors.fuel_unit = 'Unit is required';
+    }
+
+    // Unlike the vehicle/equipment photo below, the Supplier Timesheet/DO photo
+    // is a hard requirement -- it's how admin verifies the typed Supplier
+    // Timesheet Number against the real document, so there's no "attach it
+    // later" leniency here.
+    if (!isStoreUser && !timesheetPhotoUri) {
+      newErrors.timesheet_photo = 'A photo of the supplier timesheet/DO is required';
     }
 
     // Photo is expected but no longer blocks submission -- a foreman who couldn't
@@ -595,9 +658,12 @@ export default function FlushingEntryScreen() {
             type: 'flushing',
             table: 'flushing_entries',
             photoColumn: 'flushing_photo_url',
-            payload: { ...basePayload, flushing_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending' },
+            payload: { ...basePayload, flushing_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending', supplier_timesheet_photo_url: isStoreUser && !timesheetPhotoUri ? 'NOT_REQUIRED' : 'pending' },
             photoDataUri: photoUri,
             photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
+            photoColumn2: 'supplier_timesheet_photo_url',
+            photoDataUri2: timesheetPhotoUri,
+            photoCapturedAt2: timesheetPhotoCapturedAt ? timesheetPhotoCapturedAt.toISOString() : null,
             watermarkJobLabel: jobName,
             downloadFilePrefix: 'Flushing',
             displayDate: formData.entry_date,
@@ -660,7 +726,19 @@ export default function FlushingEntryScreen() {
         }
       }
 
-      const payload = { ...basePayload, flushing_photo_url: uploadedPhotoUrl };
+      let uploadedTimesheetPhotoUrl = (id && timesheetPhotoUri === initialTimesheetPhotoUri) ? timesheetPhotoUri : (isStoreUser && !timesheetPhotoUri ? 'NOT_REQUIRED' : 'pending');
+
+      if (timesheetPhotoUri && (!id || timesheetPhotoUri !== initialTimesheetPhotoUri)) {
+        try {
+          const rawCloudinaryUrl = await uploadToCloudinary(timesheetPhotoUri);
+          uploadedTimesheetPhotoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, jobName, timesheetPhotoCapturedAt || undefined);
+        } catch (err: any) {
+          console.error('Cloudinary upload failed for timesheet photo, saving entry with it pending:', err);
+          photoUploadFailed = true;
+        }
+      }
+
+      const payload = { ...basePayload, flushing_photo_url: uploadedPhotoUrl, supplier_timesheet_photo_url: uploadedTimesheetPhotoUrl };
 
       let error;
       if (id) {
@@ -1237,6 +1315,49 @@ export default function FlushingEntryScreen() {
               </TouchableOpacity>
             </View>
             <Text className="text-sky-600 text-xs mt-2 text-center px-2">
+              {t('entryCommon.livePhotoHint')}
+            </Text>
+          </>
+        )}
+      </View>
+
+        <View className={`mb-6 bg-white border ${errors.timesheet_photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
+            <Text className="text-slate-700 text-sm font-medium mb-3">
+              Supplier Timesheet/DO Photo {!isStoreUser && <Text className="text-red-500">*</Text>}
+            </Text>
+            {errors.timesheet_photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.timesheet_photo}</Text> : null}
+
+            {timesheetPhotoUri ? (
+                <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+                  <Image source={{ uri: timesheetPhotoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+                  <TouchableOpacity
+                    onPress={() => { setTimesheetPhotoUri(null); setTimesheetPhotoCapturedAt(null); }}
+                    className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+                  >
+                    <X size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+        ) : Platform.OS === 'web' ? (
+          <WebCamera onImageCaptured={(uri) => { setTimesheetPhotoUri(uri); setTimesheetPhotoCapturedAt(new Date()); }} colorTheme="amber" />
+        ) : (
+          <>
+            <View className="flex-row" style={{ gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => pickTimesheetPhoto('camera')}
+                className="flex-1 bg-amber-50 border-2 border-dashed border-amber-200 rounded-lg py-8 items-center justify-center active:bg-amber-100"
+              >
+                <Camera size={28} color="#b45309" className="mb-2" />
+                <Text className="text-amber-900 font-bold text-sm text-center">Take Live Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => pickTimesheetPhoto('gallery')}
+                className="flex-1 bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg py-8 items-center justify-center active:bg-slate-100"
+              >
+                <ImageIcon size={28} color="#475569" className="mb-2" />
+                <Text className="text-slate-700 font-bold text-sm text-center">Choose from Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            <Text className="text-amber-600 text-xs mt-2 text-center px-2">
               {t('entryCommon.livePhotoHint')}
             </Text>
           </>

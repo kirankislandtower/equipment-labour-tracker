@@ -20,6 +20,13 @@ export interface QueuedEntry {
   photoCapturedAt: string | null;
   watermarkJobLabel: string;
   downloadFilePrefix: string;
+  /**
+   * A second photo column, e.g. the Supplier Timesheet/DO photo alongside the
+   * main vehicle/equipment photo. Optional -- most entry types only have one.
+   */
+  photoColumn2?: string;
+  photoDataUri2?: string | null;
+  photoCapturedAt2?: string | null;
   createdAt: string;
   displayDate: string;
   /**
@@ -88,9 +95,20 @@ export async function processQueue(): Promise<void> {
           photoUrl = getWatermarkedCloudinaryUrl(rawCloudinaryUrl, entry.watermarkJobLabel, capturedAt);
         }
 
+        const extraColumns: Record<string, any> = {};
+        if (entry.photoColumn2) {
+          let photoUrl2 = entry.payload[entry.photoColumn2];
+          if (entry.photoDataUri2) {
+            const rawCloudinaryUrl2 = await uploadToCloudinary(entry.photoDataUri2);
+            const capturedAt2 = entry.photoCapturedAt2 ? new Date(entry.photoCapturedAt2) : undefined;
+            photoUrl2 = getWatermarkedCloudinaryUrl(rawCloudinaryUrl2, entry.watermarkJobLabel, capturedAt2);
+          }
+          extraColumns[entry.photoColumn2] = photoUrl2;
+        }
+
         const { error } = await supabase
           .from(entry.table)
-          .insert({ ...entry.payload, [entry.photoColumn]: photoUrl });
+          .insert({ ...entry.payload, [entry.photoColumn]: photoUrl, ...extraColumns });
 
         if (error) throw error;
         // Successfully synced -- drop it from the queue.
