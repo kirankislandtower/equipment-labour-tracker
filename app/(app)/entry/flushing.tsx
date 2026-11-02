@@ -547,13 +547,10 @@ export default function FlushingEntryScreen() {
       if (!formData.fuel_unit) newErrors.fuel_unit = 'Unit is required';
     }
 
-    // Unlike the vehicle/equipment photo below, the Supplier Timesheet/DO photo
-    // is a hard requirement -- it's how admin verifies the typed Supplier
-    // Timesheet Number against the real document, so there's no "attach it
-    // later" leniency here.
-    if (!isStoreUser && !timesheetPhotoUri) {
-      newErrors.timesheet_photo = 'A photo of the supplier timesheet/DO is required';
-    }
+    // The Supplier Timesheet/DO photo is optional, not required -- most
+    // equipment is on monthly rental, and the supplier only issues a
+    // timesheet when it goes off-hire, not on every daily entry. There's
+    // usually nothing to photograph yet on a given day.
 
     // Photo is expected but no longer blocks submission -- a foreman who couldn't
     // get a live photo at the time can still submit and attach it later by editing
@@ -658,7 +655,7 @@ export default function FlushingEntryScreen() {
             type: 'flushing',
             table: 'flushing_entries',
             photoColumn: 'flushing_photo_url',
-            payload: { ...basePayload, flushing_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending', supplier_timesheet_photo_url: isStoreUser && !timesheetPhotoUri ? 'NOT_REQUIRED' : 'pending' },
+            payload: { ...basePayload, flushing_photo_url: isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending', supplier_timesheet_photo_url: !timesheetPhotoUri ? 'NOT_REQUIRED' : 'pending' },
             photoDataUri: photoUri,
             photoCapturedAt: photoCapturedAt ? photoCapturedAt.toISOString() : null,
             photoColumn2: 'supplier_timesheet_photo_url',
@@ -726,7 +723,14 @@ export default function FlushingEntryScreen() {
         }
       }
 
-      let uploadedTimesheetPhotoUrl = (id && timesheetPhotoUri === initialTimesheetPhotoUri) ? timesheetPhotoUri : (isStoreUser && !timesheetPhotoUri ? 'NOT_REQUIRED' : 'pending');
+      // Optional field -- most days there's genuinely nothing to photograph
+      // yet (the supplier only issues a timesheet at off-hire). A legacy or
+      // placeholder value ('pending'/'NOT_REQUIRED') is deliberately never
+      // loaded into timesheetPhotoUri/initialTimesheetPhotoUri, so on an edit
+      // where neither was touched both sides of this comparison can be null
+      // -- `|| 'NOT_REQUIRED'` keeps that from ever saving a bare null,
+      // which the database's NOT NULL constraint would reject.
+      let uploadedTimesheetPhotoUrl = (id && timesheetPhotoUri === initialTimesheetPhotoUri) ? (timesheetPhotoUri || 'NOT_REQUIRED') : (!timesheetPhotoUri ? 'NOT_REQUIRED' : 'pending');
 
       if (timesheetPhotoUri && (!id || timesheetPhotoUri !== initialTimesheetPhotoUri)) {
         try {
@@ -1321,11 +1325,9 @@ export default function FlushingEntryScreen() {
         )}
       </View>
 
-        <View className={`mb-6 bg-white border ${errors.timesheet_photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
-            <Text className="text-slate-700 text-sm font-medium mb-3">
-              Supplier Timesheet/DO Photo {!isStoreUser && <Text className="text-red-500">*</Text>}
-            </Text>
-            {errors.timesheet_photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.timesheet_photo}</Text> : null}
+        <View className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
+            <Text className="text-slate-700 text-sm font-medium mb-1">Supplier Timesheet/DO Photo (Optional)</Text>
+            <Text className="text-slate-400 text-xs mb-3">Only if the supplier has already provided one -- usually at the end of the rental period.</Text>
 
             {timesheetPhotoUri ? (
                 <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
