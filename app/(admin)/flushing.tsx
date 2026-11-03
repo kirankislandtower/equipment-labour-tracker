@@ -164,12 +164,13 @@ export default function AdminFlushing() {
       // rows (e.g. water tankers) are logged by how many trips, not hours, so
       // those get their own column instead -- each row fills only the one that
       // actually applies to it and leaves the other blank.
-      const headers = ['Date', 'Job Number', 'Job Name', 'Supplier', 'Equipment', 'Vehicle Number', 'Basis', 'Hours', 'No. of Trips', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
+      const headers = ['Date', 'Job Number', 'Job Name', 'Location', 'Supplier', 'Equipment', 'Vehicle Number', 'Basis', 'Hours', 'No. of Trips', 'Status', 'Foreman', 'Remarks', 'Fuel Provided', 'Fuel Qty', 'Fuel Unit', 'Supplier Timesheet Number', 'Invoice Status', 'Invoice Number'];
       const rentalTypeLabels: Record<string, string> = { HOURLY: 'Hourly', DAILY: 'Daily', WEEKLY: 'Weekly', MONTHLY: 'Monthly', TRIP_BASIS: 'Trip Basis' };
       const rows = filteredEntries.map(e => [
         e.entry_date || '',
         e.jobs?.job_number || '',
         e.jobs?.job_name || '',
+        e.location || '',
         e.suppliers?.supplier_name || '',
         e.equipment_master?.equipment_name || '',
         e.vehicle_number || '',
@@ -656,6 +657,13 @@ export default function AdminFlushing() {
                 <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Job Details</Text>
                 <Text className="text-slate-900 font-bold text-base">{selectedEntry.jobs?.job_number}</Text>
                 <Text className="text-slate-500 mb-4">{selectedEntry.jobs?.job_name}</Text>
+
+                {!!selectedEntry.location && (
+                  <View className="mb-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Location</Text>
+                    <Text className="text-slate-900 font-bold text-base">{selectedEntry.location}</Text>
+                  </View>
+                )}
 
                 <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Equipment</Text>
                 <Text className="text-slate-900 font-bold text-base">{selectedEntry.equipment_master?.equipment_name}</Text>
