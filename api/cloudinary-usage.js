@@ -28,7 +28,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
   const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
   if (userError || !user) {
     res.status(401).json({ error: 'Invalid or expired session.' });
