@@ -9,9 +9,11 @@ import DatePickerModal from '../../components/DatePickerModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Download } from 'lucide-react-native';
+import { useAuth } from '../../lib/auth';
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { session, initialized } = useAuth();
 
   const todayStr = getLocalDateString();
   const [fromDate, setFromDate] = useState(todayStr);
@@ -37,8 +39,15 @@ export default function AdminDashboard() {
   }, [fromDate, toDate]);
 
   useEffect(() => {
+    // Waits for the auth context to finish restoring the session from storage
+    // before firing -- calling supabase.auth.getSession() directly on mount
+    // (the old approach) could race ahead of that restore on a fresh page
+    // load and see no session yet, sending this request with no token even
+    // though the admin really is logged in.
+    if (!initialized) return;
     fetchCloudinaryUsage();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialized]);
 
   // Reads live account usage from Cloudinary via a small serverless function
   // (api/cloudinary-usage.js) -- the API Secret this needs can only live server-side,
@@ -46,9 +55,11 @@ export default function AdminDashboard() {
   // Fails quietly (no widget shown) in any environment where that endpoint doesn't
   // exist yet, e.g. local `expo start --web` without `vercel dev`.
   const fetchCloudinaryUsage = async () => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || !session?.access_token) return;
     try {
-      const response = await fetch('/api/cloudinary-usage');
+      const response = await fetch('/api/cloudinary-usage', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       const data = await response.json();
       if (!response.ok) {
         setCloudinaryError(data.error || 'Failed to load Cloudinary usage.');
