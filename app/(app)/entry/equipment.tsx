@@ -163,6 +163,20 @@ export default function EquipmentEntryScreen() {
   const [initialTimesheetPhotoUri, setInitialTimesheetPhotoUri] = useState<string | null>(null);
   const [timesheetPhotoCapturedAt, setTimesheetPhotoCapturedAt] = useState<Date | null>(null);
 
+  // What fuel_provided/quantity/unit looked like when this entry was loaded
+  // (new entry: always "nothing yet"), and whatever Store had already decided
+  // about it -- used on submit to tell "Foreman changed the fuel figure, this
+  // needs Store's eyes again" apart from "nothing fuel-related changed, leave
+  // Store's existing decision alone".
+  const [initialFuelSnapshot, setInitialFuelSnapshot] = useState<{ provided: boolean; quantity: number; unit: string }>({ provided: false, quantity: 0, unit: 'Gallons' });
+  const [existingFuelApproval, setExistingFuelApproval] = useState<{
+    status: string | null;
+    requestedQuantity: number | null;
+    approvedBy: string | null;
+    approvedAt: string | null;
+    rejectionReason: string | null;
+  }>({ status: null, requestedQuantity: null, approvedBy: null, approvedAt: null, rejectionReason: null });
+
   // ViewShot removed
   const pickImage = async (source: 'camera' | 'gallery' = 'camera') => {
     try {
@@ -482,6 +496,18 @@ export default function EquipmentEntryScreen() {
             setTimesheetPhotoUri(entryData.supplier_timesheet_photo_url);
             setInitialTimesheetPhotoUri(entryData.supplier_timesheet_photo_url);
           }
+          setInitialFuelSnapshot({
+            provided: entryData.fuel_provided || false,
+            quantity: entryData.fuel_quantity !== null && entryData.fuel_quantity !== undefined ? parseFloat(entryData.fuel_quantity) : 0,
+            unit: entryData.fuel_unit || 'Gallons',
+          });
+          setExistingFuelApproval({
+            status: entryData.fuel_approval_status || null,
+            requestedQuantity: entryData.fuel_requested_quantity ?? null,
+            approvedBy: entryData.fuel_approved_by || null,
+            approvedAt: entryData.fuel_approved_at || null,
+            rejectionReason: entryData.fuel_rejection_reason || null,
+          });
         }
       } else {
         // Reset form for a new entry
@@ -517,6 +543,8 @@ export default function EquipmentEntryScreen() {
         setTimesheetPhotoUri(null);
         setTimesheetPhotoCapturedAt(null);
         setInitialTimesheetPhotoUri(null);
+        setInitialFuelSnapshot({ provided: false, quantity: 0, unit: 'Gallons' });
+        setExistingFuelApproval({ status: null, requestedQuantity: null, approvedBy: null, approvedAt: null, rejectionReason: null });
         setErrors({});
       }
 
@@ -657,6 +685,31 @@ export default function EquipmentEntryScreen() {
       const selectedJob = jobs.find((j: any) => j.value === formData.job_id);
       const jobName = selectedJob ? selectedJob.label : 'Unknown Site';
 
+      // Store only needs to look at a fuel request when it's new or actually
+      // changed -- re-saving an entry for an unrelated edit (fixing a remark,
+      // say) shouldn't wipe out a decision Store already made on the same
+      // fuel figure.
+      const fuelApprovalFields = (() => {
+        if (!formData.fuel_provided) {
+          return { fuel_approval_status: null, fuel_requested_quantity: null, fuel_approved_by: null, fuel_approved_at: null, fuel_rejection_reason: null };
+        }
+        const newQuantity = parseFloat(formData.fuel_quantity) || 0;
+        const isNewFuelRequest = !id
+          || !initialFuelSnapshot.provided
+          || initialFuelSnapshot.quantity !== newQuantity
+          || initialFuelSnapshot.unit !== formData.fuel_unit;
+        if (isNewFuelRequest) {
+          return { fuel_approval_status: 'PENDING', fuel_requested_quantity: newQuantity, fuel_approved_by: null, fuel_approved_at: null, fuel_rejection_reason: null };
+        }
+        return {
+          fuel_approval_status: existingFuelApproval.status,
+          fuel_requested_quantity: existingFuelApproval.requestedQuantity,
+          fuel_approved_by: existingFuelApproval.approvedBy,
+          fuel_approved_at: existingFuelApproval.approvedAt,
+          fuel_rejection_reason: existingFuelApproval.rejectionReason,
+        };
+      })();
+
       const basePayload = {
         entry_date: formData.entry_date,
         company: formData.company,
@@ -680,6 +733,7 @@ export default function EquipmentEntryScreen() {
         fuel_provided: formData.fuel_provided,
         fuel_quantity: formData.fuel_provided && formData.fuel_quantity ? parseFloat(formData.fuel_quantity) : null,
         fuel_unit: formData.fuel_provided ? formData.fuel_unit : null,
+        ...fuelApprovalFields,
         supplier_timesheet_number: formData.supplier_timesheet_number.trim() || null,
         requested_by: isStoreUser ? formData.requested_by : null,
         assigned_job_id: isStoreUser ? formData.assigned_job_id : null

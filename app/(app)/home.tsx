@@ -3,10 +3,11 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'rea
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
-import { Truck, Users, FileCheck2, Clock, Plus, ChevronLeft, ChevronRight, Camera } from 'lucide-react-native';
+import { Truck, Users, FileCheck2, Clock, Plus, ChevronLeft, ChevronRight, Camera, Fuel } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
 import { setAppLanguage, AppLanguage } from '../../lib/i18n';
+import { isStoreForeman } from '../../lib/foremanFlags';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -22,6 +23,8 @@ export default function HomeScreen() {
   };
   const [loadingStats, setLoadingStats] = useState(true);
   const [missingPhotoCount, setMissingPhotoCount] = useState(0);
+  const [pendingFuelApprovals, setPendingFuelApprovals] = useState(0);
+  const isStore = isStoreForeman(user?.email);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [stats, setStats] = useState({
     equipment: 0,
@@ -51,6 +54,20 @@ export default function HomeScreen() {
         setMissingPhotoCount(results.reduce((sum, r) => sum + (r.count || 0), 0));
       }).catch(err => console.error('Error counting entries missing photos:', err));
     }, [user?.id])
+  );
+
+  // Only the Store account approves fuel, so only bother asking for this count
+  // when it's Store logged in.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isStore) return;
+      Promise.all([
+        supabase.from('equipment_entries').select('id', { count: 'exact', head: true }).eq('fuel_approval_status', 'PENDING'),
+        supabase.from('flushing_entries').select('id', { count: 'exact', head: true }).eq('fuel_approval_status', 'PENDING'),
+      ]).then(results => {
+        setPendingFuelApprovals(results.reduce((sum, r) => sum + (r.count || 0), 0));
+      }).catch(err => console.error('Error counting pending fuel approvals:', err));
+    }, [isStore])
   );
 
   const fetchStats = async () => {
@@ -150,6 +167,24 @@ export default function HomeScreen() {
       </View>
 
       <View className="px-6 pt-6 pb-32">
+        {isStore && pendingFuelApprovals > 0 && (
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/fuel-approvals')}
+            className="flex-row items-center bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-3 active:opacity-80"
+          >
+            <View className="bg-blue-100 w-10 h-10 rounded-xl items-center justify-center mr-3">
+              <Fuel size={20} color="#1d4ed8" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-blue-900 font-outfit-bold text-[15px]">
+                {pendingFuelApprovals} Fuel Request{pendingFuelApprovals === 1 ? '' : 's'} Waiting on You
+              </Text>
+              <Text className="text-blue-700 font-outfit-medium text-xs mt-0.5">Tap to review and confirm liters</Text>
+            </View>
+            <ChevronRight size={20} color="#1d4ed8" />
+          </TouchableOpacity>
+        )}
+
         {missingPhotoCount > 0 && (
           <TouchableOpacity
             onPress={() => router.push('/(app)/missing-photos')}

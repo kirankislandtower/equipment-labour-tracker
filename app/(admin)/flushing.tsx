@@ -755,6 +755,35 @@ export default function AdminFlushing() {
                   )}
                 </View>
 
+                {!!selectedEntry.fuel_provided && !!selectedEntry.fuel_approval_status && (
+                  <View className="mb-4">
+                    <View
+                      className={`self-start px-3 py-1.5 rounded-full border ${
+                        selectedEntry.fuel_approval_status === 'APPROVED' ? 'bg-green-50 border-green-200' :
+                        selectedEntry.fuel_approval_status === 'REJECTED' ? 'bg-red-50 border-red-200' :
+                        'bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-bold ${
+                          selectedEntry.fuel_approval_status === 'APPROVED' ? 'text-green-700' :
+                          selectedEntry.fuel_approval_status === 'REJECTED' ? 'text-red-700' :
+                          'text-amber-700'
+                        }`}
+                      >
+                        {selectedEntry.fuel_approval_status === 'APPROVED'
+                          ? `✓ Store Approved${selectedEntry.fuel_approved_by ? ` by ${selectedEntry.fuel_approved_by}` : ''}${selectedEntry.fuel_requested_quantity != null && selectedEntry.fuel_requested_quantity !== selectedEntry.fuel_quantity ? ` (requested ${selectedEntry.fuel_requested_quantity} ${selectedEntry.fuel_unit})` : ''}`
+                          : selectedEntry.fuel_approval_status === 'REJECTED'
+                            ? `✕ Store Rejected${selectedEntry.fuel_approved_by ? ` by ${selectedEntry.fuel_approved_by}` : ''}`
+                            : '⏳ Pending Store Approval'}
+                      </Text>
+                    </View>
+                    {selectedEntry.fuel_approval_status === 'REJECTED' && !!selectedEntry.fuel_rejection_reason && (
+                      <Text className="text-red-600 text-xs mt-1.5 ml-1">{selectedEntry.fuel_rejection_reason}</Text>
+                    )}
+                  </View>
+                )}
+
                 {!!selectedEntry.remarks && (
                   <View className="mb-4">
                     <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Remarks</Text>

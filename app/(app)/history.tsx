@@ -55,6 +55,11 @@ export default function HistoryScreen() {
             status,
             rejection_reason,
             remarks,
+            fuel_provided,
+            fuel_quantity,
+            fuel_unit,
+            fuel_approval_status,
+            fuel_rejection_reason,
             equipment_master:equipment_master_id (equipment_name),
             jobs:job_id (job_name)
           `)
@@ -115,6 +120,11 @@ export default function HistoryScreen() {
             status,
             rejection_reason,
             remarks,
+            fuel_provided,
+            fuel_quantity,
+            fuel_unit,
+            fuel_approval_status,
+            fuel_rejection_reason,
             equipment_master:equipment_master_id (equipment_name),
             jobs:job_id (job_name)
           `)
@@ -437,6 +447,37 @@ export default function HistoryScreen() {
                       ? `${entry.labour_designations?.designation_name} @ ${entry.jobs?.job_name}`
                       : `${entry.from_job?.job_name} -> ${entry.to_job?.job_name}`}
                 </Text>
+
+                {(activeTab === 'EQUIPMENT' || activeTab === 'FLUSHING') && !!entry.fuel_provided && !!entry.fuel_approval_status && (
+                  <View
+                    className={`flex-row items-center self-start px-2.5 py-1 rounded-full mb-3 ${
+                      entry.fuel_approval_status === 'APPROVED' ? 'bg-green-50 border border-green-200' :
+                      entry.fuel_approval_status === 'REJECTED' ? 'bg-red-50 border border-red-200' :
+                      'bg-amber-50 border border-amber-200'
+                    }`}
+                  >
+                    <Text
+                      className={`text-[10px] font-bold ${
+                        entry.fuel_approval_status === 'APPROVED' ? 'text-green-700' :
+                        entry.fuel_approval_status === 'REJECTED' ? 'text-red-700' :
+                        'text-amber-700'
+                      }`}
+                    >
+                      {entry.fuel_approval_status === 'APPROVED'
+                        ? `Fuel Approved · ${entry.fuel_quantity} ${entry.fuel_unit}`
+                        : entry.fuel_approval_status === 'REJECTED'
+                          ? 'Fuel Rejected by Store'
+                          : 'Fuel Pending Store Approval'}
+                    </Text>
+                  </View>
+                )}
+
+                {entry.fuel_approval_status === 'REJECTED' && !!entry.fuel_rejection_reason && (
+                  <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                    <Text className="text-red-800 font-bold text-xs uppercase mb-1">Why Fuel Was Rejected</Text>
+                    <Text className="text-red-600 text-sm">{entry.fuel_rejection_reason}</Text>
+                  </View>
+                )}
 
                 {entry.status === 'REJECTED' && !!entry.rejection_reason && (
                   <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
