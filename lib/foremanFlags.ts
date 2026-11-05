@@ -1,15 +1,11 @@
 /**
  * The "Store" foreman account tracks warehouse/store stock movements rather than
  * on-site equipment/labour hours, so it doesn't need a live photo or time-tracking
- * fields on any entry form -- unlike every other foreman account. In practice the
- * real login username for this account is "foreman1" (its display name is set to
- * "Store"), not literally "store" -- both are recognized here in case a second,
- * literally-named "store" account ever gets created too.
+ * fields on any entry form -- unlike every other foreman account.
  */
 export function isStoreForeman(email?: string | null): boolean {
   if (!email) return false;
-  const username = email.split('@')[0]?.trim().toLowerCase();
-  return username === 'store' || username === 'foreman1';
+  return email.split('@')[0]?.trim().toLowerCase() === 'store';
 }
 
 /**

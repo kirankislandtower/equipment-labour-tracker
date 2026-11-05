@@ -37,16 +37,14 @@ UPDATE flushing_entries
 -- its own -- the existing update policy only allows the row's own creator
 -- (or an Admin) to update it. Re-create just these two tables' update
 -- policies with the Store account added, rather than reopening update access
--- more broadly. The real login username for the Store account turned out to
--- be foreman1 (its display name is set to "Store"), not literally "store" --
--- both are allowed here in case a second, literally-named "store" account
--- ever gets created too (matches lib/foremanFlags.ts's isStoreForeman()).
+-- more broadly. The Store login is store@islandtower.local (see
+-- lib/foremanFlags.ts's isStoreForeman()).
 DROP POLICY IF EXISTS "equipment_entries_update" ON public.equipment_entries;
 CREATE POLICY "equipment_entries_update" ON public.equipment_entries FOR UPDATE TO authenticated
-  USING (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') IN ('store@islandtower.local', 'foreman1@islandtower.local'))
-  WITH CHECK (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') IN ('store@islandtower.local', 'foreman1@islandtower.local'));
+  USING (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') = 'store@islandtower.local')
+  WITH CHECK (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') = 'store@islandtower.local');
 
 DROP POLICY IF EXISTS "flushing_entries_update" ON public.flushing_entries;
 CREATE POLICY "flushing_entries_update" ON public.flushing_entries FOR UPDATE TO authenticated
-  USING (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') IN ('store@islandtower.local', 'foreman1@islandtower.local'))
-  WITH CHECK (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') IN ('store@islandtower.local', 'foreman1@islandtower.local'));
+  USING (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') = 'store@islandtower.local')
+  WITH CHECK (created_by = auth.uid() OR public.current_user_role() = 'ADMIN' OR (auth.jwt() ->> 'email') = 'store@islandtower.local');
