@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Modal, SafeAreaView, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
-import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell, Receipt, Droplets, Wrench, UserCog } from 'lucide-react-native';
+import { Truck, Users, LayoutDashboard, LogOut, Settings, UserPlus, Menu, X, AlertTriangle, FileText, Shield, MapPin, ArrowRightLeft, Clock as AttendanceIcon, BarChart3, Calculator, Copy, Bell, Receipt, Droplets, Wrench, UserCog, ClipboardCheck } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 
@@ -143,6 +143,7 @@ export default function AdminLayout() {
         <NavItem icon={Bell} label="Follow-ups" href="/(admin)/followups" />
         <NavItem icon={AttendanceIcon} label="Attendance" href="/(admin)/attendance" />
         <NavItem icon={MapPin} label="Site Allocations" href="/(admin)/allocations" />
+        <NavItem icon={ClipboardCheck} label="Allocation Report" href="/(admin)/allocation-report" />
         <NavItem icon={Settings} label="Master Data" href="/(admin)/settings" />
         <NavItem icon={UserPlus} label="Foreman" href="/(admin)/employees" />
         <NavItem icon={UserCog} label="Drivers" href="/(admin)/drivers" />
