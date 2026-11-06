@@ -12,6 +12,16 @@ const TABLES = {
   flushing: { table: 'flushing_entries', label: 'Flushing' },
 } as const;
 
+// Quick-pick rejection reasons for the ones that come up over and over --
+// "Other" reveals a free-text box instead for anything that doesn't fit.
+const REJECTION_REASONS = [
+  'Supplier responsible for fuel per PO -- not our scope',
+  'No fuel was actually given',
+  'Wrong equipment/vehicle selected',
+  'Duplicate entry',
+  'Other',
+] as const;
+
 type PendingRequest = {
   id: string;
   type: keyof typeof TABLES;
@@ -39,6 +49,7 @@ export default function FuelApprovalsScreen() {
   const [editedQuantity, setEditedQuantity] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedPresetReason, setSelectedPresetReason] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
 
   const isStore = isStoreForeman(user?.email);
@@ -102,6 +113,7 @@ export default function FuelApprovalsScreen() {
     setEditedQuantity(isSame ? '' : (req.fuel_quantity != null ? req.fuel_quantity.toString() : ''));
     setRejecting(false);
     setRejectionReason('');
+    setSelectedPresetReason(null);
   };
 
   const handleApprove = async (req: PendingRequest) => {
@@ -222,7 +234,7 @@ export default function FuelApprovalsScreen() {
                           />
                           <View className="flex-row gap-2">
                             <TouchableOpacity
-                              onPress={() => setRejecting(true)}
+                              onPress={() => { setRejecting(true); setSelectedPresetReason(null); setRejectionReason(''); }}
                               disabled={isActing}
                               className="flex-1 flex-row items-center justify-center bg-red-50 border border-red-200 py-3 rounded-xl active:bg-red-100"
                             >
@@ -246,15 +258,37 @@ export default function FuelApprovalsScreen() {
                       ) : (
                         <>
                           <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 mt-3">Reason for Rejection</Text>
-                          <TextInput
-                            value={rejectionReason}
-                            onChangeText={setRejectionReason}
-                            placeholder="e.g. No diesel issued that day"
-                            placeholderTextColor="#94a3b8"
-                            multiline
-                            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium mb-3 min-h-[70px]"
-                            style={{ outlineStyle: 'none', textAlignVertical: 'top' } as any}
-                          />
+                          <View className="mb-3">
+                            {REJECTION_REASONS.map(reason => {
+                              const isSelected = selectedPresetReason === reason;
+                              return (
+                                <TouchableOpacity
+                                  key={reason}
+                                  onPress={() => {
+                                    setSelectedPresetReason(reason);
+                                    setRejectionReason(reason === 'Other' ? '' : reason);
+                                  }}
+                                  className={`flex-row items-center p-3 mb-1.5 rounded-xl border ${isSelected ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}
+                                >
+                                  <View className={`w-4 h-4 rounded-full border-2 items-center justify-center mr-2.5 ${isSelected ? 'border-red-500' : 'border-slate-300'}`}>
+                                    {isSelected && <View className="w-2 h-2 rounded-full bg-red-500" />}
+                                  </View>
+                                  <Text className={`flex-1 text-sm ${isSelected ? 'text-red-800 font-bold' : 'text-slate-600 font-medium'}`}>{reason}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                          {selectedPresetReason === 'Other' && (
+                            <TextInput
+                              value={rejectionReason}
+                              onChangeText={setRejectionReason}
+                              placeholder="Type the reason"
+                              placeholderTextColor="#94a3b8"
+                              multiline
+                              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium mb-3 min-h-[70px]"
+                              style={{ outlineStyle: 'none', textAlignVertical: 'top' } as any}
+                            />
+                          )}
                           <View className="flex-row gap-2">
                             <TouchableOpacity
                               onPress={() => setRejecting(false)}
