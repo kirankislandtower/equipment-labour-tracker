@@ -6,7 +6,6 @@ import ConfirmModal from '../../components/ConfirmModal';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString, getFirstOfMonthString, getEarlySubmissionFlag, formatSubmittedAt } from '../../lib/dateUtils';
-import { isStoreForemanEntry } from '../../lib/foremanFlags';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { buildCSV } from '../../lib/csv';
@@ -592,38 +591,27 @@ export default function AdminLabour() {
                 <Text className="text-slate-900 font-bold text-base">{selectedEntry.employee_name}</Text>
                 <Text className="text-slate-500 mb-4">{selectedEntry.labour_designations?.designation_name} • {selectedEntry.suppliers?.supplier_name}</Text>
 
-                {isStoreForemanEntry(selectedEntry.foreman_name) ? (
-                  // Store logs a labour supply/loan-out, not a clocked shift -- it
-                  // states total hours directly, so Start/End/Break don't apply.
-                  <View className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 mb-6">
-                    <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Total Working Hours</Text>
+                <View className="flex-row justify-between mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Start Time</Text>
+                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.start_time || 'N/A'}</Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">End Time</Text>
+                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.end_time || 'N/A'}</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row justify-between mb-6">
+                  <View className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 mr-2">
+                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Break</Text>
+                    <Text className="text-slate-900 font-bold text-lg">{selectedEntry.break_hours || 0} hr</Text>
+                  </View>
+                  <View className="flex-1 bg-emerald-50 p-4 rounded-2xl border border-emerald-100 ml-2">
+                    <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Total</Text>
                     <Text className="text-emerald-700 font-black text-2xl">{selectedEntry.total_working_hours} hr</Text>
                   </View>
-                ) : (
-                  <>
-                    <View className="flex-row justify-between mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      <View className="flex-1">
-                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Start Time</Text>
-                        <Text className="text-slate-900 font-bold text-lg">{selectedEntry.start_time || 'N/A'}</Text>
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">End Time</Text>
-                        <Text className="text-slate-900 font-bold text-lg">{selectedEntry.end_time || 'N/A'}</Text>
-                      </View>
-                    </View>
-
-                    <View className="flex-row justify-between mb-6">
-                      <View className="flex-1 bg-slate-50 p-4 rounded-2xl border border-slate-100 mr-2">
-                        <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Break</Text>
-                        <Text className="text-slate-900 font-bold text-lg">{selectedEntry.break_hours || 0} hr</Text>
-                      </View>
-                      <View className="flex-1 bg-emerald-50 p-4 rounded-2xl border border-emerald-100 ml-2">
-                        <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Total</Text>
-                        <Text className="text-emerald-700 font-black text-2xl">{selectedEntry.total_working_hours} hr</Text>
-                      </View>
-                    </View>
-                  </>
-                )}
+                </View>
 
                 {!!selectedEntry.requested_by && (
                   <View className="mb-4">

@@ -151,11 +151,6 @@ export default function LabourEntryScreen() {
   const [remarks, setRemarks] = useState('');
   const [requestedBy, setRequestedBy] = useState('');
   const [assignedJob, setAssignedJob] = useState<Job | null>(null);
-  // Store doesn't clock in/out like a site Foreman -- it's logging a labour
-  // supply/loan-out, often for just a few hours of a specific task (yard
-  // shifting, etc.), not a fixed shift. So instead of Start/End Time + Break,
-  // Store just states the total hours directly.
-  const [storeWorkingHours, setStoreWorkingHours] = useState('');
 
   const [jobModalVisible, setJobModalVisible] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
@@ -299,7 +294,6 @@ export default function LabourEntryScreen() {
           setRemarks(entryData.remarks || '');
           setRequestedBy(entryData.requested_by || '');
           if (jobsRes.data) setAssignedJob(jobsRes.data.find((j: any) => j.id === entryData.assigned_job_id) || null);
-          setStoreWorkingHours(entryData.total_working_hours !== null && entryData.total_working_hours !== undefined ? entryData.total_working_hours.toString() : '');
         }
       } else {
         // Tabs.Screen keeps this component mounted across tab switches, so a fresh
@@ -318,7 +312,6 @@ export default function LabourEntryScreen() {
         setRemarks('');
         setRequestedBy('');
         setAssignedJob(null);
-        setStoreWorkingHours('');
         setErrors({});
       }
     } catch (error) {
@@ -361,16 +354,13 @@ export default function LabourEntryScreen() {
     if (!selectedSupplier) newErrors.supplier = 'Supplier is required';
     if (!employeeName) newErrors.employee_name = 'Employee Name is required';
     if (!selectedDesignation) newErrors.designation = 'Designation is required';
-    if (!isStoreUser && !startTime) newErrors.start_time = 'Start Time is required';
-    if (!isStoreUser && !endTime) newErrors.end_time = 'End Time is required';
+    if (!startTime) newErrors.start_time = 'Start Time is required';
+    if (!endTime) newErrors.end_time = 'End Time is required';
     if (!foremanName) newErrors.foreman_name = 'Foreman Name is required';
 
     if (isStoreUser) {
       if (!requestedBy) newErrors.requested_by = 'Requested By is required';
       if (!assignedJob) newErrors.assigned_job = 'Assign to Job is required';
-      // !storeWorkingHours alone treats "0" as present (it's truthy), so a
-      // typed zero would slip past this -- catch that explicitly too.
-      if (!storeWorkingHours || parseFloat(storeWorkingHours) <= 0) newErrors.store_working_hours = 'Working Hours is required';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -423,7 +413,7 @@ export default function LabourEntryScreen() {
         start_time: startTime,
         end_time: endTime,
         break_hours: parseFloat(breakHours) || 0,
-        total_working_hours: isStoreUser ? (parseFloat(storeWorkingHours) || 0) : parseFloat(totalWorkingHours),
+        total_working_hours: parseFloat(totalWorkingHours),
         foreman_name: foremanName,
         engineer_name: engineerName || null,
         remarks: remarks || null,
@@ -842,86 +832,61 @@ export default function LabourEntryScreen() {
               </TouchableOpacity>
               {errors.assigned_job ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.assigned_job}</Text> : null}
             </View>
-
-            <View className="mb-4">
-              <Text className="text-sm font-medium text-slate-700 mb-1">
-                Working Hours <Text className="text-red-500">*</Text>
-              </Text>
-              <View className={`flex-row items-center bg-white border ${errors.store_working_hours ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}>
-                <Clock size={18} color="#94a3b8" className="mr-2" />
-                <TextInput
-                  className="flex-1 text-slate-900 text-base"
-                  placeholder="e.g. 4"
-                  placeholderTextColor="#94a3b8"
-                  keyboardType="decimal-pad"
-                  value={storeWorkingHours}
-                  onChangeText={(t) => {
-                    setStoreWorkingHours(t);
-                    if (errors.store_working_hours) setErrors(prev => ({ ...prev, store_working_hours: '' }));
-                  }}
-                />
-              </View>
-              {errors.store_working_hours ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.store_working_hours}</Text> : null}
-            </View>
           </>
         )}
 
-        {!isStoreUser && (
-          <>
-            <View className="flex-row mb-4 gap-x-4">
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-slate-700 mb-1">
-                  Start Time <Text className="text-red-500">*</Text>
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowStartTimePicker(true)}
-                  className={`flex-row items-center bg-white border ${errors.start_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
-                >
-                  <Clock size={18} color="#94a3b8" className="mr-2" />
-                  <Text className="flex-1 text-slate-900 text-base font-medium">{startTime}</Text>
-                </TouchableOpacity>
-                {errors.start_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.start_time}</Text> : null}
-              </View>
+        <View className="flex-row mb-4 gap-x-4">
+          <View className="flex-1">
+            <Text className="text-sm font-medium text-slate-700 mb-1">
+              Start Time <Text className="text-red-500">*</Text>
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowStartTimePicker(true)}
+              className={`flex-row items-center bg-white border ${errors.start_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
+            >
+              <Clock size={18} color="#94a3b8" className="mr-2" />
+              <Text className="flex-1 text-slate-900 text-base font-medium">{startTime}</Text>
+            </TouchableOpacity>
+            {errors.start_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.start_time}</Text> : null}
+          </View>
 
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-slate-700 mb-1">
-                  End Time <Text className="text-red-500">*</Text>
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowEndTimePicker(true)}
-                  className={`flex-row items-center bg-white border ${errors.end_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
-                >
-                  <Clock size={18} color="#94a3b8" className="mr-2" />
-                  <Text className="flex-1 text-slate-900 text-base font-medium">{endTime}</Text>
-                </TouchableOpacity>
-                {errors.end_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.end_time}</Text> : null}
-              </View>
+          <View className="flex-1">
+            <Text className="text-sm font-medium text-slate-700 mb-1">
+              End Time <Text className="text-red-500">*</Text>
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowEndTimePicker(true)}
+              className={`flex-row items-center bg-white border ${errors.end_time ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}
+            >
+              <Clock size={18} color="#94a3b8" className="mr-2" />
+              <Text className="flex-1 text-slate-900 text-base font-medium">{endTime}</Text>
+            </TouchableOpacity>
+            {errors.end_time ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.end_time}</Text> : null}
+          </View>
+        </View>
+
+        <View className="flex-row mb-4 gap-x-4">
+          <View className="flex-1">
+            <Text className="text-sm font-medium text-slate-700 mb-1">Break Hours</Text>
+            <View className="bg-white border border-slate-300 rounded-lg px-4 h-14 justify-center">
+              <TextInput
+                className="flex-1 text-slate-900 text-base font-medium"
+                placeholder="1"
+                placeholderTextColor="#94a3b8"
+                value={breakHours}
+                onChangeText={setBreakHours}
+                keyboardType="numeric"
+              />
             </View>
+          </View>
 
-            <View className="flex-row mb-4 gap-x-4">
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-slate-700 mb-1">Break Hours</Text>
-                <View className="bg-white border border-slate-300 rounded-lg px-4 h-14 justify-center">
-                  <TextInput
-                    className="flex-1 text-slate-900 text-base font-medium"
-                    placeholder="1"
-                    placeholderTextColor="#94a3b8"
-                    value={breakHours}
-                    onChangeText={setBreakHours}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-slate-700 mb-1">Total Hours</Text>
-                <View className="bg-slate-100 border border-slate-200 rounded-lg px-4 h-14 justify-center">
-                  <Text className="text-slate-900 text-base font-bold tracking-tight">{totalWorkingHours}</Text>
-                </View>
-              </View>
+          <View className="flex-1">
+            <Text className="text-sm font-medium text-slate-700 mb-1">Total Hours</Text>
+            <View className="bg-slate-100 border border-slate-200 rounded-lg px-4 h-14 justify-center">
+              <Text className="text-slate-900 text-base font-bold tracking-tight">{totalWorkingHours}</Text>
             </View>
-          </>
-        )}
+          </View>
+        </View>
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">
