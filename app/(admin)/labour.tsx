@@ -467,12 +467,10 @@ export default function AdminLabour() {
                             <Text className="text-slate-900 font-bold">{entry.jobs?.job_number}</Text>
                             <Text className="text-slate-500 text-xs" numberOfLines={1}>{entry.jobs?.job_name}</Text>
                           </View>
-                          {!isStoreForemanEntry(entry.foreman_name) && (
-                            <View className="items-end">
-                              <Text className="text-xs font-bold text-slate-400 mb-1 uppercase">Hours</Text>
-                              <Text className="text-slate-900 font-black text-lg">{entry.total_working_hours}</Text>
-                            </View>
-                          )}
+                          <View className="items-end">
+                            <Text className="text-xs font-bold text-slate-400 mb-1 uppercase">Hours</Text>
+                            <Text className="text-slate-900 font-black text-lg">{entry.total_working_hours}</Text>
+                          </View>
                         </View>
 
                         <View className="mb-4">
@@ -594,7 +592,14 @@ export default function AdminLabour() {
                 <Text className="text-slate-900 font-bold text-base">{selectedEntry.employee_name}</Text>
                 <Text className="text-slate-500 mb-4">{selectedEntry.labour_designations?.designation_name} • {selectedEntry.suppliers?.supplier_name}</Text>
 
-                {!isStoreForemanEntry(selectedEntry.foreman_name) && (
+                {isStoreForemanEntry(selectedEntry.foreman_name) ? (
+                  // Store logs a labour supply/loan-out, not a clocked shift -- it
+                  // states total hours directly, so Start/End/Break don't apply.
+                  <View className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 mb-6">
+                    <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Total Working Hours</Text>
+                    <Text className="text-emerald-700 font-black text-2xl">{selectedEntry.total_working_hours} hr</Text>
+                  </View>
+                ) : (
                   <>
                     <View className="flex-row justify-between mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                       <View className="flex-1">

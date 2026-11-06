@@ -151,6 +151,11 @@ export default function LabourEntryScreen() {
   const [remarks, setRemarks] = useState('');
   const [requestedBy, setRequestedBy] = useState('');
   const [assignedJob, setAssignedJob] = useState<Job | null>(null);
+  // Store doesn't clock in/out like a site Foreman -- it's logging a labour
+  // supply/loan-out, often for just a few hours of a specific task (yard
+  // shifting, etc.), not a fixed shift. So instead of Start/End Time + Break,
+  // Store just states the total hours directly.
+  const [storeWorkingHours, setStoreWorkingHours] = useState('');
 
   const [jobModalVisible, setJobModalVisible] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
@@ -294,6 +299,7 @@ export default function LabourEntryScreen() {
           setRemarks(entryData.remarks || '');
           setRequestedBy(entryData.requested_by || '');
           if (jobsRes.data) setAssignedJob(jobsRes.data.find((j: any) => j.id === entryData.assigned_job_id) || null);
+          setStoreWorkingHours(entryData.total_working_hours !== null && entryData.total_working_hours !== undefined ? entryData.total_working_hours.toString() : '');
         }
       } else {
         // Tabs.Screen keeps this component mounted across tab switches, so a fresh
@@ -312,6 +318,7 @@ export default function LabourEntryScreen() {
         setRemarks('');
         setRequestedBy('');
         setAssignedJob(null);
+        setStoreWorkingHours('');
         setErrors({});
       }
     } catch (error) {
@@ -361,6 +368,9 @@ export default function LabourEntryScreen() {
     if (isStoreUser) {
       if (!requestedBy) newErrors.requested_by = 'Requested By is required';
       if (!assignedJob) newErrors.assigned_job = 'Assign to Job is required';
+      // !storeWorkingHours alone treats "0" as present (it's truthy), so a
+      // typed zero would slip past this -- catch that explicitly too.
+      if (!storeWorkingHours || parseFloat(storeWorkingHours) <= 0) newErrors.store_working_hours = 'Working Hours is required';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -413,7 +423,7 @@ export default function LabourEntryScreen() {
         start_time: startTime,
         end_time: endTime,
         break_hours: parseFloat(breakHours) || 0,
-        total_working_hours: parseFloat(totalWorkingHours),
+        total_working_hours: isStoreUser ? (parseFloat(storeWorkingHours) || 0) : parseFloat(totalWorkingHours),
         foreman_name: foremanName,
         engineer_name: engineerName || null,
         remarks: remarks || null,
@@ -831,6 +841,27 @@ export default function LabourEntryScreen() {
                 <ChevronDown size={20} color={errors.assigned_job ? "#ef4444" : "#94a3b8"} />
               </TouchableOpacity>
               {errors.assigned_job ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.assigned_job}</Text> : null}
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-slate-700 mb-1">
+                Working Hours <Text className="text-red-500">*</Text>
+              </Text>
+              <View className={`flex-row items-center bg-white border ${errors.store_working_hours ? 'border-red-500' : 'border-slate-300'} rounded-lg px-4 h-14`}>
+                <Clock size={18} color="#94a3b8" className="mr-2" />
+                <TextInput
+                  className="flex-1 text-slate-900 text-base"
+                  placeholder="e.g. 4"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="decimal-pad"
+                  value={storeWorkingHours}
+                  onChangeText={(t) => {
+                    setStoreWorkingHours(t);
+                    if (errors.store_working_hours) setErrors(prev => ({ ...prev, store_working_hours: '' }));
+                  }}
+                />
+              </View>
+              {errors.store_working_hours ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.store_working_hours}</Text> : null}
             </View>
           </>
         )}
