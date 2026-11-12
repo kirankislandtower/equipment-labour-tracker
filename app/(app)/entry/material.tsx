@@ -444,7 +444,7 @@ export default function MaterialTransferEntryScreen() {
         }
       }
 
-      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
+      let uploadedPhotoUrl = (id && photoUri === initialPhotoUri && photoUri) ? photoUri : (isStoreUser && !photoUri ? 'NOT_REQUIRED' : 'pending');
       let photoUploadFailed = false;
 
       if (photoUri && (!id || photoUri !== initialPhotoUri)) {

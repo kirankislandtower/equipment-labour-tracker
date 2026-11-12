@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { openWhatsApp } from '../../lib/whatsapp';
 import { Users, Plus, X, User, Eye, EyeOff, Search, Phone, Check, MessageCircle, FileText, Trash2, RotateCcw, AlertCircle, Clock, LogIn, LogOut } from 'lucide-react-native';
+import { FadeInUp } from '../../components/Animations';
 
 export default function EmployeesScreen() {
   const router = useRouter();
@@ -20,10 +21,6 @@ export default function EmployeesScreen() {
   // attendance_logs row is a LOGIN with no LOGOUT after it -- the same signal the
   // Attendance screen shows per-day, just taken across all time and per account.
   const [loggedInIds, setLoggedInIds] = useState<Set<string>>(new Set());
-  // Anyone who has EVER logged in, regardless of whether they're signed in right
-  // now -- used for "Not Logged In", which should mean "has never used the app",
-  // not "isn't signed in at this exact moment".
-  const [everLoggedInIds, setEverLoggedInIds] = useState<Set<string>>(new Set());
   // Anyone who has ever had an Equipment, Labour, or Material entry attributed to
   // their account -- a foreman can be logged in without ever actually submitting a
   // form, which this catches separately from login status.
@@ -93,20 +90,12 @@ export default function EmployeesScreen() {
 
       const seen = new Set<string>();
       const loggedIn = new Set<string>();
-      const everLoggedIn = new Set<string>();
       (data || []).forEach((log: any) => {
-        // Every real login inserts a LOGIN row (see app/index.tsx), so appearing here
-        // at all -- regardless of current state -- means this account has actually
-        // been used at least once. That's a different question from "signed in right
-        // now": someone who logged in yesterday and later logged out has still used
-        // the app, so they shouldn't show up as "Not Logged In".
-        everLoggedIn.add(log.user_id);
         if (seen.has(log.user_id)) return;
         seen.add(log.user_id);
         if (log.action === 'LOGIN') loggedIn.add(log.user_id);
       });
       setLoggedInIds(loggedIn);
-      setEverLoggedInIds(everLoggedIn);
     } catch (error) {
       console.error('Error fetching login status:', error);
     }
@@ -310,19 +299,23 @@ export default function EmployeesScreen() {
   };
 
   const loggedInCount = usersList.filter((u) => loggedInIds.has(u.id)).length;
-  const notLoggedInCount = usersList.filter((u) => !everLoggedInIds.has(u.id)).length;
+  // "Not Logged In" means not signed in right now -- covers both someone who's
+  // never used the app AND someone who has used it before but is logged out at
+  // this moment, so a foreman who's gone quiet after using the app regularly
+  // still surfaces here for a reminder instead of only true first-timers.
+  const notLoggedInCount = usersList.filter((u) => !loggedInIds.has(u.id)).length;
   const submittedCount = usersList.filter((u) => everSubmittedIds.has(u.id)).length;
   const notSubmittedCount = usersList.filter((u) => !everSubmittedIds.has(u.id)).length;
 
-  // Only the foremen who haven't logged in can be WhatsApp-reminded, and only if
-  // there's a saved number -- this splits that group so the admin can see how many
-  // still need a phone number collected before a reminder can even be sent.
-  const notLoggedInWithNumberCount = usersList.filter((u) => !everLoggedInIds.has(u.id) && !!u.phone_number).length;
-  const notLoggedInNoNumberCount = usersList.filter((u) => !everLoggedInIds.has(u.id) && !u.phone_number).length;
+  // Only the foremen who aren't logged in right now can be WhatsApp-reminded, and
+  // only if there's a saved number -- this splits that group so the admin can see
+  // how many still need a phone number collected before a reminder can even be sent.
+  const notLoggedInWithNumberCount = usersList.filter((u) => !loggedInIds.has(u.id) && !!u.phone_number).length;
+  const notLoggedInNoNumberCount = usersList.filter((u) => !loggedInIds.has(u.id) && !u.phone_number).length;
 
   const filteredUsers = usersList.filter((u) => {
     if (activeTab === 'loggedin' && !loggedInIds.has(u.id)) return false;
-    if (activeTab === 'notloggedin' && everLoggedInIds.has(u.id)) return false;
+    if (activeTab === 'notloggedin' && loggedInIds.has(u.id)) return false;
     if (activeTab === 'notloggedin' && notLoggedInPhoneFilter === 'has_number' && !u.phone_number) return false;
     if (activeTab === 'notloggedin' && notLoggedInPhoneFilter === 'no_number' && !!u.phone_number) return false;
     if (activeTab === 'submitted' && !everSubmittedIds.has(u.id)) return false;
@@ -334,6 +327,7 @@ export default function EmployeesScreen() {
   });
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
       <View className={`justify-between items-center mb-6 ${isMobile ? 'flex-col items-stretch gap-y-4' : 'flex-row'}`}>
         <View>
@@ -503,7 +497,7 @@ export default function EmployeesScreen() {
                       : activeTab === 'notloggedin' && notLoggedInPhoneFilter === 'no_number'
                       ? 'All not-logged-in foremen have a saved number.'
                       : activeTab === 'notloggedin'
-                      ? 'Everyone has logged in at least once.'
+                      ? 'Everyone is currently logged in.'
                       : activeTab === 'submitted'
                       ? 'No foremen have submitted anything yet.'
                       : activeTab === 'notsubmitted'
@@ -1021,5 +1015,6 @@ export default function EmployeesScreen() {
       </Modal>
 
     </View>
+    </FadeInUp>
   );
 }
