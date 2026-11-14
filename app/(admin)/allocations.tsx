@@ -2,10 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Switch, TextInput, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/crossAlert';
-import { Truck, ChevronDown, Check, X, Search, Save, MapPin, Users, Plus, UserPlus } from 'lucide-react-native';
+import { Truck, ChevronDown, Check, X, Search, Save, MapPin, Users, Plus, UserPlus, PowerOff } from 'lucide-react-native';
 import { FadeInUp } from '../../components/Animations';
 import ScrollToTopButton from '../../components/ScrollToTopButton';
 import ScrollProgressBar from '../../components/ScrollProgressBar';
+import { fetchOffHireStatusForJob, offHireKey } from '../../lib/equipmentOffHire';
+import {
+  RentalBasis,
+  RentalInfoRow,
+  RENTAL_BASIS_OPTIONS,
+  fetchRentalInfoForJob,
+  formatDueLabel,
+  formatRentalPeriod,
+} from '../../lib/equipmentRental';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => {
@@ -70,10 +79,32 @@ export default function SiteAllocationsScreen() {
   const [allocatedEquipmentByScope, setAllocatedEquipmentByScope] = useState<Record<string, Set<string>>>({ GENERAL: new Set() });
   const [equipmentScope, setEquipmentScope] = useState('GENERAL');
   const [equipmentSearch, setEquipmentSearch] = useState('');
+  // Same idea as supplierListFilter below -- tapping "N Selected" narrows the
+  // Equipment List to just what's toggled on for the currently chosen scope.
+  const [equipmentListFilter, setEquipmentListFilter] = useState<'all' | 'selected'>('all');
+  // Quick-jump list: of the suppliers allocated to this job, which ones actually
+  // have supplier-specific equipment toggled on -- most allocated suppliers won't,
+  // so this saves clicking through the full "Assign Equipment To" picker one by one.
+  const [showSuppliersWithEquipModal, setShowSuppliersWithEquipModal] = useState(false);
+  // Read-only here -- off-hire is toggled from the Allocation Report screen's
+  // equipment modal, not from this screen. Just shown as a badge so it's visible
+  // wherever an admin is looking at this job's equipment.
+  const [offHireKeys, setOffHireKeys] = useState<Set<string>>(new Set());
+  const [rentalInfoByKey, setRentalInfoByKey] = useState<Map<string, RentalInfoRow>>(new Map());
+
+  // Rental-details modal, shown when toggling an equipment item ON -- see
+  // toggleEquipment. Not shown when toggling off.
+  const [rentalModalEquip, setRentalModalEquip] = useState<{ id: string; name: string } | null>(null);
+  const [rentalBasisInput, setRentalBasisInput] = useState<RentalBasis>('DAILY');
+  const [rentalStartInput, setRentalStartInput] = useState('');
+  const [rentalDueInput, setRentalDueInput] = useState('');
 
   const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
   const [allocatedSupplierIds, setAllocatedSupplierIds] = useState<Set<string>>(new Set());
   const [supplierSearch, setSupplierSearch] = useState('');
+  // Tapping the "N Selected" count narrows the Supplier List down to just the
+  // currently-toggled-on suppliers, instead of scrolling the full list to find them.
+  const [supplierListFilter, setSupplierListFilter] = useState<'all' | 'selected'>('all');
 
   // Employee rosters are always scoped to one specific supplier (job_supplier_employees.supplier_id
   // is NOT NULL) -- unlike equipment there's no job-wide "General" bucket for employees.
@@ -145,6 +176,8 @@ export default function SiteAllocationsScreen() {
   useEffect(() => {
     setEquipmentScope('GENERAL');
     setEmployeeScope('');
+    setSupplierListFilter('all');
+    setEquipmentListFilter('all');
     if (selectedJob) {
       fetchAllocationsForJob(selectedJob);
     } else {
@@ -189,11 +222,15 @@ export default function SiteAllocationsScreen() {
 
   const fetchAllocationsForJob = async (jobId: string) => {
     try {
-      const [equipAlloc, suppAlloc, empAlloc] = await Promise.all([
+      const [equipAlloc, suppAlloc, empAlloc, offHireSet, rentalMap] = await Promise.all([
         supabase.from('job_equipment').select('equipment_master_id, supplier_id').eq('job_id', jobId),
         supabase.from('job_suppliers').select('supplier_id').eq('job_id', jobId),
-        supabase.from('job_supplier_employees').select('supplier_id, employee_name').eq('job_id', jobId)
+        supabase.from('job_supplier_employees').select('supplier_id, employee_name').eq('job_id', jobId),
+        fetchOffHireStatusForJob(jobId),
+        fetchRentalInfoForJob(jobId),
       ]);
+      setOffHireKeys(offHireSet);
+      setRentalInfoByKey(rentalMap);
 
       if (equipAlloc.data) {
         const byScope: Record<string, Set<string>> = { GENERAL: new Set() };
@@ -220,15 +257,98 @@ export default function SiteAllocationsScreen() {
     }
   };
 
+  // Turning an item OFF is immediate. Turning one ON opens the rental-details
+  // modal first (confirmAddEquipment below is what actually adds it to state,
+  // once the modal is confirmed with details or skipped).
   const toggleEquipment = (equipId: string) => {
+    const isSelected = allocatedEquipmentByScope[equipmentScope]?.has(equipId) || false;
+    if (isSelected) {
+      setAllocatedEquipmentByScope(prev => {
+        const next = { ...prev };
+        const current = new Set(next[equipmentScope] || []);
+        current.delete(equipId);
+        next[equipmentScope] = current;
+        return next;
+      });
+      const supplierId = equipmentScope === 'GENERAL' ? null : equipmentScope;
+      const key = offHireKey(supplierId, equipId);
+      // Local only -- the actual job_equipment_rental sync happens in handleSave,
+      // alongside the equipment allocation itself, not here.
+      setRentalInfoByKey(prev => {
+        if (!prev.has(key)) return prev;
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
+
+    const equip = allEquipment.find(e => e.id === equipId);
+    setRentalBasisInput('DAILY');
+    setRentalStartInput('');
+    setRentalDueInput('');
+    setRentalModalEquip({ id: equipId, name: equip?.equipment_name || 'Equipment' });
+  };
+
+  const confirmAddEquipment = (equipId: string) => {
     setAllocatedEquipmentByScope(prev => {
       const next = { ...prev };
       const current = new Set(next[equipmentScope] || []);
-      if (current.has(equipId)) current.delete(equipId);
-      else current.add(equipId);
+      current.add(equipId);
       next[equipmentScope] = current;
       return next;
     });
+  };
+
+  const handleSkipRental = () => {
+    if (!rentalModalEquip) return;
+    confirmAddEquipment(rentalModalEquip.id);
+    setRentalModalEquip(null);
+  };
+
+  // Local only, same as the rest of this screen's toggles -- actually written to
+  // job_equipment_rental inside handleSave, alongside the equipment allocation
+  // itself, so a rental record can never exist without its allocation (or vice
+  // versa). Nothing here hits the database.
+  const handleSaveRental = () => {
+    if (!rentalModalEquip || !selectedJob) return;
+    let dueDate: Date | null = null;
+    if (rentalDueInput) {
+      dueDate = new Date(rentalDueInput);
+      if (isNaN(dueDate.getTime())) {
+        showAlert('Invalid Date', 'That due date/time could not be read.');
+        return;
+      }
+    }
+    let startDate: Date | null = null;
+    if (rentalStartInput) {
+      startDate = new Date(rentalStartInput);
+      if (isNaN(startDate.getTime())) {
+        showAlert('Invalid Date', 'That start date/time could not be read.');
+        return;
+      }
+    }
+
+    const supplierId = equipmentScope === 'GENERAL' ? null : equipmentScope;
+    setRentalInfoByKey(prev => {
+      const next = new Map(prev);
+      next.set(offHireKey(supplierId, rentalModalEquip.id), {
+        id: '',
+        job_id: selectedJob,
+        supplier_id: supplierId,
+        equipment_master_id: rentalModalEquip.id,
+        rental_basis: rentalBasisInput,
+        rental_start_at: startDate ? startDate.toISOString() : null,
+        rental_due_at: dueDate ? dueDate.toISOString() : null,
+        set_by: null,
+        set_by_name: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      return next;
+    });
+    confirmAddEquipment(rentalModalEquip.id);
+    setRentalModalEquip(null);
   };
 
   const toggleSupplier = (suppId: string) => {
@@ -267,26 +387,53 @@ export default function SiteAllocationsScreen() {
     if (!selectedJob) return;
     setSaving(true);
     try {
-      // 1. Delete all existing mappings for this job
-      const [delEquip, delSupp, delEmp] = await Promise.all([
+      // 1. Delete all existing mappings for this job -- job_equipment_rental is
+      // wiped and rebuilt the same way, so a rental record can never outlive (or
+      // predate) the equipment allocation it's attached to.
+      const [delEquip, delSupp, delEmp, delRental] = await Promise.all([
         supabase.from('job_equipment').delete().eq('job_id', selectedJob),
         supabase.from('job_suppliers').delete().eq('job_id', selectedJob),
-        supabase.from('job_supplier_employees').delete().eq('job_id', selectedJob)
+        supabase.from('job_supplier_employees').delete().eq('job_id', selectedJob),
+        supabase.from('job_equipment_rental').delete().eq('job_id', selectedJob),
       ]);
       if (delEquip.error) throw delEquip.error;
       if (delSupp.error) throw delSupp.error;
       if (delEmp.error) throw delEmp.error;
+      if (delRental.error) throw delRental.error;
 
       // 2. Insert new ones. Only keep equipment scoped to a supplier that's still
       // actually allocated to this job (or the job-wide GENERAL scope) -- a supplier
       // toggled off in the Supplier List shouldn't leave orphaned equipment rows
       // referencing it.
       const equipInserts: { job_id: string; equipment_master_id: string; supplier_id: string | null }[] = [];
+      // Rental info staged locally (via the modal) only actually gets written here,
+      // alongside its equipment allocation, and only for combos that survive the
+      // same orphan-prevention rule -- never for a combo whose allocation didn't
+      // make it in.
+      const rentalInserts: {
+        job_id: string;
+        supplier_id: string | null;
+        equipment_master_id: string;
+        rental_basis: RentalBasis;
+        rental_start_at: string | null;
+        rental_due_at: string | null;
+      }[] = [];
       Object.entries(allocatedEquipmentByScope).forEach(([scope, ids]) => {
         if (scope !== 'GENERAL' && !allocatedSupplierIds.has(scope)) return;
         const supplierId = scope === 'GENERAL' ? null : scope;
         ids.forEach(equipId => {
           equipInserts.push({ job_id: selectedJob, equipment_master_id: equipId, supplier_id: supplierId });
+          const rental = rentalInfoByKey.get(offHireKey(supplierId, equipId));
+          if (rental) {
+            rentalInserts.push({
+              job_id: selectedJob,
+              supplier_id: supplierId,
+              equipment_master_id: equipId,
+              rental_basis: rental.rental_basis,
+              rental_start_at: rental.rental_start_at,
+              rental_due_at: rental.rental_due_at,
+            });
+          }
         });
       });
       const suppInserts = Array.from(allocatedSupplierIds).map(id => ({ job_id: selectedJob, supplier_id: id }));
@@ -301,14 +448,16 @@ export default function SiteAllocationsScreen() {
         });
       });
 
-      const [insEquip, insSupp, insEmp] = await Promise.all([
+      const [insEquip, insSupp, insEmp, insRental] = await Promise.all([
         equipInserts.length > 0 ? supabase.from('job_equipment').insert(equipInserts) : Promise.resolve({ error: null } as any),
         suppInserts.length > 0 ? supabase.from('job_suppliers').insert(suppInserts) : Promise.resolve({ error: null } as any),
-        empInserts.length > 0 ? supabase.from('job_supplier_employees').insert(empInserts) : Promise.resolve({ error: null } as any)
+        empInserts.length > 0 ? supabase.from('job_supplier_employees').insert(empInserts) : Promise.resolve({ error: null } as any),
+        rentalInserts.length > 0 ? supabase.from('job_equipment_rental').insert(rentalInserts) : Promise.resolve({ error: null } as any),
       ]);
       if (insEquip.error) throw insEquip.error;
       if (insSupp.error) throw insSupp.error;
       if (insEmp.error) throw insEmp.error;
+      if (insRental.error) throw insRental.error;
 
       // 3. Re-fetch from the DB rather than trusting local state, so the UI reflects
       // what actually persisted, not just what we attempted to save.
@@ -332,9 +481,8 @@ export default function SiteAllocationsScreen() {
   }
 
   // Filter, then group equipment by category
-  const filteredEquipment = equipmentSearch.trim()
-    ? allEquipment.filter(e => e.equipment_name.toLowerCase().includes(equipmentSearch.trim().toLowerCase()))
-    : allEquipment;
+  const filteredEquipment = (equipmentListFilter === 'selected' ? allEquipment.filter(e => allocatedEquipmentByScope[equipmentScope]?.has(e.id)) : allEquipment)
+    .filter(e => !equipmentSearch.trim() || e.equipment_name.toLowerCase().includes(equipmentSearch.trim().toLowerCase()));
   const groupedEquipment = filteredEquipment.reduce((acc, curr) => {
     const cat = curr.equipment_category || 'Uncategorized';
     if (!acc[cat]) acc[cat] = [];
@@ -342,9 +490,15 @@ export default function SiteAllocationsScreen() {
     return acc;
   }, {} as Record<string, any[]>);
 
-  const filteredSuppliers = supplierSearch.trim()
-    ? allSuppliers.filter(s => s.supplier_name.toLowerCase().includes(supplierSearch.trim().toLowerCase()))
-    : allSuppliers;
+  // Of the suppliers allocated to this job, which ones have at least one piece of
+  // equipment toggled on specifically under them (as opposed to GENERAL).
+  const suppliersWithEquipment = Array.from(allocatedSupplierIds)
+    .filter(id => (allocatedEquipmentByScope[id]?.size || 0) > 0)
+    .map(id => ({ id, name: allSuppliers.find(s => s.id === id)?.supplier_name || 'Unknown Supplier', count: allocatedEquipmentByScope[id]?.size || 0 }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const filteredSuppliers = (supplierListFilter === 'selected' ? allSuppliers.filter(s => allocatedSupplierIds.has(s.id)) : allSuppliers)
+    .filter(s => !supplierSearch.trim() || s.supplier_name.toLowerCase().includes(supplierSearch.trim().toLowerCase()));
 
   return (
     <FadeInUp style={{ flex: 1 }}>
@@ -404,9 +558,15 @@ export default function SiteAllocationsScreen() {
                     <Plus size={14} color="#1d4ed8" />
                     <Text className="text-blue-700 font-bold text-xs ml-1">New</Text>
                   </TouchableOpacity>
-                  <Text className="text-slate-500 font-bold bg-slate-100 px-3 py-1 rounded-full text-xs">
-                    {allocatedSupplierIds.size} Selected
-                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setSupplierListFilter(prev => (prev === 'selected' ? 'all' : 'selected'))}
+                    className={`flex-row items-center px-3 py-1.5 rounded-full ${supplierListFilter === 'selected' ? 'bg-blue-600' : 'bg-slate-100'}`}
+                  >
+                    <Text className={`font-bold text-xs ${supplierListFilter === 'selected' ? 'text-white' : 'text-slate-500'}`}>
+                      {allocatedSupplierIds.size} Selected
+                    </Text>
+                    {supplierListFilter === 'selected' && <X size={12} color="#ffffff" style={{ marginLeft: 6 }} />}
+                  </TouchableOpacity>
                 </View>
               </View>
               <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 mb-6">
@@ -427,7 +587,11 @@ export default function SiteAllocationsScreen() {
                 )}
               </View>
               {filteredSuppliers.length === 0 && (
-                <Text className="text-slate-500 font-medium text-center py-6">No suppliers match "{supplierSearch}".</Text>
+                <Text className="text-slate-500 font-medium text-center py-6">
+                  {supplierListFilter === 'selected' && !supplierSearch.trim()
+                    ? 'No suppliers selected yet.'
+                    : `No suppliers match "${supplierSearch}".`}
+                </Text>
               )}
               {filteredSuppliers.map(supp => {
                 const isSelected = allocatedSupplierIds.has(supp.id);
@@ -468,9 +632,15 @@ export default function SiteAllocationsScreen() {
                     <Plus size={14} color="#1d4ed8" />
                     <Text className="text-blue-700 font-bold text-xs ml-1">New</Text>
                   </TouchableOpacity>
-                  <Text className="text-slate-500 font-bold bg-slate-100 px-3 py-1 rounded-full text-xs">
-                    {allocatedEquipmentByScope[equipmentScope]?.size || 0} Selected
-                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setEquipmentListFilter(prev => (prev === 'selected' ? 'all' : 'selected'))}
+                    className={`flex-row items-center px-3 py-1.5 rounded-full ${equipmentListFilter === 'selected' ? 'bg-blue-600' : 'bg-slate-100'}`}
+                  >
+                    <Text className={`font-bold text-xs ${equipmentListFilter === 'selected' ? 'text-white' : 'text-slate-500'}`}>
+                      {allocatedEquipmentByScope[equipmentScope]?.size || 0} Selected
+                    </Text>
+                    {equipmentListFilter === 'selected' && <X size={12} color="#ffffff" style={{ marginLeft: 6 }} />}
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -484,16 +654,58 @@ export default function SiteAllocationsScreen() {
                       .filter(s => allocatedSupplierIds.has(s.id) && s.supplier_type !== 'LABOUR')
                       .map(s => ({ label: s.supplier_name, value: s.id })),
                   ]}
-                  onSelect={setEquipmentScope}
+                  onSelect={(v: string) => { setEquipmentScope(v); setEquipmentListFilter('all'); }}
                   placeholder="General (not tied to a supplier)"
                 />
-                <Text className="text-xs text-slate-400 -mt-2">
+                <Text className="text-xs text-slate-400 -mt-2 mb-3">
                   Toggles below allocate equipment under whichever scope is selected here. Switch to a
                   supplier to give that supplier its own equipment list on the foreman side; only
                   suppliers already toggled on above show up here, and any supplier tagged "Labour"
                   in Master Data is left out of this list.
                 </Text>
+                {suppliersWithEquipment.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setShowSuppliersWithEquipModal(true)}
+                    className="flex-row items-center self-start bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl active:bg-indigo-100"
+                  >
+                    <Truck size={14} color="#4338ca" />
+                    <Text className="text-indigo-700 font-bold text-xs ml-2">
+                      {suppliersWithEquipment.length} of {allocatedSupplierIds.size} suppliers have equipment assigned -- tap to jump to one
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
+
+              <Modal visible={showSuppliersWithEquipModal} transparent animationType="fade" onRequestClose={() => setShowSuppliersWithEquipModal(false)}>
+                <View className="flex-1 bg-black/50 justify-center items-center p-6">
+                  <View className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl" style={{ maxHeight: '75%' }}>
+                    <View className="flex-row items-center justify-between mb-4">
+                      <Text className="text-lg font-black text-slate-900">Suppliers With Equipment</Text>
+                      <TouchableOpacity onPress={() => setShowSuppliersWithEquipModal(false)} className="p-1">
+                        <X size={20} color="#64748b" />
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                      {suppliersWithEquipment.map((supp) => (
+                        <TouchableOpacity
+                          key={supp.id}
+                          onPress={() => {
+                            setEquipmentScope(supp.id);
+                            setEquipmentListFilter('all');
+                            setShowSuppliersWithEquipModal(false);
+                          }}
+                          className="flex-row items-center justify-between p-4 mb-2 rounded-xl border border-slate-100 bg-slate-50 active:bg-slate-100"
+                        >
+                          <Text className="font-semibold text-base text-slate-700 flex-1 pr-3">{supp.name}</Text>
+                          <View className="bg-white px-2.5 py-1 rounded-full border border-slate-200">
+                            <Text className="text-slate-500 font-bold text-xs">{supp.count} item{supp.count === 1 ? '' : 's'}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
 
               <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-4 h-12 mb-6">
                 <Search size={18} color="#94a3b8" />
@@ -513,7 +725,11 @@ export default function SiteAllocationsScreen() {
                 )}
               </View>
               {filteredEquipment.length === 0 && (
-                <Text className="text-slate-500 font-medium text-center py-6">No equipment matches "{equipmentSearch}".</Text>
+                <Text className="text-slate-500 font-medium text-center py-6">
+                  {equipmentListFilter === 'selected' && !equipmentSearch.trim()
+                    ? 'No equipment selected yet for this scope.'
+                    : `No equipment matches "${equipmentSearch}".`}
+                </Text>
               )}
               {Object.keys(groupedEquipment).map(category => (
                 <View key={category} className="mb-6">
@@ -521,7 +737,11 @@ export default function SiteAllocationsScreen() {
                     {category}
                   </Text>
                   {groupedEquipment[category].map((equip: any) => {
+                    const scopeSupplierId = equipmentScope === 'GENERAL' ? null : equipmentScope;
                     const isSelected = allocatedEquipmentByScope[equipmentScope]?.has(equip.id) || false;
+                    const isOffHire = offHireKeys.has(offHireKey(scopeSupplierId, equip.id));
+                    const rentalInfo = rentalInfoByKey.get(offHireKey(scopeSupplierId, equip.id));
+                    const dueInfo = rentalInfo ? formatDueLabel(rentalInfo.rental_due_at) : null;
                     return (
                       <TouchableOpacity
                         key={equip.id}
@@ -529,13 +749,26 @@ export default function SiteAllocationsScreen() {
                         onPress={() => toggleEquipment(equip.id)}
                         className={`flex-row items-center justify-between p-4 mb-2 rounded-xl border ${isSelected ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-white'}`}
                       >
-                        <View className="flex-row items-center flex-1 pr-4">
+                        <View className="flex-row items-center flex-1 pr-4 flex-wrap">
                           <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${isSelected ? 'bg-blue-100' : 'bg-slate-100'}`}>
                             <Truck size={20} color={isSelected ? '#1d4ed8' : '#94a3b8'} />
                           </View>
                           <Text className={`font-semibold text-base ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>
                             {equip.equipment_name}
                           </Text>
+                          {isOffHire && (
+                            <View className="bg-amber-100 px-2 py-1 rounded-full border border-amber-200 flex-row items-center ml-2">
+                              <PowerOff size={10} color="#b45309" />
+                              <Text className="text-amber-700 font-bold text-[9px] ml-1 uppercase tracking-wider">Off-Hire</Text>
+                            </View>
+                          )}
+                          {rentalInfo && (
+                            <View className={`px-2 py-1 rounded-full border flex-row items-center ml-2 ${dueInfo ? (dueInfo.overdue ? 'bg-red-100 border-red-200' : 'bg-blue-50 border-blue-200') : 'bg-slate-100 border-slate-200'}`}>
+                              <Text className={`font-bold text-[9px] uppercase tracking-wider ${dueInfo ? (dueInfo.overdue ? 'text-red-700' : 'text-blue-700') : 'text-slate-600'}`}>
+                                {dueInfo ? dueInfo.label : formatRentalPeriod(rentalInfo)}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                         <Switch
                           value={isSelected}
@@ -732,6 +965,96 @@ export default function SiteAllocationsScreen() {
               className={`w-full py-4 rounded-2xl flex-row items-center justify-center ${isAddingSupp ? 'bg-blue-300' : 'bg-[#1e3a8a] active:bg-[#1e40af]'}`}
             >
               {isAddingSupp ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-lg">Save Supplier</Text>}
+            </TouchableOpacity>
+            <View className="h-8" />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Rental Details Modal -- shown when toggling an equipment item ON */}
+      <Modal visible={!!rentalModalEquip} transparent animationType="slide" onRequestClose={() => setRentalModalEquip(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-6 shadow-2xl">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-xl font-black text-slate-900 flex-1 pr-3">{rentalModalEquip?.name}</Text>
+              <TouchableOpacity onPress={() => setRentalModalEquip(null)} className="p-2 bg-slate-100 rounded-full">
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-slate-400 font-medium text-xs mb-5">
+              Is this on a rental clock? Record the basis and period here so you (and anyone checking the Rental Due
+              page) can see at a glance whether it's Hourly/Daily/Weekly/Monthly and when it's due back -- this is
+              informational only, it doesn't change anything in the Foreman app. Not every item needs this -- skip it
+              for equipment that isn't on a fixed return date. Nothing here is saved yet -- it goes in together with
+              the rest of this screen when you hit the main Save button below.
+            </Text>
+
+            <Text className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-1.5">Rental Basis</Text>
+            <View className="flex-row bg-slate-100 p-1 rounded-xl mb-5">
+              {RENTAL_BASIS_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => setRentalBasisInput(opt.value)}
+                  className={`flex-1 py-2.5 rounded-lg items-center ${rentalBasisInput === opt.value ? 'bg-white shadow-sm' : ''}`}
+                >
+                  <Text className={`font-bold text-sm ${rentalBasisInput === opt.value ? 'text-slate-900' : 'text-slate-500'}`}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-1.5">Rental Start (Optional)</Text>
+            <View className="bg-slate-50 border border-slate-200 rounded-2xl px-5 h-14 justify-center mb-5">
+              {Platform.OS === 'web' ? (
+                <input
+                  type="datetime-local"
+                  value={rentalStartInput}
+                  onChange={(e: any) => setRentalStartInput(e.target.value)}
+                  style={{ border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit', width: '100%' }}
+                />
+              ) : (
+                <TextInput
+                  value={rentalStartInput}
+                  onChangeText={setRentalStartInput}
+                  placeholder="YYYY-MM-DDTHH:mm"
+                  placeholderTextColor="#94a3b8"
+                  className="text-slate-900 font-semibold"
+                />
+              )}
+            </View>
+
+            <Text className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-1.5">Due Back By (Optional)</Text>
+            <View className="bg-slate-50 border border-slate-200 rounded-2xl px-5 h-14 justify-center mb-6">
+              {Platform.OS === 'web' ? (
+                <input
+                  type="datetime-local"
+                  value={rentalDueInput}
+                  onChange={(e: any) => setRentalDueInput(e.target.value)}
+                  style={{ border: 'none', outline: 'none', background: 'transparent', color: '#0f172a', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit', width: '100%' }}
+                />
+              ) : (
+                <TextInput
+                  value={rentalDueInput}
+                  onChangeText={setRentalDueInput}
+                  placeholder="YYYY-MM-DDTHH:mm"
+                  placeholderTextColor="#94a3b8"
+                  className="text-slate-900 font-semibold"
+                />
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={handleSaveRental}
+              className="w-full py-4 rounded-2xl flex-row items-center justify-center mb-3 bg-[#1e3a8a] active:bg-[#1e40af]"
+            >
+              <Text className="text-white font-bold text-lg">Save Rental Details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSkipRental}
+              className="w-full py-3.5 rounded-2xl items-center border border-slate-200 active:bg-slate-50"
+            >
+              <Text className="text-slate-600 font-bold">Skip -- No Rental Tracking</Text>
             </TouchableOpacity>
             <View className="h-8" />
           </View>

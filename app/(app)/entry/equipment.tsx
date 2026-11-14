@@ -16,6 +16,7 @@ import { compressImageToDataUri } from '../../../lib/imageUtils';
 import { downloadImageToDevice } from '../../../lib/download';
 import TimePickerModal from '../../../components/TimePickerModal';
 import { resolveSupplierId, resolveEquipmentId } from '../../../lib/masterData';
+import { fetchOffHireStatusForJob, offHireKey } from '../../../lib/equipmentOffHire';
 import { isStoreForeman } from '../../../lib/foremanFlags';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
@@ -357,14 +358,19 @@ export default function EquipmentEntryScreen() {
         return;
       }
       const { data: supplierOptions } = await fetchWithCache(`equip-suppliers-for-job:${formData.job_id}`, async () => {
-        const [suppAllocRes, equipAllocRes] = await Promise.all([
+        const [suppAllocRes, equipAllocRes, offHireKeys] = await Promise.all([
           supabase.from('job_suppliers').select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)').eq('job_id', formData.job_id).eq('suppliers.is_active', true),
-          supabase.from('job_equipment').select('supplier_id').eq('job_id', formData.job_id),
+          supabase.from('job_equipment').select('supplier_id, equipment_master_id').eq('job_id', formData.job_id),
+          fetchOffHireStatusForJob(formData.job_id),
         ]);
         if (suppAllocRes.error) return { data: null, error: suppAllocRes.error };
         if (equipAllocRes.error) return { data: null, error: equipAllocRes.error };
 
-        const equipRows = equipAllocRes.data || [];
+        // A supplier whose only equipment has all been off-hired has nothing left
+        // to offer either -- same dead-end-picker concern as the LABOUR filter below.
+        const equipRows = (equipAllocRes.data || []).filter(
+          (row: any) => !offHireKeys.has(offHireKey(row.supplier_id, row.equipment_master_id))
+        );
         const suppliersWithEquipment = new Set(equipRows.filter((row: any) => row.supplier_id).map((row: any) => row.supplier_id));
 
         const options = (suppAllocRes.data || [])
@@ -389,17 +395,20 @@ export default function EquipmentEntryScreen() {
         return;
       }
 
-      const { data } = await fetchWithCache(`equipment-for-job-supplier:${formData.job_id}:${formData.supplier_id}`, () =>
-        supabase
-          .from('job_equipment')
-          .select('equipment_master_id, supplier_id, equipment_master!inner(id, equipment_name)')
-          .eq('job_id', formData.job_id)
-          .eq('supplier_id', formData.supplier_id)
-          .eq('equipment_master.is_active', true)
-      );
+      const [{ data }, offHireKeys] = await Promise.all([
+        fetchWithCache(`equipment-for-job-supplier:${formData.job_id}:${formData.supplier_id}`, () =>
+          supabase
+            .from('job_equipment')
+            .select('equipment_master_id, supplier_id, equipment_master!inner(id, equipment_name)')
+            .eq('job_id', formData.job_id)
+            .eq('supplier_id', formData.supplier_id)
+            .eq('equipment_master.is_active', true)
+        ),
+        fetchOffHireStatusForJob(formData.job_id),
+      ]);
 
       const rawOptions = (data || [])
-        .filter((row: any) => row.equipment_master)
+        .filter((row: any) => row.equipment_master && !offHireKeys.has(offHireKey(row.supplier_id, row.equipment_master_id)))
         .map((row: any) => ({ label: row.equipment_master.equipment_name, value: row.equipment_master.id }));
       const equipmentOptions = Array.from(new Map(rawOptions.map(e => [e.value, e])).values())
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
