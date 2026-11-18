@@ -56,6 +56,7 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => 
                   placeholder={`Search ${label.toLowerCase()}...`}
                   placeholderTextColor="#94a3b8"
                   className="flex-1 ml-2 text-slate-900 font-medium"
+                  style={{ outline: 'none' } as any}
                 />
                 {searchQuery.length > 0 && (
                   <TouchableOpacity onPress={() => setSearchQuery('')}>
