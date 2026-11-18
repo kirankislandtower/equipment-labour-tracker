@@ -19,6 +19,11 @@ import {
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredOptions = searchQuery.trim()
+    ? options.filter((o: any) => o.label.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : options;
 
   return (
     <View className="mb-4">
@@ -33,22 +38,43 @@ const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => 
         <ChevronDown size={20} color="#64748b" />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} transparent animationType="slide">
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => { setModalVisible(false); setSearchQuery(''); }}>
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl h-[70%] shadow-2xl">
             <View className="flex-row items-center justify-between p-6 border-b border-slate-100">
               <Text className="text-slate-900 text-xl font-black tracking-tight">Select {label}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} className="p-2 bg-slate-100 rounded-full active:opacity-60">
+              <TouchableOpacity onPress={() => { setModalVisible(false); setSearchQuery(''); }} className="p-2 bg-slate-100 rounded-full active:opacity-60">
                 <X size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
+            <View className="px-6 pt-4 pb-2">
+              <View className="flex-row items-center bg-slate-100 rounded-xl px-4 py-3">
+                <Search size={18} color="#94a3b8" />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder={`Search ${label.toLowerCase()}...`}
+                  placeholderTextColor="#94a3b8"
+                  className="flex-1 ml-2 text-slate-900 font-medium"
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <X size={16} color="#94a3b8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
             <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-              {options.map((item: any) => (
+              {filteredOptions.length === 0 && (
+                <Text className="text-center text-slate-400 font-medium py-10">No matches found.</Text>
+              )}
+              {filteredOptions.map((item: any) => (
                 <TouchableOpacity
                   key={item.value}
                   onPress={() => {
                     onSelect(item.value);
                     setModalVisible(false);
+                    setSearchQuery('');
                   }}
                   className="flex-row items-center justify-between p-5 border-b border-slate-50 active:bg-blue-50"
                 >
