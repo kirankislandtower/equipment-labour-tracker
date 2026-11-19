@@ -293,7 +293,16 @@ export default function InternalVehicleEntryScreen() {
           if (name === 'New User' && userData.email) {
             name = userData.email.split('@')[0];
           }
-          setFormData(prev => ({ ...prev, requester_name: name }));
+          // Requester Name records who asked for the vehicle -- for a Foreman
+          // filling this in themselves, that's them, so auto-fill it. A Driver
+          // must name the Foreman who requested the trip instead, never
+          // themselves, so leave it blank for them on a new entry (an edit's
+          // saved value is restored separately below, by id).
+          if (role !== 'DRIVER') {
+            setFormData(prev => ({ ...prev, requester_name: name }));
+          } else if (!id) {
+            setFormData(prev => ({ ...prev, requester_name: '' }));
+          }
         }
       }
 
@@ -401,7 +410,7 @@ export default function InternalVehicleEntryScreen() {
     if (!formData.vehicle_id) newErrors.vehicle_id = 'Vehicle is required';
     if (!formData.job_id) newErrors.job_id = 'Job is required';
     if (formData.company === 'IST' && !formData.section) newErrors.section = 'Section is required';
-    if (!formData.number_of_trips) newErrors.number_of_trips = 'Number of trips is required';
+    if (formData.basis === 'TRIP_BASIS' && !formData.number_of_trips) newErrors.number_of_trips = 'Number of trips is required';
     if (!formData.requester_name) newErrors.requester_name = 'Requester name is required';
     if (!formData.driver_id) newErrors.driver_id = 'Driver / Operator is required';
 
@@ -818,7 +827,10 @@ export default function InternalVehicleEntryScreen() {
           required={true}
           value={formData.basis}
           options={BASIS_OPTIONS}
-          onSelect={(v: string) => updateForm('basis', v)}
+          onSelect={(v: string) => {
+            updateForm('basis', v);
+            if (v === 'HOURLY' && errors.number_of_trips) setErrors(prev => ({ ...prev, number_of_trips: '' }));
+          }}
         />
 
         <SectionHeader icon={Clock} label="Timing" />
@@ -881,7 +893,7 @@ export default function InternalVehicleEntryScreen() {
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-slate-700 mb-1">
-            Trip <Text className="text-red-500">*</Text>
+            Trip {formData.basis === 'TRIP_BASIS' ? <Text className="text-red-500">*</Text> : <Text className="text-slate-400">(Optional)</Text>}
           </Text>
           <TextInput
             value={formData.number_of_trips}
@@ -904,9 +916,12 @@ export default function InternalVehicleEntryScreen() {
             value={formData.requester_name}
             onChangeText={(t) => updateForm('requester_name', t)}
             className={`bg-white border ${errors.requester_name ? 'border-red-500' : 'border-slate-300'} text-slate-900 rounded-lg px-4 py-3.5`}
-            placeholder="Who requested this vehicle"
+            placeholder={role === 'DRIVER' ? "Foreman's name who requested this trip" : 'Who requested this vehicle'}
             placeholderTextColor="#94a3b8"
           />
+          {role === 'DRIVER' ? (
+            <Text className="text-xs text-slate-400 mt-1 ml-1">Enter the Foreman's name who asked for this trip, not your own.</Text>
+          ) : null}
           {errors.requester_name ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.requester_name}</Text> : null}
         </View>
 
