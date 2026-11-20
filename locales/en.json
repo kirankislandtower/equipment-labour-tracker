@@ -85,7 +85,9 @@
     "materialTitle": "Material Transfer",
     "materialDesc": "Log material shifted from one site to another, capture photo",
     "flushingTitle": "Flushing",
-    "flushingDesc": "Log tanker water supply/removal for flushing work"
+    "flushingDesc": "Log tanker water supply/removal for flushing work",
+    "fuelTopupTitle": "Fuel Top-Up Request",
+    "fuelTopupDesc": "Ask Store to send fuel for a vehicle on-site"
   },
   "profile": {
     "title": "Profile",

@@ -64,6 +64,7 @@ export default function HomeScreen() {
       Promise.all([
         supabase.from('equipment_entries').select('id', { count: 'exact', head: true }).eq('fuel_approval_status', 'PENDING'),
         supabase.from('flushing_entries').select('id', { count: 'exact', head: true }).eq('fuel_approval_status', 'PENDING'),
+        supabase.from('fuel_topup_requests').select('id', { count: 'exact', head: true }).eq('status', 'PENDING'),
       ]).then(results => {
         setPendingFuelApprovals(results.reduce((sum, r) => sum + (r.count || 0), 0));
       }).catch(err => console.error('Error counting pending fuel approvals:', err));

@@ -35,8 +35,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           // plus the driver-only Home variant and Internal Vehicles, which is
           // Driver-login only now.
           const hiddenRoutes = FLUSHING_ENABLED_FOR_FOREMEN
-            ? ['driver-home', 'entry/select', 'entry/material', 'entry/internal-vehicles', 'history', 'missing-photos', 'fuel-approvals']
-            : ['driver-home', 'entry/select', 'entry/material', 'entry/internal-vehicles', 'history', 'missing-photos', 'fuel-approvals', 'entry/flushing'];
+            ? ['driver-home', 'entry/select', 'entry/material', 'entry/internal-vehicles', 'history', 'missing-photos', 'fuel-approvals', 'entry/fuel-topup']
+            : ['driver-home', 'entry/select', 'entry/material', 'entry/internal-vehicles', 'history', 'missing-photos', 'fuel-approvals', 'entry/fuel-topup', 'entry/flushing'];
           if (hiddenRoutes.includes(route.name)) return null;
         }
 
@@ -197,6 +197,7 @@ export default function AppLayout() {
       <Tabs.Screen name="entry/material" options={{ href: null }} />
       <Tabs.Screen name="missing-photos" options={{ href: null }} />
       <Tabs.Screen name="fuel-approvals" options={{ href: null }} />
+      <Tabs.Screen name="entry/fuel-topup" options={{ href: null }} />
     </Tabs>
   );
 

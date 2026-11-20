@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Truck, Users, ArrowLeft, ChevronRight, ArrowRightLeft, Droplets } from 'lucide-react-native';
+import { Truck, Users, ArrowLeft, ChevronRight, ArrowRightLeft, Droplets, Fuel } from 'lucide-react-native';
 import { FLUSHING_ENABLED_FOR_FOREMEN } from '../../../lib/foremanFlags';
 
 export default function EntrySelectScreen() {
@@ -61,7 +61,7 @@ export default function EntrySelectScreen() {
         {/* Material Transfer Card */}
         <TouchableOpacity
           onPress={() => router.push('/(app)/entry/material')}
-          className={`bg-white rounded-2xl p-5 ${FLUSHING_ENABLED_FOR_FOREMEN ? 'mb-4' : 'mb-10'} border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center`}
+          className="bg-white rounded-2xl p-5 mb-4 border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center"
         >
           <View className="w-14 h-14 rounded-xl bg-amber-50 items-center justify-center mr-4 border border-amber-100">
             <ArrowRightLeft size={28} color="#d97706" />
@@ -69,6 +69,21 @@ export default function EntrySelectScreen() {
           <View className="flex-1">
             <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">{t('entrySelect.materialTitle')}</Text>
             <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">{t('entrySelect.materialDesc')}</Text>
+          </View>
+          <ChevronRight size={20} color="#cbd5e1" />
+        </TouchableOpacity>
+
+        {/* Fuel Top-Up Request Card */}
+        <TouchableOpacity
+          onPress={() => router.push('/(app)/entry/fuel-topup')}
+          className={`bg-white rounded-2xl p-5 ${FLUSHING_ENABLED_FOR_FOREMEN ? 'mb-4' : 'mb-10'} border border-slate-200 shadow-sm active:scale-[0.98] transition-transform flex-row items-center`}
+        >
+          <View className="w-14 h-14 rounded-xl bg-blue-50 items-center justify-center mr-4 border border-blue-100">
+            <Fuel size={28} color="#1d4ed8" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-slate-900 text-xl font-outfit-black tracking-tight mb-1">{t('entrySelect.fuelTopupTitle')}</Text>
+            <Text className="text-slate-500 font-outfit-medium text-xs leading-relaxed">{t('entrySelect.fuelTopupDesc')}</Text>
           </View>
           <ChevronRight size={20} color="#cbd5e1" />
         </TouchableOpacity>

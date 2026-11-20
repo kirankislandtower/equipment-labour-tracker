@@ -92,7 +92,7 @@ export default function AdminSettings() {
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
         supabase.from('equipment_master').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
         supabase.from('labour_designations').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
-        supabase.from('internal_vehicles').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
+        supabase.from('internal_vehicles').select('*', { count: 'exact', head: true }).or(`company.eq.${activeCompany},company.is.null`),
         supabase.from('internal_vehicle_drivers').select('*', { count: 'exact', head: true }).eq('company', activeCompany),
       ]);
       setCounts({
@@ -124,7 +124,11 @@ export default function AdminSettings() {
         const { data } = await supabase.from('labour_designations').select('*').eq('company', activeCompany).order('designation_name');
         setDesignations(data || []);
       } else if (activeTab === 'INTERNAL_VEHICLES') {
-        const { data } = await supabase.from('internal_vehicles').select('*').eq('company', activeCompany).order('vehicle_number');
+        // Unlike Jobs/Suppliers/Equipment/Designations, the internal vehicle
+        // fleet is shared across all 3 companies rather than owned by one --
+        // a NULL company means "common to every company", so it shows up
+        // under whichever tab is active alongside that company's own vehicles.
+        const { data } = await supabase.from('internal_vehicles').select('*').or(`company.eq.${activeCompany},company.is.null`).order('vehicle_number');
         setInternalVehicles(data || []);
       } else if (activeTab === 'DRIVERS') {
         const { data } = await supabase.from('internal_vehicle_drivers').select('*').eq('company', activeCompany).order('name');

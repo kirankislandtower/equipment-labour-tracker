@@ -22,6 +22,13 @@ const REJECTION_REASONS = [
   'Other',
 ] as const;
 
+const TOPUP_REJECTION_REASONS = [
+  'Already fueled recently -- not needed',
+  'Wrong vehicle/job selected',
+  'Duplicate request',
+  'Other',
+] as const;
+
 type PendingRequest = {
   id: string;
   type: keyof typeof TABLES;
@@ -34,6 +41,17 @@ type PendingRequest = {
   job_name: string;
 };
 
+type TopupRequest = {
+  id: string;
+  entry_date: string;
+  vehicle_number: string;
+  foreman_name: string;
+  quantity: number;
+  unit: string;
+  job_name: string;
+  remarks: string | null;
+};
+
 // Store-only screen -- the other half of the Fuel Approval workflow. A Foreman's
 // fuel entry saves instantly as "PENDING" (never blocks them on-site); this is
 // where Store reviews it against their own issue register and locks in the real
@@ -44,6 +62,7 @@ export default function FuelApprovalsScreen() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [storeName, setStoreName] = useState('Store');
+  const [activeTab, setActiveTab] = useState<'entries' | 'topups'>('entries');
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editedQuantity, setEditedQuantity] = useState('');
@@ -51,6 +70,16 @@ export default function FuelApprovalsScreen() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedPresetReason, setSelectedPresetReason] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+
+  // Top-Up Requests tab -- separate state from the Entries tab above since
+  // they're two unrelated lists that just happen to share this screen.
+  const [topupRequests, setTopupRequests] = useState<TopupRequest[]>([]);
+  const [expandedTopupId, setExpandedTopupId] = useState<string | null>(null);
+  const [editedTopupQuantity, setEditedTopupQuantity] = useState('');
+  const [rejectingTopup, setRejectingTopup] = useState(false);
+  const [topupRejectionReason, setTopupRejectionReason] = useState('');
+  const [selectedTopupPresetReason, setSelectedTopupPresetReason] = useState<string | null>(null);
+  const [actingTopupId, setActingTopupId] = useState<string | null>(null);
 
   const isStore = isStoreForeman(user?.email);
 
@@ -64,7 +93,7 @@ export default function FuelApprovalsScreen() {
         }
       }
 
-      const [eq, fl] = await Promise.all([
+      const [eq, fl, tu] = await Promise.all([
         supabase
           .from('equipment_entries')
           .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
@@ -74,6 +103,11 @@ export default function FuelApprovalsScreen() {
           .from('flushing_entries')
           .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
           .eq('fuel_approval_status', 'PENDING')
+          .order('entry_date', { ascending: false }),
+        supabase
+          .from('fuel_topup_requests')
+          .select('id, entry_date, vehicle_number, foreman_name, quantity, unit, remarks, jobs:job_id (job_name)')
+          .eq('status', 'PENDING')
           .order('entry_date', { ascending: false }),
       ]);
 
@@ -92,6 +126,19 @@ export default function FuelApprovalsScreen() {
       const all = [...(eq.data || []).map(toRow('equipment')), ...(fl.data || []).map(toRow('flushing'))];
       all.sort((a, b) => (a.entry_date < b.entry_date ? 1 : -1));
       setRequests(all);
+
+      const topups = (tu.data || []).map((e: any): TopupRequest => ({
+        id: e.id,
+        entry_date: e.entry_date,
+        vehicle_number: e.vehicle_number || 'Unknown Vehicle',
+        foreman_name: e.foreman_name || 'Unknown Foreman',
+        quantity: e.quantity,
+        unit: e.unit || '',
+        job_name: e.jobs?.job_name || 'Unknown Job',
+        remarks: e.remarks || null,
+      }));
+      topups.sort((a, b) => (a.entry_date < b.entry_date ? 1 : -1));
+      setTopupRequests(topups);
     } catch (err) {
       console.error('Error loading fuel approvals', err);
     } finally {
@@ -168,6 +215,63 @@ export default function FuelApprovalsScreen() {
     }
   };
 
+  const openTopupRequest = (req: TopupRequest) => {
+    const isSame = expandedTopupId === req.id;
+    setExpandedTopupId(isSame ? null : req.id);
+    setEditedTopupQuantity(isSame ? '' : (req.quantity != null ? req.quantity.toString() : ''));
+    setRejectingTopup(false);
+    setTopupRejectionReason('');
+    setSelectedTopupPresetReason(null);
+  };
+
+  const handleApproveTopup = async (req: TopupRequest) => {
+    const quantity = parseFloat(editedTopupQuantity);
+    if (!editedTopupQuantity || isNaN(quantity) || quantity <= 0) return;
+    setActingTopupId(req.id);
+    try {
+      const { error } = await supabase
+        .from('fuel_topup_requests')
+        .update({
+          quantity,
+          status: 'APPROVED',
+          approved_by: storeName,
+          approved_at: new Date().toISOString(),
+          rejection_reason: null,
+        })
+        .eq('id', req.id);
+      if (error) throw error;
+      setTopupRequests(prev => prev.filter(r => r.id !== req.id));
+      setExpandedTopupId(null);
+    } catch (err: any) {
+      console.error('Error approving fuel top-up request', err);
+    } finally {
+      setActingTopupId(null);
+    }
+  };
+
+  const handleRejectTopup = async (req: TopupRequest) => {
+    if (!topupRejectionReason.trim()) return;
+    setActingTopupId(req.id);
+    try {
+      const { error } = await supabase
+        .from('fuel_topup_requests')
+        .update({
+          status: 'REJECTED',
+          approved_by: storeName,
+          approved_at: new Date().toISOString(),
+          rejection_reason: topupRejectionReason.trim(),
+        })
+        .eq('id', req.id);
+      if (error) throw error;
+      setTopupRequests(prev => prev.filter(r => r.id !== req.id));
+      setExpandedTopupId(null);
+    } catch (err: any) {
+      console.error('Error rejecting fuel top-up request', err);
+    } finally {
+      setActingTopupId(null);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <StatusBar barStyle="dark-content" />
@@ -179,13 +283,33 @@ export default function FuelApprovalsScreen() {
         <Text className="text-slate-900 text-2xl font-black tracking-tight ml-3">Fuel Approvals</Text>
       </View>
 
+      <View className="flex-row bg-slate-100 p-1 mx-4 mt-4 rounded-xl">
+        <TouchableOpacity
+          onPress={() => setActiveTab('entries')}
+          className={`flex-1 py-2.5 rounded-lg items-center ${activeTab === 'entries' ? 'bg-white shadow-sm' : ''}`}
+        >
+          <Text className={`font-bold text-sm ${activeTab === 'entries' ? 'text-slate-900' : 'text-slate-500'}`}>
+            Fuel Confirmations {requests.length > 0 ? `(${requests.length})` : ''}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('topups')}
+          className={`flex-1 py-2.5 rounded-lg items-center ${activeTab === 'topups' ? 'bg-white shadow-sm' : ''}`}
+        >
+          <Text className={`font-bold text-sm ${activeTab === 'topups' ? 'text-slate-900' : 'text-slate-500'}`}>
+            Top-Up Requests {topupRequests.length > 0 ? `(${topupRequests.length})` : ''}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
         {loading ? (
           <View className="py-20 items-center">
             <ActivityIndicator size="large" color="#1e3a8a" />
           </View>
-        ) : requests.length === 0 ? (
+        ) : activeTab === 'entries' ? (
+        requests.length === 0 ? (
           <View className="py-20 items-center bg-white rounded-3xl border border-slate-100">
             <View className="bg-green-50 p-4 rounded-full mb-4">
               <CheckCircle2 size={32} color="#16a34a" />
@@ -319,6 +443,144 @@ export default function FuelApprovalsScreen() {
               );
             })}
           </>
+        )
+        ) : (
+        topupRequests.length === 0 ? (
+          <View className="py-20 items-center bg-white rounded-3xl border border-slate-100">
+            <View className="bg-green-50 p-4 rounded-full mb-4">
+              <CheckCircle2 size={32} color="#16a34a" />
+            </View>
+            <Text className="text-slate-900 text-lg font-black">All caught up</Text>
+            <Text className="text-slate-500 mt-1 text-center">No fuel top-up requests waiting on you.</Text>
+          </View>
+        ) : (
+          <>
+            <Text className="text-slate-500 font-medium mb-4">
+              A Foreman is asking for fuel to be sent out. Confirm the liters you're actually issuing, then Approve -- or Reject with a reason if it's not needed.
+            </Text>
+            {topupRequests.map(req => {
+              const isExpanded = expandedTopupId === req.id;
+              const isActing = actingTopupId === req.id;
+              return (
+                <View key={req.id} className="bg-white rounded-2xl border border-slate-200 mb-3 shadow-sm overflow-hidden">
+                  <TouchableOpacity onPress={() => openTopupRequest(req)} className="p-4 active:bg-slate-50">
+                    <View className="flex-row justify-between items-start mb-1">
+                      <View className="px-2.5 py-1 rounded-full bg-indigo-100">
+                        <Text className="text-[10px] font-bold uppercase text-indigo-700">Top-Up Request</Text>
+                      </View>
+                      <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
+                        <Fuel size={12} color="#d97706" />
+                        <Text className="text-amber-800 font-bold text-xs ml-1">{req.quantity} {req.unit}</Text>
+                      </View>
+                    </View>
+                    <Text className="text-slate-900 font-bold text-base mt-2">{req.vehicle_number}</Text>
+                    <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}</Text>
+                    <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
+                    {!!req.remarks && (
+                      <Text className="text-slate-500 text-xs mt-1.5 italic">"{req.remarks}"</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  {isExpanded && (
+                    <View className="px-4 pb-4 pt-1 border-t border-slate-100">
+                      {!rejectingTopup ? (
+                        <>
+                          <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 mt-3">Confirmed Quantity</Text>
+                          <TextInput
+                            value={editedTopupQuantity}
+                            onChangeText={setEditedTopupQuantity}
+                            keyboardType="decimal-pad"
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold text-base mb-3"
+                            style={{ outlineStyle: 'none' } as any}
+                          />
+                          <View className="flex-row gap-2">
+                            <TouchableOpacity
+                              onPress={() => { setRejectingTopup(true); setSelectedTopupPresetReason(null); setTopupRejectionReason(''); }}
+                              disabled={isActing}
+                              className="flex-1 flex-row items-center justify-center bg-red-50 border border-red-200 py-3 rounded-xl active:bg-red-100"
+                            >
+                              <XCircle size={16} color="#b91c1c" />
+                              <Text className="text-red-700 font-bold ml-2">Reject</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => handleApproveTopup(req)}
+                              disabled={isActing}
+                              className={`flex-1 flex-row items-center justify-center py-3 rounded-xl ${isActing ? 'bg-green-300' : 'bg-green-600 active:bg-green-700'}`}
+                            >
+                              {isActing ? <ActivityIndicator color="#fff" size="small" /> : (
+                                <>
+                                  <Check size={16} color="#ffffff" />
+                                  <Text className="text-white font-bold ml-2">Approve</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 mt-3">Reason for Rejection</Text>
+                          <View className="mb-3">
+                            {TOPUP_REJECTION_REASONS.map(reason => {
+                              const isSelected = selectedTopupPresetReason === reason;
+                              return (
+                                <TouchableOpacity
+                                  key={reason}
+                                  onPress={() => {
+                                    setSelectedTopupPresetReason(reason);
+                                    setTopupRejectionReason(reason === 'Other' ? '' : reason);
+                                  }}
+                                  className={`flex-row items-center p-3 mb-1.5 rounded-xl border ${isSelected ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}
+                                >
+                                  <View className={`w-4 h-4 rounded-full border-2 items-center justify-center mr-2.5 ${isSelected ? 'border-red-500' : 'border-slate-300'}`}>
+                                    {isSelected && <View className="w-2 h-2 rounded-full bg-red-500" />}
+                                  </View>
+                                  <Text className={`flex-1 text-sm ${isSelected ? 'text-red-800 font-bold' : 'text-slate-600 font-medium'}`}>{reason}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                          {selectedTopupPresetReason === 'Other' && (
+                            <TextInput
+                              value={topupRejectionReason}
+                              onChangeText={setTopupRejectionReason}
+                              placeholder="Type the reason"
+                              placeholderTextColor="#94a3b8"
+                              multiline
+                              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-medium mb-3 min-h-[70px]"
+                              style={{ outlineStyle: 'none', textAlignVertical: 'top' } as any}
+                            />
+                          )}
+                          <View className="flex-row gap-2">
+                            <TouchableOpacity
+                              onPress={() => setRejectingTopup(false)}
+                              disabled={isActing}
+                              className="flex-1 flex-row items-center justify-center bg-slate-100 py-3 rounded-xl active:bg-slate-200"
+                            >
+                              <X size={16} color="#475569" />
+                              <Text className="text-slate-700 font-bold ml-2">Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => handleRejectTopup(req)}
+                              disabled={isActing || !topupRejectionReason.trim()}
+                              className={`flex-1 flex-row items-center justify-center py-3 rounded-xl ${!topupRejectionReason.trim() || isActing ? 'bg-red-300' : 'bg-red-600 active:bg-red-700'}`}
+                            >
+                              {isActing ? <ActivityIndicator color="#fff" size="small" /> : (
+                                <>
+                                  <XCircle size={16} color="#ffffff" />
+                                  <Text className="text-white font-bold ml-2">Confirm Reject</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </>
+        )
         )}
       </ScrollView>
       </KeyboardAvoidingView>
