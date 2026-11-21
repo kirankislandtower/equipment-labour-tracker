@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, StatusBar, Platform } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, StatusBar, Platform, Animated } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Truck, Users, CheckCircle, Clock, ChevronRight, LayoutDashboard, Calendar, Filter, CloudCog, AlertTriangle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -9,7 +9,118 @@ import DatePickerModal from '../../components/DatePickerModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Download } from 'lucide-react-native';
+import { FadeInUp, AnimatedPressable } from '../../components/Animations';
 import { useAuth } from '../../lib/auth';
+
+// Hoisted out of AdminDashboard (was defined inline before) so it's a stable
+// component type across renders -- otherwise React would remount it, and its
+// own entrance/count-up state, on every unrelated parent re-render.
+const StatCard = ({ title, value, icon: Icon, colorClass, bgColorClass, iconColor, onPress, index = 0 }: any) => {
+  const entranceAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const countAnim = useRef(new Animated.Value(0)).current;
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    Animated.timing(entranceAnim, { toValue: 1, duration: 450, delay: index * 90, useNativeDriver: true }).start();
+    Animated.timing(countAnim, { toValue: value, duration: 700, delay: index * 90, useNativeDriver: false }).start();
+    const id = countAnim.addListener(({ value: v }) => setDisplayValue(Math.round(v)));
+    return () => countAnim.removeListener(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePressIn = () => Animated.spring(scaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start();
+  const handlePressOut = () => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 4 }).start();
+
+  return (
+    <Animated.View
+      style={{
+        width: '48%',
+        opacity: entranceAnim,
+        transform: [
+          { translateY: entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) },
+          { scale: scaleAnim },
+        ],
+      }}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.9}
+        className="bg-white p-6 rounded-2xl border border-slate-200 mb-4 justify-between shadow-sm"
+      >
+        <View className="flex-row justify-between items-start mb-4">
+          <View className={`${bgColorClass} p-2.5 rounded-xl`}>
+            <Icon size={20} color={iconColor} strokeWidth={2.5} />
+          </View>
+        </View>
+        <View>
+          <Text className={`text-5xl font-mono-bold ${colorClass} tracking-tighter mb-1`}>{displayValue}</Text>
+          <Text className="text-slate-500 text-[10px] font-outfit-bold uppercase tracking-widest leading-tight">{title}</Text>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// Its own component (not an inline IIFE in the parent's JSX) specifically so its
+// useRef/useEffect for the progress-bar animation don't break the rules of hooks
+// when cloudinaryUsage is conditionally null -- a conditionally-rendered component
+// is fine; a conditionally-invoked hook inside the parent's own render isn't.
+const CloudinaryUsageBar = ({ usage }: { usage: { usedPercent: number; creditsUsed: number; creditsLimit: number; plan: string } }) => {
+  const pct = usage.usedPercent;
+  const level = pct >= 85 ? 'danger' : pct >= 60 ? 'warning' : 'safe';
+  const colors = {
+    safe: { bar: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-200', bg: 'bg-emerald-50', icon: '#059669' },
+    warning: { bar: 'bg-amber-500', text: 'text-amber-700', border: 'border-amber-200', bg: 'bg-amber-50', icon: '#d97706' },
+    danger: { bar: 'bg-red-500', text: 'text-red-700', border: 'border-red-200', bg: 'bg-red-50', icon: '#dc2626' },
+  }[level];
+
+  const barAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(barAnim, { toValue: Math.min(pct, 100), duration: 900, useNativeDriver: false }).start();
+  }, [pct]);
+
+  return (
+    <FadeInUp delay={150} style={{ marginBottom: 24 }}>
+      <View className={`p-5 rounded-2xl border ${colors.border} ${colors.bg}`}>
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center">
+            <CloudCog size={18} color={colors.icon} />
+            <Text className="text-slate-900 font-outfit-bold text-[15px] ml-2">Cloudinary Storage</Text>
+          </View>
+          <Text className={`font-mono-bold text-lg ${colors.text}`}>{pct.toFixed(1)}%</Text>
+        </View>
+        <View className="h-2.5 bg-white rounded-full overflow-hidden mb-2 border border-slate-200">
+          <Animated.View
+            style={{ height: '100%', width: barAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }}
+            className={colors.bar}
+          />
+        </View>
+        <Text className="text-slate-500 text-[11px] font-outfit-medium">
+          {usage.creditsUsed.toFixed(2)} of {usage.creditsLimit} credits used this cycle ({usage.plan} plan)
+        </Text>
+        {level === 'danger' && (
+          <View className="flex-row items-center mt-3">
+            <AlertTriangle size={14} color="#dc2626" />
+            <Text className="text-red-700 text-[11px] font-outfit-bold ml-1.5">
+              Approaching your plan limit -- time to upgrade Cloudinary.
+            </Text>
+          </View>
+        )}
+        {level === 'warning' && (
+          <View className="flex-row items-center mt-3">
+            <AlertTriangle size={14} color="#d97706" />
+            <Text className="text-amber-700 text-[11px] font-outfit-bold ml-1.5">
+              Usage is climbing -- keep an eye on this over the next few days.
+            </Text>
+          </View>
+        )}
+      </View>
+    </FadeInUp>
+  );
+};
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -276,45 +387,30 @@ export default function AdminDashboard() {
     }
   };
 
-  const StatCard = ({ title, value, icon: Icon, colorClass, bgColorClass, iconColor, onPress }: any) => (
-    <TouchableOpacity 
-      onPress={onPress} 
-      className="bg-white p-6 rounded-2xl border border-slate-200 mb-4 justify-between active:scale-[0.98] transition-transform shadow-sm"
-      style={{ width: '48%' }}
-    >
-      <View className="flex-row justify-between items-start mb-4">
-        <View className={`${bgColorClass} p-2.5 rounded-xl`}>
-          <Icon size={20} color={iconColor} strokeWidth={2.5} />
-        </View>
-      </View>
-      <View>
-        <Text className={`text-5xl font-mono-bold ${colorClass} tracking-tighter mb-1`}>{value}</Text>
-        <Text className="text-slate-500 text-[10px] font-outfit-bold uppercase tracking-widest leading-tight">{title}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
   return (
     <View className="flex-1 bg-slate-50">
       <StatusBar barStyle="light-content" />
       
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false} bounces={false}>
         {/* Premium Header */}
-        <View className="bg-slate-950 pt-16 pb-8 px-6 rounded-b-[32px] border-b border-slate-900 shadow-sm">
-          <View className="flex-row items-center justify-between mb-2">
-            <View>
-              <Text className="text-white text-3xl font-outfit-black tracking-tight">Dashboard</Text>
-              <Text className="text-indigo-400 text-xs font-outfit-bold uppercase tracking-widest mt-1">Island Tower Admin</Text>
-            </View>
-            <View className="bg-white/10 p-4 rounded-2xl">
-              <LayoutDashboard size={28} color="#ffffff" strokeWidth={2} />
+        <FadeInUp delay={0}>
+          <View className="bg-slate-950 pt-16 pb-8 px-6 rounded-b-[32px] border-b border-slate-900 shadow-sm">
+            <View className="flex-row items-center justify-between mb-2">
+              <View>
+                <Text className="text-white text-3xl font-outfit-black tracking-tight">Dashboard</Text>
+                <Text className="text-indigo-400 text-xs font-outfit-bold uppercase tracking-widest mt-1">Island Tower Admin</Text>
+              </View>
+              <View className="bg-white/10 p-4 rounded-2xl">
+                <LayoutDashboard size={28} color="#ffffff" strokeWidth={2} />
+              </View>
             </View>
           </View>
-        </View>
+        </FadeInUp>
 
         <View className="px-5 pt-6">
         {/* Date Range Header */}
-        <View className="flex-row justify-between items-center mb-6 mt-[-10px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <FadeInUp delay={80} style={{ marginBottom: 24, marginTop: -10 }}>
+        <View className="flex-row justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <View className="flex-1 mr-3">
             <Text className="text-slate-500 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">Showing Data For</Text>
             <Text className="text-slate-900 font-mono-bold text-sm flex-wrap">
@@ -324,51 +420,49 @@ export default function AdminDashboard() {
                 </Text>
               ) : (
                 <Text>
-                  {fromDate} <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mx-1">{new Date(fromDate).toLocaleDateString('en-US', { weekday: 'short' })}</Text> 
-                  <Text className="text-slate-400 mx-1">to</Text> 
+                  {fromDate} <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mx-1">{new Date(fromDate).toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+                  <Text className="text-slate-400 mx-1">to</Text>
                   {toDate} <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest ml-1">{new Date(toDate).toLocaleDateString('en-US', { weekday: 'short' })}</Text>
                 </Text>
               )}
             </Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => setIsFilterExpanded(!isFilterExpanded)}
-            className={`flex-shrink-0 px-3 py-2 rounded-full flex-row items-center border ${isFilterExpanded ? 'bg-slate-900 border-slate-900' : 'bg-indigo-50 border-indigo-100'}`}
-          >
-            <Filter size={14} color={isFilterExpanded ? '#ffffff' : '#4f46e5'} />
-            <Text className={`font-outfit-bold text-[10px] ml-1.5 tracking-wide ${isFilterExpanded ? 'text-white' : 'text-indigo-600'}`}>
-              {isFilterExpanded ? 'HIDE' : 'FILTER'}
-            </Text>
-          </TouchableOpacity>
+          <AnimatedPressable onPress={() => setIsFilterExpanded(!isFilterExpanded)}>
+            <View className={`flex-shrink-0 px-3 py-2 rounded-full flex-row items-center border ${isFilterExpanded ? 'bg-slate-900 border-slate-900' : 'bg-indigo-50 border-indigo-100'}`}>
+              <Filter size={14} color={isFilterExpanded ? '#ffffff' : '#4f46e5'} />
+              <Text className={`font-outfit-bold text-[10px] ml-1.5 tracking-wide ${isFilterExpanded ? 'text-white' : 'text-indigo-600'}`}>
+                {isFilterExpanded ? 'HIDE' : 'FILTER'}
+              </Text>
+            </View>
+          </AnimatedPressable>
         </View>
+        </FadeInUp>
 
         {isFilterExpanded && (
-          <View className={`mb-6 flex-row gap-3`}>
-            <TouchableOpacity 
-              className="flex-row items-center bg-white border border-slate-200 rounded-2xl p-4 flex-1 shadow-sm active:scale-[0.99] relative overflow-hidden"
-              onPress={() => setShowFromPicker(true)}
-            >
-              <View className="bg-indigo-50 p-3 rounded-xl mr-3 border border-indigo-100" pointerEvents="none">
-                <Calendar size={20} color="#4f46e5" />
+          <FadeInUp delay={0} style={{ marginBottom: 24, flexDirection: 'row', gap: 12 }}>
+            <AnimatedPressable onPress={() => setShowFromPicker(true)} style={{ flex: 1 }}>
+              <View className="flex-row items-center bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <View className="bg-indigo-50 p-3 rounded-xl mr-3 border border-indigo-100">
+                  <Calendar size={20} color="#4f46e5" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">From Date</Text>
+                  <Text className="text-slate-900 font-mono-bold text-base">{fromDate}</Text>
+                </View>
               </View>
-              <View className="flex-1" pointerEvents="none">
-                <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">From Date</Text>
-                <Text className="text-slate-900 font-mono-bold text-base">{fromDate}</Text>
+            </AnimatedPressable>
+
+            <AnimatedPressable onPress={() => setShowToPicker(true)} style={{ flex: 1 }}>
+              <View className="flex-row items-center bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <View className="bg-indigo-50 p-3 rounded-xl mr-3 border border-indigo-100">
+                  <Calendar size={20} color="#4f46e5" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">To Date</Text>
+                  <Text className="text-slate-900 font-mono-bold text-base">{toDate}</Text>
+                </View>
               </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              className="flex-row items-center bg-white border border-slate-200 rounded-2xl p-4 flex-1 shadow-sm active:scale-[0.99] relative overflow-hidden"
-              onPress={() => setShowToPicker(true)}
-            >
-              <View className="bg-indigo-50 p-3 rounded-xl mr-3 border border-indigo-100" pointerEvents="none">
-                <Calendar size={20} color="#4f46e5" />
-              </View>
-              <View className="flex-1" pointerEvents="none">
-                <Text className="text-slate-400 text-[10px] font-outfit-bold uppercase tracking-widest mb-1">To Date</Text>
-                <Text className="text-slate-900 font-mono-bold text-base">{toDate}</Text>
-              </View>
-            </TouchableOpacity>
+            </AnimatedPressable>
 
             <DatePickerModal
               visible={showFromPicker}
@@ -383,7 +477,7 @@ export default function AdminDashboard() {
               onClose={() => setShowToPicker(false)}
               onSelect={(d) => setToDate(d)}
             />
-          </View>
+          </FadeInUp>
         )}
         
         {loading ? (
@@ -396,97 +490,61 @@ export default function AdminDashboard() {
             {/* Statistics Grid */}
             <View className="flex-row flex-wrap justify-between">
               <StatCard 
-                title="Pending Equipment" 
-                value={stats.pendingEquipment} 
-                icon={Clock} 
+                title="Pending Equipment"
+                value={stats.pendingEquipment}
+                icon={Clock}
                 colorClass="text-amber-600"
                 bgColorClass="bg-amber-100"
                 iconColor="#d97706"
                 onPress={() => router.push({ pathname: '/(admin)/equipment', params: { filter: 'SUBMITTED' } })}
+                index={0}
               />
-              <StatCard 
-                title="Pending Labour" 
-                value={stats.pendingLabour} 
-                icon={Clock} 
+              <StatCard
+                title="Pending Labour"
+                value={stats.pendingLabour}
+                icon={Clock}
                 colorClass="text-amber-600"
                 bgColorClass="bg-amber-100"
                 iconColor="#d97706"
                 onPress={() => router.push({ pathname: '/(admin)/labour', params: { filter: 'SUBMITTED' } })}
+                index={1}
               />
-              <StatCard 
-                title="Approved Equipment" 
-                value={stats.approvedEquipment} 
-                icon={CheckCircle} 
+              <StatCard
+                title="Approved Equipment"
+                value={stats.approvedEquipment}
+                icon={CheckCircle}
                 colorClass="text-green-600"
                 bgColorClass="bg-green-100"
                 iconColor="#16a34a"
                 onPress={() => router.push({ pathname: '/(admin)/equipment', params: { filter: 'APPROVED' } })}
+                index={2}
               />
-              <StatCard 
-                title="Approved Labour" 
-                value={stats.approvedLabour} 
-                icon={CheckCircle} 
+              <StatCard
+                title="Approved Labour"
+                value={stats.approvedLabour}
+                icon={CheckCircle}
                 colorClass="text-green-600"
                 bgColorClass="bg-green-100"
                 iconColor="#16a34a"
                 onPress={() => router.push({ pathname: '/(admin)/labour', params: { filter: 'APPROVED' } })}
+                index={3}
               />
             </View>
 
             {(!loading && stats.pendingEquipment === 0 && stats.pendingLabour === 0) && (
-              <View className="mb-6 bg-emerald-50 p-6 rounded-2xl border border-emerald-200 items-center justify-center">
-                <View className="bg-emerald-100 p-3 rounded-full mb-3">
-                  <CheckCircle size={28} color="#10b981" />
+              <FadeInUp delay={360} style={{ marginBottom: 24 }}>
+                <View className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 items-center justify-center">
+                  <View className="bg-emerald-100 p-3 rounded-full mb-3">
+                    <CheckCircle size={28} color="#10b981" />
+                  </View>
+                  <Text className="text-emerald-900 text-xl font-outfit-bold tracking-tight">All caught up!</Text>
+                  <Text className="text-emerald-700 text-center mt-1 text-sm font-outfit-medium">No pending entries require approval.</Text>
                 </View>
-                <Text className="text-emerald-900 text-xl font-outfit-bold tracking-tight">All caught up!</Text>
-                <Text className="text-emerald-700 text-center mt-1 text-sm font-outfit-medium">No pending entries require approval.</Text>
-              </View>
+              </FadeInUp>
             )}
 
             {/* Cloudinary Usage */}
-            {cloudinaryUsage && (() => {
-              const pct = cloudinaryUsage.usedPercent;
-              const level = pct >= 85 ? 'danger' : pct >= 60 ? 'warning' : 'safe';
-              const colors = {
-                safe: { bar: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-200', bg: 'bg-emerald-50', icon: '#059669' },
-                warning: { bar: 'bg-amber-500', text: 'text-amber-700', border: 'border-amber-200', bg: 'bg-amber-50', icon: '#d97706' },
-                danger: { bar: 'bg-red-500', text: 'text-red-700', border: 'border-red-200', bg: 'bg-red-50', icon: '#dc2626' },
-              }[level];
-
-              return (
-                <View className={`mb-6 p-5 rounded-2xl border ${colors.border} ${colors.bg}`}>
-                  <View className="flex-row items-center justify-between mb-3">
-                    <View className="flex-row items-center">
-                      <CloudCog size={18} color={colors.icon} />
-                      <Text className="text-slate-900 font-outfit-bold text-[15px] ml-2">Cloudinary Storage</Text>
-                    </View>
-                    <Text className={`font-mono-bold text-lg ${colors.text}`}>{pct.toFixed(1)}%</Text>
-                  </View>
-                  <View className="h-2.5 bg-white rounded-full overflow-hidden mb-2 border border-slate-200">
-                    <View style={{ width: `${Math.min(pct, 100)}%` }} className={`h-full ${colors.bar}`} />
-                  </View>
-                  <Text className="text-slate-500 text-[11px] font-outfit-medium">
-                    {cloudinaryUsage.creditsUsed.toFixed(2)} of {cloudinaryUsage.creditsLimit} credits used this cycle ({cloudinaryUsage.plan} plan)
-                  </Text>
-                  {level === 'danger' && (
-                    <View className="flex-row items-center mt-3">
-                      <AlertTriangle size={14} color="#dc2626" />
-                      <Text className="text-red-700 text-[11px] font-outfit-bold ml-1.5">
-                        Approaching your plan limit -- time to upgrade Cloudinary.
-                      </Text>
-                    </View>
-                  )}
-                  {level === 'warning' && (
-                    <View className="flex-row items-center mt-3">
-                      <AlertTriangle size={14} color="#d97706" />
-                      <Text className="text-amber-700 text-[11px] font-outfit-bold ml-1.5">
-                        Usage is climbing -- keep an eye on this over the next few days.
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })()}
+            {cloudinaryUsage && <CloudinaryUsageBar usage={cloudinaryUsage} />}
 
             {!cloudinaryUsage && cloudinaryError && (
               <View className="mb-6 p-4 rounded-2xl border border-slate-200 bg-slate-50">
@@ -500,49 +558,51 @@ export default function AdminDashboard() {
             {/* Quick Actions */}
             <View className="mt-2 mb-8">
               <Text className="text-slate-900 text-sm font-outfit-bold uppercase tracking-widest mb-4 px-1">Quick Actions</Text>
-              
-              <TouchableOpacity 
-                onPress={() => router.push('/(admin)/equipment')}
-                className="bg-white flex-row items-center p-4 rounded-2xl border border-slate-200 mb-3 shadow-sm active:scale-[0.99] transition-transform"
-              >
-                <View className="bg-slate-50 p-3 rounded-xl mr-4 border border-slate-100">
-                  <Truck size={20} color="#475569" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-slate-900 font-outfit-bold text-[15px]">Manage Equipment</Text>
-                  <Text className="text-slate-500 text-[11px] mt-0.5 font-outfit-medium">Review and approve daily entries</Text>
-                </View>
-                <ChevronRight size={18} color="#cbd5e1" />
-              </TouchableOpacity>
 
-              <TouchableOpacity 
-                onPress={() => router.push('/(admin)/labour')}
-                className="bg-white flex-row items-center p-4 rounded-2xl border border-slate-200 shadow-sm active:scale-[0.99] transition-transform"
-              >
-                <View className="bg-slate-50 p-3 rounded-xl mr-4 border border-slate-100">
-                  <Users size={20} color="#475569" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-slate-900 font-outfit-bold text-[15px]">Manage Labour</Text>
-                  <Text className="text-slate-500 text-[11px] mt-0.5 font-outfit-medium">Review and approve daily timesheets</Text>
-                </View>
-                <ChevronRight size={18} color="#cbd5e1" />
-              </TouchableOpacity>
+              <FadeInUp delay={0} style={{ marginBottom: 12 }}>
+                <AnimatedPressable onPress={() => router.push('/(admin)/equipment')}>
+                  <View className="bg-white flex-row items-center p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <View className="bg-slate-50 p-3 rounded-xl mr-4 border border-slate-100">
+                      <Truck size={20} color="#475569" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-slate-900 font-outfit-bold text-[15px]">Manage Equipment</Text>
+                      <Text className="text-slate-500 text-[11px] mt-0.5 font-outfit-medium">Review and approve daily entries</Text>
+                    </View>
+                    <ChevronRight size={18} color="#cbd5e1" />
+                  </View>
+                </AnimatedPressable>
+              </FadeInUp>
 
-              <TouchableOpacity 
-                onPress={exportDailyReport}
-                disabled={exporting}
-                className="bg-slate-950 flex-row items-center p-4 rounded-2xl active:scale-[0.99] transition-transform mt-3 shadow-sm"
-              >
-                <View className="bg-slate-800 p-3 rounded-xl mr-4">
-                  {exporting ? <ActivityIndicator color="#fff" size="small" /> : <Download size={20} color="#ffffff" />}
-                </View>
-                <View className="flex-1">
-                  <Text className="text-white font-outfit-bold text-[15px]">Export Daily CSV</Text>
-                  <Text className="text-slate-400 text-[11px] mt-0.5 font-outfit-medium">Download for Google Sheets or Excel</Text>
-                </View>
-                <ChevronRight size={18} color="#475569" />
-              </TouchableOpacity>
+              <FadeInUp delay={80}>
+                <AnimatedPressable onPress={() => router.push('/(admin)/labour')}>
+                  <View className="bg-white flex-row items-center p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <View className="bg-slate-50 p-3 rounded-xl mr-4 border border-slate-100">
+                      <Users size={20} color="#475569" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-slate-900 font-outfit-bold text-[15px]">Manage Labour</Text>
+                      <Text className="text-slate-500 text-[11px] mt-0.5 font-outfit-medium">Review and approve daily timesheets</Text>
+                    </View>
+                    <ChevronRight size={18} color="#cbd5e1" />
+                  </View>
+                </AnimatedPressable>
+              </FadeInUp>
+
+              <FadeInUp delay={160} style={{ marginTop: 12 }}>
+                <AnimatedPressable onPress={exportDailyReport} disabled={exporting}>
+                  <View className="bg-slate-950 flex-row items-center p-4 rounded-2xl shadow-sm">
+                    <View className="bg-slate-800 p-3 rounded-xl mr-4">
+                      {exporting ? <ActivityIndicator color="#fff" size="small" /> : <Download size={20} color="#ffffff" />}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-white font-outfit-bold text-[15px]">Export Daily CSV</Text>
+                      <Text className="text-slate-400 text-[11px] mt-0.5 font-outfit-medium">Download for Google Sheets or Excel</Text>
+                    </View>
+                    <ChevronRight size={18} color="#475569" />
+                  </View>
+                </AnimatedPressable>
+              </FadeInUp>
             </View>
           </>
         )}

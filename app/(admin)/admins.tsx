@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Users, Plus, X, User, Eye, EyeOff } from 'lucide-react-native';
+import { FadeInUp } from '../../components/Animations';
 
 export default function AdminsScreen() {
   const { width } = useWindowDimensions();
@@ -94,6 +95,7 @@ export default function AdminsScreen() {
   };
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className={`flex-1 bg-slate-50 ${isMobile ? 'p-4' : 'p-8'}`}>
       <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
         <View>
@@ -260,5 +262,6 @@ export default function AdminsScreen() {
       </Modal>
 
     </View>
+    </FadeInUp>
   );
 }

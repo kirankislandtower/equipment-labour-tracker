@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, Modal, useWindowDimensions } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Copy, Search, X } from 'lucide-react-native';
+import { FadeInUp } from '../../components/Animations';
 
 const TYPE_STYLES: Record<string, { label: string; bg: string; text: string }> = {
   equipment: { label: 'Equipment', bg: 'bg-blue-100', text: 'text-blue-700' },
   labour: { label: 'Labour', bg: 'bg-green-100', text: 'text-green-700' },
   material: { label: 'Material', bg: 'bg-amber-100', text: 'text-amber-700' },
+  flushing: { label: 'Flushing', bg: 'bg-cyan-100', text: 'text-cyan-700' },
 };
 
 export default function DuplicateAlerts() {
@@ -51,6 +53,7 @@ export default function DuplicateAlerts() {
     : attempts;
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         <View className="mb-6">
@@ -193,5 +196,6 @@ export default function DuplicateAlerts() {
         </View>
       </Modal>
     </View>
+    </FadeInUp>
   );
 }

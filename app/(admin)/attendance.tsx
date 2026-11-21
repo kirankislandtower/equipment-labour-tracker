@@ -7,6 +7,7 @@ import DatePickerModal from '../../components/DatePickerModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { buildCSV } from '../../lib/csv';
+import { FadeInUp } from '../../components/Animations';
 
 interface GroupedUser {
   user_id: string;
@@ -152,6 +153,7 @@ export default function AdminAttendance() {
   };
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       <View className={`flex-row justify-between items-center mb-8 ${isMobile ? 'flex-wrap gap-y-4' : ''}`}>
@@ -347,5 +349,6 @@ export default function AdminAttendance() {
         onSelect={(d) => setModalFilterDate(d)}
       />
     </View>
+    </FadeInUp>
   );
 }

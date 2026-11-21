@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Calendar, ChevronDown, Check, X, FileText, Calculator, AlertCircle, CheckCircle2, Search } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
+import { FadeInUp } from '../../components/Animations';
 
 // Helper for modal picker
 const CustomPicker = ({ label, value, options, onSelect, placeholder }: any) => {
@@ -201,6 +202,7 @@ export default function InvoiceReconciler() {
   }
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-slate-50">
       <ScrollView className={`flex-1 ${isMobile ? 'p-4' : 'p-8'}`} showsVerticalScrollIndicator={false}>
         
@@ -384,5 +386,6 @@ export default function InvoiceReconciler() {
       )}
 
     </KeyboardAvoidingView>
+    </FadeInUp>
   );
 }

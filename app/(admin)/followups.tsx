@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
 import { openWhatsApp } from '../../lib/whatsapp';
 import { Camera, UserX, Search, X, MessageCircle, RefreshCw } from 'lucide-react-native';
+import { FadeInUp } from '../../components/Animations';
 
 type Tab = 'photos' | 'today';
 
@@ -133,6 +134,7 @@ export default function FollowUps() {
   );
 
   return (
+    <FadeInUp style={{ flex: 1 }}>
     <View className="flex-1 bg-slate-50">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: isMobile ? 16 : 32, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         <View className="mb-6 flex-row justify-between items-start">
@@ -272,5 +274,6 @@ export default function FollowUps() {
         )}
       </ScrollView>
     </View>
+    </FadeInUp>
   );
 }
