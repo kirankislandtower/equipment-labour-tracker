@@ -475,7 +475,7 @@ export default function AdminInternalVehicles() {
               <Text className="flex-1 font-bold text-slate-700 text-sm">Date</Text>
               <Text className="w-20 font-bold text-slate-700 text-sm">Co.</Text>
               <Text className="flex-2 font-bold text-slate-700 text-sm" style={{flex: 2}}>Vehicle</Text>
-              <Text className="flex-2 font-bold text-slate-700 text-sm" style={{flex: 2}}>Job</Text>
+              <Text className="flex-2 font-bold text-slate-700 text-sm" style={{flex: 2}}>Driver</Text>
               <Text className="flex-1 font-bold text-slate-700 text-sm">Requester</Text>
               <Text className="flex-1 font-bold text-slate-700 text-sm text-center">Status</Text>
               <Text className="flex-1 font-bold text-slate-700 text-sm text-right">Actions</Text>
@@ -574,8 +574,7 @@ export default function AdminInternalVehicles() {
                           <Text className="text-slate-500 text-xs" numberOfLines={1}>{entry.internal_vehicles?.vehicle_type}</Text>
                         </View>
                         <View style={{flex: 2}}>
-                          <Text className="text-slate-900 font-bold">{entry.jobs?.job_number}</Text>
-                          <Text className="text-slate-500 text-xs" numberOfLines={1}>{entry.jobs?.job_name}</Text>
+                          <Text className="text-slate-900 font-bold">{entry.internal_vehicle_drivers?.name || 'N/A'}</Text>
                         </View>
                         <Text className="flex-1 text-slate-900 font-medium" numberOfLines={1}>{entry.requester_name}</Text>
                         <View className="flex-1 items-center justify-center" style={{ gap: 4 }}>
