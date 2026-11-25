@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRight, ArrowRightLeft, Droplets, Wrench } from 'lucide-react-native';
+import { ArrowLeft, Truck, Users, Calendar, Clock, Edit2, ChevronLeft, ChevronRight, ArrowRightLeft, Droplets, Wrench, Fuel } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateString } from '../../lib/dateUtils';
@@ -37,6 +37,23 @@ export default function HistoryScreen() {
   useEffect(() => {
     fetchHistory();
   }, [activeTab, selectedDate]);
+
+  // The tab row scrolls sideways, so a tab near the end (e.g. Fuel Top-Up,
+  // opened via ?type=FUEL_TOPUP) can be selected yet sit off-screen. Track
+  // each tab's position and keep the active one scrolled into view.
+  const tabScrollRef = useRef<ScrollView>(null);
+  const tabPositions = useRef<Record<string, number>>({});
+  const scrollToTab = (key: string, animated: boolean) => {
+    const x = tabPositions.current[key];
+    if (x != null) tabScrollRef.current?.scrollTo({ x: Math.max(0, x - 16), animated });
+  };
+  const onTabLayout = (key: string) => (e: LayoutChangeEvent) => {
+    tabPositions.current[key] = e.nativeEvent.layout.x;
+    if (key === activeTab) scrollToTab(key, false);
+  };
+  useEffect(() => {
+    scrollToTab(activeTab, true);
+  }, [activeTab]);
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -155,6 +172,33 @@ export default function HistoryScreen() {
 
         if (error) throw error;
         serverEntries = data || [];
+      } else if (activeTab === 'FUEL_TOPUP') {
+        const { data, error } = await supabase
+          .from('fuel_topup_requests')
+          .select(`
+            id,
+            entry_date,
+            vehicle_number,
+            requested_quantity,
+            quantity,
+            unit,
+            status,
+            approved_by,
+            rejection_reason,
+            remarks,
+            supplier_id,
+            jobs:job_id (job_name),
+            equipment_master:equipment_master_id (equipment_name),
+            suppliers:supplier_id (supplier_name)
+          `)
+          .eq('entry_date', dateStr)
+          .eq('created_by', user?.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        // Top-ups store "PENDING"; every other entry type (and this screen's
+        // filters) use "SUBMITTED" for the same thing.
+        serverEntries = (data || []).map((e: any) => ({ ...e, status: e.status === 'PENDING' ? 'SUBMITTED' : e.status }));
       }
 
       // Entries saved locally while offline haven't reached Supabase yet, so they
@@ -236,6 +280,66 @@ export default function HistoryScreen() {
 
   const filteredEntries = entries.filter(e => statusFilter === 'ALL' || e.status === statusFilter);
 
+  // Top-ups have no edit form, so no edit button -- the card's job is to tell
+  // the foreman whether Store sent the fuel, how much, and if not, why.
+  const renderTopupCard = (entry: any) => (
+    <View key={entry.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-3">
+      <View className="flex-row justify-between items-start mb-2">
+        <Text className="font-black tracking-tight text-slate-900 flex-1 text-lg" numberOfLines={1}>
+          {entry.equipment_master?.equipment_name
+            ? `${entry.equipment_master.equipment_name} · ${entry.vehicle_number}`
+            : entry.vehicle_number || t('history.unknownVehicle')}
+        </Text>
+        <Text className={`font-bold tracking-wide text-[10px] px-2 py-1 border rounded uppercase ${getStatusColor(entry.status)} ${getStatusBg(entry.status)}`}>
+          {entry.status === 'SUBMITTED' ? t('history.pending') : getStatusLabel(entry.status)}
+        </Text>
+      </View>
+
+      <Text className="text-slate-500 font-medium mb-1 leading-relaxed">{entry.jobs?.job_name}</Text>
+      <Text className="text-slate-400 text-xs mb-3">
+        {entry.suppliers?.supplier_name ? `Supplier: ${entry.suppliers.supplier_name}` : 'Internal Vehicle'}
+      </Text>
+
+      {entry.status === 'APPROVED' && (
+        <View className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+          <Text className="text-green-800 font-bold text-sm">
+            Store approved {entry.quantity} {entry.unit}
+          </Text>
+          {entry.requested_quantity != null && Number(entry.requested_quantity) !== Number(entry.quantity) && (
+            <Text className="text-green-700 text-xs mt-0.5">You asked for {entry.requested_quantity} {entry.unit}</Text>
+          )}
+        </View>
+      )}
+
+      {entry.status === 'SUBMITTED' && (
+        <View className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+          <Text className="text-amber-800 font-bold text-sm">Waiting for Store to approve</Text>
+        </View>
+      )}
+
+      {entry.status === 'REJECTED' && (
+        <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+          <Text className="text-red-800 font-bold text-xs uppercase mb-1">Rejected by Store</Text>
+          {!!entry.rejection_reason && <Text className="text-red-600 text-sm">{entry.rejection_reason}</Text>}
+        </View>
+      )}
+
+      {!!entry.remarks && (
+        <View className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-3">
+          <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider mb-1">{t('history.remarks')}</Text>
+          <Text className="text-slate-700 text-sm leading-tight italic">"{entry.remarks}"</Text>
+        </View>
+      )}
+
+      <View className="flex-row items-center border-t border-slate-100 pt-3">
+        <Fuel size={14} color="#94a3b8" />
+        <Text className="text-slate-500 text-xs font-medium ml-1.5">
+          Requested <Text className="text-slate-900 font-bold">{entry.requested_quantity ?? entry.quantity}</Text> {entry.unit}
+        </Text>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <StatusBar barStyle="dark-content" />
@@ -277,10 +381,11 @@ export default function HistoryScreen() {
           so there's nothing to switch between; the control is skipped entirely. */}
       {role !== 'DRIVER' && (
       <View className="mb-4">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+        <ScrollView ref={tabScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
           <View className="flex-row bg-slate-100 p-1 rounded-xl">
             <TouchableOpacity
               onPress={() => setActiveTab('EQUIPMENT')}
+              onLayout={onTabLayout('EQUIPMENT')}
               className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'EQUIPMENT' ? 'bg-white shadow-sm' : ''}`}
             >
               <Truck size={16} color={activeTab === 'EQUIPMENT' ? '#1e3a8a' : '#64748b'} />
@@ -290,6 +395,7 @@ export default function HistoryScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('LABOUR')}
+              onLayout={onTabLayout('LABOUR')}
               className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'LABOUR' ? 'bg-white shadow-sm' : ''}`}
             >
               <Users size={16} color={activeTab === 'LABOUR' ? '#1e3a8a' : '#64748b'} />
@@ -299,6 +405,7 @@ export default function HistoryScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('MATERIAL')}
+              onLayout={onTabLayout('MATERIAL')}
               className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'MATERIAL' ? 'bg-white shadow-sm' : ''}`}
             >
               <ArrowRightLeft size={16} color={activeTab === 'MATERIAL' ? '#1e3a8a' : '#64748b'} />
@@ -309,6 +416,7 @@ export default function HistoryScreen() {
             {FLUSHING_ENABLED_FOR_FOREMEN && (
               <TouchableOpacity
                 onPress={() => setActiveTab('FLUSHING')}
+              onLayout={onTabLayout('FLUSHING')}
                 className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'FLUSHING' ? 'bg-white shadow-sm' : ''}`}
               >
                 <Droplets size={16} color={activeTab === 'FLUSHING' ? '#1e3a8a' : '#64748b'} />
@@ -319,11 +427,22 @@ export default function HistoryScreen() {
             )}
             <TouchableOpacity
               onPress={() => setActiveTab('INTERNAL_VEHICLE')}
+              onLayout={onTabLayout('INTERNAL_VEHICLE')}
               className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'INTERNAL_VEHICLE' ? 'bg-white shadow-sm' : ''}`}
             >
               <Wrench size={16} color={activeTab === 'INTERNAL_VEHICLE' ? '#1e3a8a' : '#64748b'} />
               <Text className={`ml-2 font-bold ${activeTab === 'INTERNAL_VEHICLE' ? 'text-blue-900' : 'text-slate-500'}`}>
                 {t('history.internalVehicles')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('FUEL_TOPUP')}
+              onLayout={onTabLayout('FUEL_TOPUP')}
+              className={`flex-row items-center justify-center px-4 py-3 rounded-lg ${activeTab === 'FUEL_TOPUP' ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Fuel size={16} color={activeTab === 'FUEL_TOPUP' ? '#1e3a8a' : '#64748b'} />
+              <Text className={`ml-2 font-bold ${activeTab === 'FUEL_TOPUP' ? 'text-blue-900' : 'text-slate-500'}`}>
+                {t('history.fuelTopup')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -403,15 +522,15 @@ export default function HistoryScreen() {
                 <Text className="text-white font-black text-xs tracking-wide">
                   {t('history.entryCount', {
                     count: filteredEntries.length,
-                    type: activeTab === 'EQUIPMENT' ? t('history.equipment') : activeTab === 'LABOUR' ? t('history.labour') : activeTab === 'FLUSHING' ? t('history.flushing') : activeTab === 'INTERNAL_VEHICLE' ? t('history.internalVehicles') : t('history.material'),
+                    type: activeTab === 'EQUIPMENT' ? t('history.equipment') : activeTab === 'LABOUR' ? t('history.labour') : activeTab === 'FLUSHING' ? t('history.flushing') : activeTab === 'INTERNAL_VEHICLE' ? t('history.internalVehicles') : activeTab === 'FUEL_TOPUP' ? t('history.fuelTopup') : t('history.material'),
                   })}
                 </Text>
               </View>
               <View className="flex-1 h-px bg-slate-200 ml-3" />
             </View>
 
-            {filteredEntries.map((entry) => (
-              <TouchableOpacity 
+            {filteredEntries.map((entry) => activeTab === 'FUEL_TOPUP' ? renderTopupCard(entry) : (
+              <TouchableOpacity
                 key={entry.id} 
                 className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-3 active:bg-slate-50"
                 onPress={() => {

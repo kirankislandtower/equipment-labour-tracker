@@ -130,9 +130,13 @@ export default function AppLayout() {
   const content = (
     <Tabs 
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ 
+      screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true, // Prevents footer from floating above keyboard
+        // Every foreman page (entry forms, History, Fuel Approvals...) is a
+        // screen in this navigator, so this one setting animates all of them --
+        // a quick fade with a slight slide, matching the admin side's FadeInUp.
+        animation: 'shift',
       }}
     >
       <Tabs.Screen

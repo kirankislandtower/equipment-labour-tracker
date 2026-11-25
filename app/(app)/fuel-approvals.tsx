@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar, TextInput, KeyboardAvoidingView, Platform, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Fuel, CheckCircle2, XCircle, Check, X, Calendar } from 'lucide-react-native';
@@ -57,6 +57,9 @@ type TopupRequest = {
   unit: string;
   job_name: string;
   remarks: string | null;
+  equipment_name: string | null;
+  supplier_name: string | null;
+  photo_url: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   approved_by: string | null;
   approved_at: string | null;
@@ -137,7 +140,7 @@ export default function FuelApprovalsScreen() {
           .order('entry_date', { ascending: false }),
         supabase
           .from('fuel_topup_requests')
-          .select('id, entry_date, vehicle_number, foreman_name, quantity, unit, remarks, status, approved_by, approved_at, rejection_reason, jobs:job_id (job_name)')
+          .select('id, entry_date, vehicle_number, foreman_name, quantity, unit, remarks, photo_url, status, approved_by, approved_at, rejection_reason, jobs:job_id (job_name), equipment_master:equipment_master_id (equipment_name), suppliers:supplier_id (supplier_name)')
           .gte('entry_date', fromDate)
           .lte('entry_date', toDate)
           .order('entry_date', { ascending: false }),
@@ -172,6 +175,9 @@ export default function FuelApprovalsScreen() {
         unit: e.unit || '',
         job_name: e.jobs?.job_name || 'Unknown Job',
         remarks: e.remarks || null,
+        equipment_name: e.equipment_master?.equipment_name || null,
+        supplier_name: e.suppliers?.supplier_name || null,
+        photo_url: e.photo_url || null,
         status: e.status || 'PENDING',
         approved_by: e.approved_by || null,
         approved_at: e.approved_at || null,
@@ -609,11 +615,20 @@ export default function FuelApprovalsScreen() {
                           <Text className="text-amber-800 font-bold text-xs ml-1">{req.quantity} {req.unit}</Text>
                         </View>
                       </View>
-                      <Text className="text-slate-900 font-bold text-base mt-2">{req.vehicle_number}</Text>
+                      <Text className="text-slate-900 font-bold text-base mt-2">
+                        {req.equipment_name ? `${req.equipment_name} · ${req.vehicle_number}` : req.vehicle_number}
+                      </Text>
                       <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}</Text>
+                      <Text className="text-slate-400 text-xs mt-0.5">{req.supplier_name ? `Supplier: ${req.supplier_name}` : 'Internal Vehicle'}</Text>
                       <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
                       {!!req.remarks && (
                         <Text className="text-slate-500 text-xs mt-1.5 italic">"{req.remarks}"</Text>
+                      )}
+                      {!!req.photo_url && (
+                        <TouchableOpacity onPress={() => Linking.openURL(req.photo_url!)} className="mt-2 self-start">
+                          <Image source={{ uri: req.photo_url }} style={{ width: 96, height: 72, borderRadius: 8 }} resizeMode="cover" />
+                          <Text className="text-blue-600 text-[10px] font-bold mt-1">Tap to view photo</Text>
+                        </TouchableOpacity>
                       )}
                       {!isPending && (
                         <Text className="text-slate-400 text-xs mt-1.5">

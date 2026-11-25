@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, useWindowDimensions, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
@@ -14,6 +14,12 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const [changingLanguage, setChangingLanguage] = useState(false);
+  // Summary cards scroll sideways. Each is ~44% of the row so two fit with the
+  // third (Fuel Top-Up) peeking in at the edge -- a visible hint to swipe.
+  // On web the app is capped at a 480px column (see (app)/_layout.tsx).
+  const { width: screenWidth } = useWindowDimensions();
+  const rowWidth = (Platform.OS === 'web' ? Math.min(screenWidth, 480) : screenWidth) - 48;
+  const summaryCardWidth = Math.round(rowWidth * 0.44);
 
   const handleLanguageChange = async (lang: AppLanguage) => {
     if (lang === i18n.language || changingLanguage) return;
@@ -231,10 +237,16 @@ export default function HomeScreen() {
         </View>
 
         {/* Stats Grid */}
-        <View className="flex-row justify-between mb-3">
-          <TouchableOpacity 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginHorizontal: -24, marginBottom: 12 }}
+          contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+        >
+          <TouchableOpacity
             onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate), type: 'EQUIPMENT' } })}
-            className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
+            style={{ width: summaryCardWidth }}
+            className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
           >
             <View className="bg-indigo-50 w-10 h-10 rounded-xl items-center justify-center mb-3 border border-indigo-100">
               <Truck size={20} color="#4f46e5" />
@@ -243,9 +255,10 @@ export default function HomeScreen() {
             <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">{t('home.equipment')}</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => router.push({ pathname: '/(app)/history', params: { date: getLocalDateString(selectedDate), type: 'LABOUR' } })}
-            className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
+            style={{ width: summaryCardWidth }}
+            className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 items-center active:scale-[0.98] transition-transform"
           >
             <View className="bg-emerald-50 w-10 h-10 rounded-xl items-center justify-center mb-3 border border-emerald-100">
               <Users size={20} color="#10b981" />
@@ -253,7 +266,19 @@ export default function HomeScreen() {
             <Text className="text-4xl font-mono-bold text-slate-900 tracking-tighter">{stats.labour}</Text>
             <Text className="text-[10px] text-slate-500 font-outfit-bold uppercase tracking-widest mt-1">{t('home.labour')}</Text>
           </TouchableOpacity>
-        </View>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/entry/fuel-topup')}
+            style={{ width: summaryCardWidth }}
+            className="bg-blue-600 p-5 rounded-2xl shadow-sm items-center active:scale-[0.98] transition-transform"
+          >
+            <View className="bg-white/20 w-10 h-10 rounded-xl items-center justify-center mb-3">
+              <Fuel size={20} color="#ffffff" />
+            </View>
+            <Plus size={36} color="#ffffff" strokeWidth={2.5} />
+            <Text className="text-[10px] text-white font-outfit-bold uppercase tracking-widest mt-2">{t('entrySelect.fuelTopupTitle')}</Text>
+          </TouchableOpacity>
+        </ScrollView>
 
         <View className="flex-row justify-between mb-4">
           <TouchableOpacity 

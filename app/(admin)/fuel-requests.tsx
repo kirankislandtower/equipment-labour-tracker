@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, Modal, useWindowDimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, Modal, useWindowDimensions, KeyboardAvoidingView, Platform, Image, Linking } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { Fuel, Search, X, Check, XCircle, Calendar } from 'lucide-react-native';
 import { FadeInUp } from '../../components/Animations';
@@ -22,6 +22,8 @@ type FuelRow = {
   company: string | null;
   vehicle_number: string;
   equipment_name: string | null;
+  supplier_name?: string | null;
+  photo_url?: string | null;
   foreman_name: string;
   requested_quantity: number | null;
   quantity: number;
@@ -79,7 +81,7 @@ export default function FuelRequestsScreen() {
       const [tu, eq, fl] = await Promise.all([
         supabase
           .from('fuel_topup_requests')
-          .select('*, jobs:job_id (job_name)')
+          .select('*, jobs:job_id (job_name), equipment_master:equipment_master_id (equipment_name), suppliers:supplier_id (supplier_name)')
           .gte('entry_date', fromDate)
           .lte('entry_date', toDate)
           .order('entry_date', { ascending: false })
@@ -108,7 +110,9 @@ export default function FuelRequestsScreen() {
         entry_date: r.entry_date,
         company: r.company || null,
         vehicle_number: r.vehicle_number || 'Unknown Vehicle',
-        equipment_name: null,
+        equipment_name: r.equipment_master?.equipment_name || null,
+        supplier_name: r.suppliers?.supplier_name || null,
+        photo_url: r.photo_url || null,
         foreman_name: r.foreman_name || 'Unknown Foreman',
         requested_quantity: r.requested_quantity,
         quantity: r.quantity,
@@ -177,6 +181,7 @@ export default function FuelRequestsScreen() {
     Type: r.source === 'topup' ? 'Top-Up Request' : r.source === 'equipment' ? 'Equipment' : 'Flushing',
     Company: r.company || '',
     Job: r.job_name,
+    Supplier: r.source === 'topup' ? (r.supplier_name || 'Internal') : '',
     Equipment: r.equipment_name || '',
     Vehicle: r.vehicle_number,
     Foreman: r.foreman_name,
@@ -186,6 +191,7 @@ export default function FuelRequestsScreen() {
     Status: r.status,
     'Approved/Rejected By': r.approved_by || '',
     'Rejection Reason': r.rejection_reason || '',
+    Photo: r.photo_url || '',
   }));
 
   const updateRow = (target: FuelRow, patch: Partial<FuelRow>) => {
@@ -349,6 +355,9 @@ export default function FuelRequestsScreen() {
                     {req.equipment_name ? `${req.equipment_name} · ${req.vehicle_number}` : req.vehicle_number}
                   </Text>
                   <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}{req.company ? ` · ${req.company}` : ''}</Text>
+                  {req.source === 'topup' && (
+                    <Text className="text-slate-400 text-xs mt-0.5">{req.supplier_name ? `Supplier: ${req.supplier_name}` : 'Internal Vehicle'}</Text>
+                  )}
                   <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
                 </View>
                 <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
@@ -363,6 +372,13 @@ export default function FuelRequestsScreen() {
 
               {req.source === 'topup' && !!req.remarks && (
                 <Text className="text-slate-500 text-xs italic mb-2">"{req.remarks}"</Text>
+              )}
+
+              {!!req.photo_url && (
+                <TouchableOpacity onPress={() => Linking.openURL(req.photo_url!)} className="mb-2 self-start">
+                  <Image source={{ uri: req.photo_url }} style={{ width: 120, height: 90, borderRadius: 8 }} resizeMode="cover" />
+                  <Text className="text-blue-600 text-[10px] font-bold mt-1">Tap to view photo</Text>
+                </TouchableOpacity>
               )}
 
               {req.status !== 'PENDING' && (

@@ -1,15 +1,21 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StatusBar, ActivityIndicator, Platform, Modal, FlatList
+  StatusBar, ActivityIndicator, Platform, Modal, FlatList, Image, Alert
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
+import WebCamera from '../../../components/WebCamera';
+import { compressImageToDataUri } from '../../../lib/imageUtils';
+import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Check, Fuel, Calendar, ChevronDown, X, Search } from 'lucide-react-native';
+import { ArrowLeft, Check, Fuel, Calendar, ChevronDown, X, Search, Camera, Image as ImageIcon, History } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import { getLocalDateString } from '../../../lib/dateUtils';
 import { fetchWithCache } from '../../../lib/dataCache';
 import MessageModal, { MessageModalContent } from '../../../components/MessageModal';
+import { fetchOffHireStatusForJob, offHireKey } from '../../../lib/equipmentOffHire';
 
 const COMPANY_OPTIONS = [
   { label: 'IST', value: 'IST', fullName: 'Island Tower Electromechanical' },
@@ -133,12 +139,48 @@ export default function FuelTopupRequestScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [allJobs, setAllJobs] = useState<any[]>([]);
   const [allVehicles, setAllVehicles] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<{ label: string; value: string }[]>([]);
+  const [equipmentList, setEquipmentList] = useState<{ label: string; value: string }[]>([]);
+  const { t } = useTranslation();
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  // When the photo was actually taken -- used for the watermark stamp rather
+  // than whenever the upload finishes.
+  const [photoCapturedAt, setPhotoCapturedAt] = useState<Date | null>(null);
+
+  const pickImage = async (source: 'camera' | 'gallery') => {
+    try {
+      const { status } = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', source === 'camera' ? 'Camera permission is needed to take a photo.' : 'Photo library permission is needed to choose a photo.');
+        return;
+      }
+      const options = { mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.7 };
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setPhotoUri(await compressImageToDataUri(asset.uri, asset.width, asset.height));
+        setPhotoCapturedAt(new Date());
+        setErrors(prev => ({ ...prev, photo: '' }));
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      setMessageModal({ title: 'Error', message: 'Failed to pick image.' });
+    }
+  };
 
   const [formData, setFormData] = useState({
     entry_date: getLocalDateString(),
     company: '',
     job_id: '',
+    vehicle_source: 'INTERNAL' as 'INTERNAL' | 'SUPPLIER',
     vehicle_id: '',
+    supplier_id: '',
+    equipment_id: '',
+    supplier_vehicle_number: '',
     quantity: '',
     unit: 'Liters',
     foreman_name: '',
@@ -179,13 +221,91 @@ export default function FuelTopupRequestScreen() {
     }
   };
 
+  // Same supplier/equipment cascade as the Equipment entry form: suppliers
+  // allocated to the job in Site Allocations that still have non-off-hired
+  // equipment under them, then that supplier's equipment for this job.
+  useEffect(() => {
+    const loadSuppliersForJob = async () => {
+      if (!formData.job_id || formData.vehicle_source !== 'SUPPLIER') {
+        setSuppliers([]);
+        return;
+      }
+      const { data: supplierOptions } = await fetchWithCache(`equip-suppliers-for-job:${formData.job_id}`, async () => {
+        const [suppAllocRes, equipAllocRes, offHireKeys] = await Promise.all([
+          supabase.from('job_suppliers').select('supplier_id, suppliers!inner(id, supplier_name, supplier_type)').eq('job_id', formData.job_id).eq('suppliers.is_active', true),
+          supabase.from('job_equipment').select('supplier_id, equipment_master_id').eq('job_id', formData.job_id),
+          fetchOffHireStatusForJob(formData.job_id),
+        ]);
+        if (suppAllocRes.error) return { data: null, error: suppAllocRes.error };
+        if (equipAllocRes.error) return { data: null, error: equipAllocRes.error };
+
+        const equipRows = (equipAllocRes.data || []).filter(
+          (row: any) => !offHireKeys.has(offHireKey(row.supplier_id, row.equipment_master_id))
+        );
+        const suppliersWithEquipment = new Set(equipRows.filter((row: any) => row.supplier_id).map((row: any) => row.supplier_id));
+
+        const options = (suppAllocRes.data || [])
+          .filter((row: any) => row.suppliers && row.suppliers.supplier_type !== 'LABOUR' && suppliersWithEquipment.has(row.suppliers.id))
+          .map((row: any) => ({ label: row.suppliers.supplier_name, value: row.suppliers.id }))
+          .sort((a: any, b: any) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+        return { data: options, error: null };
+      });
+      setSuppliers(supplierOptions || []);
+    };
+    loadSuppliersForJob();
+  }, [formData.job_id, formData.vehicle_source]);
+
+  useEffect(() => {
+    const loadEquipmentForSupplier = async () => {
+      if (!formData.job_id || !formData.supplier_id) {
+        setEquipmentList([]);
+        return;
+      }
+      const [{ data }, offHireKeys] = await Promise.all([
+        fetchWithCache(`equipment-for-job-supplier:${formData.job_id}:${formData.supplier_id}`, () =>
+          supabase
+            .from('job_equipment')
+            .select('equipment_master_id, supplier_id, equipment_master!inner(id, equipment_name)')
+            .eq('job_id', formData.job_id)
+            .eq('supplier_id', formData.supplier_id)
+            .eq('equipment_master.is_active', true)
+        ),
+        fetchOffHireStatusForJob(formData.job_id),
+      ]);
+      const rawOptions = (data || [])
+        .filter((row: any) => row.equipment_master && !offHireKeys.has(offHireKey(row.supplier_id, row.equipment_master_id)))
+        .map((row: any) => ({ label: row.equipment_master.equipment_name, value: row.equipment_master.id }));
+      const options = Array.from(new Map(rawOptions.map((e: any) => [e.value, e])).values())
+        .sort((a: any, b: any) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+      setEquipmentList(options as { label: string; value: string }[]);
+    };
+    loadEquipmentForSupplier();
+  }, [formData.job_id, formData.supplier_id]);
+
   const updateForm = (key: string, value: any) => {
     if (key === 'company') {
       // Jobs are tagged by company -- a previously picked job could belong to
       // a different one, so clear it rather than leave a stale, now-hidden
       // selection in place.
-      setFormData(prev => ({ ...prev, company: value, job_id: '' }));
+      setFormData(prev => ({ ...prev, company: value, job_id: '', supplier_id: '', equipment_id: '' }));
       if (errors.company) setErrors(prev => ({ ...prev, company: '' }));
+      return;
+    }
+    // Supplier depends on job, and equipment depends on supplier -- clear
+    // whatever sits downstream so a stale pick can't be submitted.
+    if (key === 'job_id') {
+      setFormData(prev => ({ ...prev, job_id: value, supplier_id: '', equipment_id: '' }));
+      if (errors.job_id) setErrors(prev => ({ ...prev, job_id: '' }));
+      return;
+    }
+    if (key === 'supplier_id') {
+      setFormData(prev => ({ ...prev, supplier_id: value, equipment_id: '' }));
+      if (errors.supplier_id) setErrors(prev => ({ ...prev, supplier_id: '' }));
+      return;
+    }
+    if (key === 'vehicle_source') {
+      setFormData(prev => ({ ...prev, vehicle_source: value, vehicle_id: '', supplier_id: '', equipment_id: '', supplier_vehicle_number: '' }));
+      setErrors(prev => ({ ...prev, vehicle_id: '', supplier_id: '', equipment_id: '', supplier_vehicle_number: '' }));
       return;
     }
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -206,7 +326,14 @@ export default function FuelTopupRequestScreen() {
     const newErrors: Record<string, string> = {};
     if (!formData.company) newErrors.company = 'Company is required';
     if (!formData.job_id) newErrors.job_id = 'Job is required';
-    if (!formData.vehicle_id) newErrors.vehicle_id = 'Vehicle is required';
+    if (formData.vehicle_source === 'INTERNAL') {
+      if (!formData.vehicle_id) newErrors.vehicle_id = 'Vehicle is required';
+    } else {
+      if (!formData.supplier_id) newErrors.supplier_id = 'Supplier is required';
+      if (!formData.equipment_id) newErrors.equipment_id = 'Equipment is required';
+      if (!formData.supplier_vehicle_number.trim()) newErrors.supplier_vehicle_number = 'Vehicle number is required';
+    }
+    if (!photoUri) newErrors.photo = 'Vehicle photo is required';
     if (!formData.quantity || parseFloat(formData.quantity) <= 0) newErrors.quantity = 'Quantity is required';
     if (!formData.foreman_name.trim()) newErrors.foreman_name = 'Foreman name is required';
 
@@ -220,21 +347,51 @@ export default function FuelTopupRequestScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       const quantity = parseFloat(formData.quantity) || 0;
 
+      // A photo is required to submit, but a Cloudinary failure (quota, weak
+      // signal) mustn't lose the whole request -- it's sent without the photo
+      // and the foreman is told, same as the Equipment form.
+      let photoUrl: string | null = null;
+      let photoUploadFailed = false;
+      if (photoUri) {
+        try {
+          const jobLabel = jobs.find((j: any) => j.value === formData.job_id)?.label || 'Unknown Site';
+          const rawUrl = await uploadToCloudinary(photoUri);
+          photoUrl = getWatermarkedCloudinaryUrl(rawUrl, jobLabel, photoCapturedAt || undefined);
+        } catch (err) {
+          console.error('Cloudinary upload failed, sending request without photo:', err);
+          photoUploadFailed = true;
+        }
+      }
+
       const { error } = await supabase.from('fuel_topup_requests').insert({
         entry_date: formData.entry_date,
         company: formData.company,
         job_id: formData.job_id,
-        vehicle_number: selectedVehicle?.vehicle_number || '',
+        vehicle_source: formData.vehicle_source,
+        vehicle_number: formData.vehicle_source === 'INTERNAL'
+          ? (selectedVehicle?.vehicle_number || '')
+          : formData.supplier_vehicle_number.trim(),
+        supplier_id: formData.vehicle_source === 'SUPPLIER' ? formData.supplier_id : null,
+        equipment_master_id: formData.vehicle_source === 'SUPPLIER' ? formData.equipment_id : null,
         requested_quantity: quantity,
         quantity,
         unit: formData.unit,
         foreman_name: formData.foreman_name,
         remarks: formData.remarks || null,
+        photo_url: photoUrl,
         status: 'PENDING',
         created_by: user?.id || null,
       });
 
       if (error) throw error;
+      if (photoUploadFailed) {
+        setMessageModal({
+          title: 'Sent Without Photo',
+          message: 'Your request was sent to Store, but the photo could not be uploaded (weak connection or storage limit).',
+          onClose: () => setSuccessVisible(true),
+        });
+        return;
+      }
       setSuccessVisible(true);
     } catch (error: any) {
       console.error('Submit error:', error);
@@ -302,9 +459,33 @@ export default function FuelTopupRequestScreen() {
       )}
 
       <ScrollView className="flex-1 px-6 pt-6" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
-        <View className="flex-row items-center mb-6">
-          <Fuel size={24} color="#1d4ed8" />
-          <Text className="text-lg font-bold text-[#1d4ed8] ml-2">Request Details</Text>
+        <View className="flex-row items-center justify-between mb-6">
+          <View className="flex-row items-center">
+            <Fuel size={24} color="#1d4ed8" />
+            <Text className="text-lg font-bold text-[#1d4ed8] ml-2">Request Details</Text>
+          </View>
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: '/(app)/history', params: { type: 'FUEL_TOPUP' } })}
+            className="bg-slate-100 p-2 rounded-xl active:bg-slate-200"
+            accessibilityLabel="Fuel top-up history"
+          >
+            <History size={18} color="#1d4ed8" />
+          </TouchableOpacity>
+          <View className="flex-row bg-slate-100 p-1 rounded-xl">
+            {(['INTERNAL', 'SUPPLIER'] as const).map(src => (
+              <TouchableOpacity
+                key={src}
+                onPress={() => updateForm('vehicle_source', src)}
+                className={`px-3 py-1.5 rounded-lg ${formData.vehicle_source === src ? 'bg-[#1d4ed8]' : ''}`}
+              >
+                <Text className={`font-bold text-xs ${formData.vehicle_source === src ? 'text-white' : 'text-slate-500'}`}>
+                  {src === 'INTERNAL' ? 'Internal' : 'Supplier'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          </View>
         </View>
 
         <View className="mb-4">
@@ -356,15 +537,98 @@ export default function FuelTopupRequestScreen() {
           error={errors.job_id}
         />
 
-        <CustomPicker
-          label="Vehicle"
-          required
-          value={formData.vehicle_id}
-          options={vehicles}
-          onSelect={(v: string) => updateForm('vehicle_id', v)}
-          placeholder="Select Vehicle"
-          error={errors.vehicle_id}
-        />
+        {formData.vehicle_source === 'INTERNAL' ? (
+          <CustomPicker
+            label="Vehicle"
+            required
+            value={formData.vehicle_id}
+            options={vehicles}
+            onSelect={(v: string) => updateForm('vehicle_id', v)}
+            placeholder="Select Vehicle"
+            error={errors.vehicle_id}
+          />
+        ) : (
+          <>
+            <CustomPicker
+              label="Supplier"
+              required
+              value={formData.supplier_id}
+              options={suppliers}
+              onSelect={(v: string) => updateForm('supplier_id', v)}
+              placeholder={formData.job_id ? (suppliers.length ? 'Select Supplier' : 'No suppliers allocated to this job') : 'Select a Job first'}
+              error={errors.supplier_id}
+            />
+            <CustomPicker
+              label="Equipment"
+              required
+              value={formData.equipment_id}
+              options={equipmentList}
+              onSelect={(v: string) => updateForm('equipment_id', v)}
+              placeholder={formData.supplier_id ? 'Select Equipment' : 'Select a Supplier first'}
+              error={errors.equipment_id}
+            />
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-slate-700 mb-1">
+                Vehicle Number <Text className="text-red-500">*</Text>
+              </Text>
+              <TextInput
+                value={formData.supplier_vehicle_number}
+                onChangeText={(t) => updateForm('supplier_vehicle_number', t)}
+                className={`bg-white border ${errors.supplier_vehicle_number ? 'border-red-500' : 'border-slate-300'} text-slate-900 rounded-lg px-4 py-3.5`}
+                placeholder="e.g. DXB 12345"
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="characters"
+              />
+              {errors.supplier_vehicle_number ? <Text className="text-red-500 text-xs mt-1 ml-1">{errors.supplier_vehicle_number}</Text> : null}
+            </View>
+          </>
+        )}
+
+        <View className={`mb-4 bg-white border ${errors.photo ? 'border-red-500' : 'border-slate-200'} rounded-lg p-4`}>
+          <Text className="text-slate-700 text-sm font-medium mb-3">
+            Vehicle Photo <Text className="text-red-500">*</Text>
+          </Text>
+          {errors.photo ? <Text className="text-red-500 text-xs mb-3 -mt-1">{errors.photo}</Text> : null}
+          {photoUri ? (
+            <View className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-black">
+              <Image source={{ uri: photoUri }} className="w-full h-full opacity-90" resizeMode="cover" />
+              <View className="absolute bottom-2 left-2 bg-black/60 px-3 py-2 rounded-lg">
+                <Text className="text-white text-xs font-bold">{(photoCapturedAt || new Date()).toLocaleString()}</Text>
+                <Text className="text-white text-xs font-semibold">
+                  {jobs.find((j: any) => j.value === formData.job_id)?.label || 'No job selected'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => { setPhotoUri(null); setPhotoCapturedAt(null); }}
+                className="absolute top-2 right-2 bg-black/60 p-2 rounded-full"
+              >
+                <X size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : Platform.OS === 'web' ? (
+            <WebCamera onImageCaptured={(uri) => { setPhotoUri(uri); setPhotoCapturedAt(new Date()); setErrors(prev => ({ ...prev, photo: '' })); }} colorTheme="blue" />
+          ) : (
+            <>
+              <View className="flex-row" style={{ gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => pickImage('camera')}
+                  className="flex-1 bg-blue-50 border-2 border-dashed border-blue-200 rounded-lg py-8 items-center justify-center active:bg-blue-100"
+                >
+                  <Camera size={28} color="#1d4ed8" />
+                  <Text className="text-blue-900 font-bold text-sm text-center mt-2">Take Live Photo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => pickImage('gallery')}
+                  className="flex-1 bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg py-8 items-center justify-center active:bg-slate-100"
+                >
+                  <ImageIcon size={28} color="#475569" />
+                  <Text className="text-slate-700 font-bold text-sm text-center mt-2">Choose from Gallery</Text>
+                </TouchableOpacity>
+              </View>
+              <Text className="text-blue-600 text-xs mt-2 text-center px-2">{t('entryCommon.livePhotoHint')}</Text>
+            </>
+          )}
+        </View>
 
         <View className="flex-row space-x-4 mb-4">
           <View className="flex-1 mr-2">
