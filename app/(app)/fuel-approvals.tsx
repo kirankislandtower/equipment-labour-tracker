@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Fuel, CheckCircle2, XCircle, Check, X } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
+import { FadeInUp, AnimatedPressable } from '../../components/Animations';
 import { supabase } from '../../lib/supabase';
 import { isStoreForeman } from '../../lib/foremanFlags';
 
@@ -400,34 +401,37 @@ export default function FuelApprovalsScreen() {
               const isPending = req.status === 'PENDING';
               return (
                 <View key={`${req.type}-${req.id}`} className="bg-white rounded-2xl border border-slate-200 mb-3 shadow-sm overflow-hidden">
-                  <TouchableOpacity onPress={() => isPending && openRequest(req)} activeOpacity={isPending ? 0.7 : 1} className="p-4 active:bg-slate-50">
-                    <View className="flex-row justify-between items-start mb-1">
-                      <View className="flex-row items-center" style={{ gap: 6 }}>
-                        <View className={`px-2.5 py-1 rounded-full ${req.type === 'equipment' ? 'bg-blue-100' : 'bg-cyan-100'}`}>
-                          <Text className={`text-[10px] font-bold uppercase ${req.type === 'equipment' ? 'text-blue-700' : 'text-cyan-700'}`}>
-                            {TABLES[req.type].label}
-                          </Text>
+                  <AnimatedPressable onPress={() => isPending && openRequest(req)} disabled={!isPending}>
+                    <View className="p-4">
+                      <View className="flex-row justify-between items-start mb-1">
+                        <View className="flex-row items-center" style={{ gap: 6 }}>
+                          <View className={`px-2.5 py-1 rounded-full ${req.type === 'equipment' ? 'bg-blue-100' : 'bg-cyan-100'}`}>
+                            <Text className={`text-[10px] font-bold uppercase ${req.type === 'equipment' ? 'text-blue-700' : 'text-cyan-700'}`}>
+                              {TABLES[req.type].label}
+                            </Text>
+                          </View>
+                          <StatusPill status={req.status} />
                         </View>
-                        <StatusPill status={req.status} />
+                        <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
+                          <Fuel size={12} color="#d97706" />
+                          <Text className="text-amber-800 font-bold text-xs ml-1">{req.fuel_quantity} {req.fuel_unit}</Text>
+                        </View>
                       </View>
-                      <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
-                        <Fuel size={12} color="#d97706" />
-                        <Text className="text-amber-800 font-bold text-xs ml-1">{req.fuel_quantity} {req.fuel_unit}</Text>
-                      </View>
+                      <Text className="text-slate-900 font-bold text-base mt-2">{req.equipment_name} · {req.vehicle_number}</Text>
+                      <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}</Text>
+                      <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
+                      {!isPending && (
+                        <Text className="text-slate-400 text-xs mt-1.5">
+                          {req.status === 'APPROVED' ? 'Approved' : 'Rejected'} by {req.approved_by || 'Store'}
+                          {req.approved_at ? ` on ${new Date(req.approved_at).toLocaleDateString()}` : ''}
+                          {req.rejection_reason ? ` — "${req.rejection_reason}"` : ''}
+                        </Text>
+                      )}
                     </View>
-                    <Text className="text-slate-900 font-bold text-base mt-2">{req.equipment_name} · {req.vehicle_number}</Text>
-                    <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}</Text>
-                    <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
-                    {!isPending && (
-                      <Text className="text-slate-400 text-xs mt-1.5">
-                        {req.status === 'APPROVED' ? 'Approved' : 'Rejected'} by {req.approved_by || 'Store'}
-                        {req.approved_at ? ` on ${new Date(req.approved_at).toLocaleDateString()}` : ''}
-                        {req.rejection_reason ? ` — "${req.rejection_reason}"` : ''}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                  </AnimatedPressable>
 
                   {isExpanded && (
+                    <FadeInUp>
                     <View className="px-4 pb-4 pt-1 border-t border-slate-100">
                       {!rejecting ? (
                         <>
@@ -521,6 +525,7 @@ export default function FuelApprovalsScreen() {
                         </>
                       )}
                     </View>
+                    </FadeInUp>
                   )}
                 </View>
               );
@@ -549,35 +554,38 @@ export default function FuelApprovalsScreen() {
               const isPending = req.status === 'PENDING';
               return (
                 <View key={req.id} className="bg-white rounded-2xl border border-slate-200 mb-3 shadow-sm overflow-hidden">
-                  <TouchableOpacity onPress={() => isPending && openTopupRequest(req)} activeOpacity={isPending ? 0.7 : 1} className="p-4 active:bg-slate-50">
-                    <View className="flex-row justify-between items-start mb-1">
-                      <View className="flex-row items-center" style={{ gap: 6 }}>
-                        <View className="px-2.5 py-1 rounded-full bg-indigo-100">
-                          <Text className="text-[10px] font-bold uppercase text-indigo-700">Top-Up Request</Text>
+                  <AnimatedPressable onPress={() => isPending && openTopupRequest(req)} disabled={!isPending}>
+                    <View className="p-4">
+                      <View className="flex-row justify-between items-start mb-1">
+                        <View className="flex-row items-center" style={{ gap: 6 }}>
+                          <View className="px-2.5 py-1 rounded-full bg-indigo-100">
+                            <Text className="text-[10px] font-bold uppercase text-indigo-700">Top-Up Request</Text>
+                          </View>
+                          <StatusPill status={req.status} />
                         </View>
-                        <StatusPill status={req.status} />
+                        <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
+                          <Fuel size={12} color="#d97706" />
+                          <Text className="text-amber-800 font-bold text-xs ml-1">{req.quantity} {req.unit}</Text>
+                        </View>
                       </View>
-                      <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
-                        <Fuel size={12} color="#d97706" />
-                        <Text className="text-amber-800 font-bold text-xs ml-1">{req.quantity} {req.unit}</Text>
-                      </View>
+                      <Text className="text-slate-900 font-bold text-base mt-2">{req.vehicle_number}</Text>
+                      <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}</Text>
+                      <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
+                      {!!req.remarks && (
+                        <Text className="text-slate-500 text-xs mt-1.5 italic">"{req.remarks}"</Text>
+                      )}
+                      {!isPending && (
+                        <Text className="text-slate-400 text-xs mt-1.5">
+                          {req.status === 'APPROVED' ? 'Approved' : 'Rejected'} by {req.approved_by || 'Store'}
+                          {req.approved_at ? ` on ${new Date(req.approved_at).toLocaleDateString()}` : ''}
+                          {req.rejection_reason ? ` — "${req.rejection_reason}"` : ''}
+                        </Text>
+                      )}
                     </View>
-                    <Text className="text-slate-900 font-bold text-base mt-2">{req.vehicle_number}</Text>
-                    <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}</Text>
-                    <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
-                    {!!req.remarks && (
-                      <Text className="text-slate-500 text-xs mt-1.5 italic">"{req.remarks}"</Text>
-                    )}
-                    {!isPending && (
-                      <Text className="text-slate-400 text-xs mt-1.5">
-                        {req.status === 'APPROVED' ? 'Approved' : 'Rejected'} by {req.approved_by || 'Store'}
-                        {req.approved_at ? ` on ${new Date(req.approved_at).toLocaleDateString()}` : ''}
-                        {req.rejection_reason ? ` — "${req.rejection_reason}"` : ''}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                  </AnimatedPressable>
 
                   {isExpanded && (
+                    <FadeInUp>
                     <View className="px-4 pb-4 pt-1 border-t border-slate-100">
                       {!rejectingTopup ? (
                         <>
@@ -671,6 +679,7 @@ export default function FuelApprovalsScreen() {
                         </>
                       )}
                     </View>
+                    </FadeInUp>
                   )}
                 </View>
               );
