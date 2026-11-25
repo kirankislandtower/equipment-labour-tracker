@@ -2,11 +2,13 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Fuel, CheckCircle2, XCircle, Check, X } from 'lucide-react-native';
+import { ArrowLeft, Fuel, CheckCircle2, XCircle, Check, X, Calendar } from 'lucide-react-native';
 import { useAuth } from '../../lib/auth';
 import { FadeInUp, AnimatedPressable } from '../../components/Animations';
 import { supabase } from '../../lib/supabase';
 import { isStoreForeman } from '../../lib/foremanFlags';
+import { getLocalDateString, getFirstOfMonthString } from '../../lib/dateUtils';
+import DatePickerModal from '../../components/DatePickerModal';
 
 const TABLES = {
   equipment: { table: 'equipment_entries', label: 'Equipment' },
@@ -81,6 +83,13 @@ export default function FuelApprovalsScreen() {
   const [storeName, setStoreName] = useState('Store');
   const [activeTab, setActiveTab] = useState<'entries' | 'topups'>('entries');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('PENDING');
+  // Defaults to the current month so Store lands on a reasonable window
+  // instead of every fuel record ever -- pick any 1-to-30/31 range within a
+  // month by moving either end.
+  const [fromDate, setFromDate] = useState(getFirstOfMonthString());
+  const [toDate, setToDate] = useState(getLocalDateString());
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editedQuantity, setEditedQuantity] = useState('');
@@ -116,15 +125,21 @@ export default function FuelApprovalsScreen() {
           .from('equipment_entries')
           .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, fuel_approval_status, fuel_approved_by, fuel_approved_at, fuel_rejection_reason, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
           .not('fuel_approval_status', 'is', null)
+          .gte('entry_date', fromDate)
+          .lte('entry_date', toDate)
           .order('entry_date', { ascending: false }),
         supabase
           .from('flushing_entries')
           .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, fuel_approval_status, fuel_approved_by, fuel_approved_at, fuel_rejection_reason, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
           .not('fuel_approval_status', 'is', null)
+          .gte('entry_date', fromDate)
+          .lte('entry_date', toDate)
           .order('entry_date', { ascending: false }),
         supabase
           .from('fuel_topup_requests')
           .select('id, entry_date, vehicle_number, foreman_name, quantity, unit, remarks, status, approved_by, approved_at, rejection_reason, jobs:job_id (job_name)')
+          .gte('entry_date', fromDate)
+          .lte('entry_date', toDate)
           .order('entry_date', { ascending: false }),
       ]);
 
@@ -169,7 +184,7 @@ export default function FuelApprovalsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, fromDate, toDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -355,6 +370,32 @@ export default function FuelApprovalsScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <View className="flex-row gap-2 mx-4 mt-3">
+        <TouchableOpacity
+          onPress={() => setShowFromPicker(true)}
+          className="flex-1 flex-row items-center bg-white border border-slate-200 rounded-xl px-3 py-2.5"
+        >
+          <Calendar size={16} color="#64748b" />
+          <View className="ml-2">
+            <Text className="text-slate-400 text-[9px] font-bold uppercase">From</Text>
+            <Text className="text-slate-900 font-bold text-sm">{fromDate}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setShowToPicker(true)}
+          className="flex-1 flex-row items-center bg-white border border-slate-200 rounded-xl px-3 py-2.5"
+        >
+          <Calendar size={16} color="#64748b" />
+          <View className="ml-2">
+            <Text className="text-slate-400 text-[9px] font-bold uppercase">To</Text>
+            <Text className="text-slate-900 font-bold text-sm">{toDate}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <DatePickerModal visible={showFromPicker} date={fromDate} onClose={() => setShowFromPicker(false)} onSelect={setFromDate} />
+      <DatePickerModal visible={showToPicker} date={toDate} onClose={() => setShowToPicker(false)} onSelect={setToDate} />
 
       <View className="flex-row flex-wrap gap-2 mx-4 mt-3">
         {(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as StatusFilter[]).map(f => (
