@@ -39,6 +39,10 @@ type PendingRequest = {
   fuel_unit: string;
   equipment_name: string;
   job_name: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
 };
 
 type TopupRequest = {
@@ -50,6 +54,18 @@ type TopupRequest = {
   unit: string;
   job_name: string;
   remarks: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
+};
+
+type StatusFilter = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL';
+
+const StatusPill = ({ status }: { status: string }) => {
+  if (status === 'APPROVED') return <View className="bg-green-100 px-2.5 py-1 rounded-full"><Text className="text-green-700 font-bold text-[10px] uppercase">Approved</Text></View>;
+  if (status === 'REJECTED') return <View className="bg-red-100 px-2.5 py-1 rounded-full"><Text className="text-red-700 font-bold text-[10px] uppercase">Rejected</Text></View>;
+  return <View className="bg-amber-100 px-2.5 py-1 rounded-full"><Text className="text-amber-700 font-bold text-[10px] uppercase">Pending</Text></View>;
 };
 
 // Store-only screen -- the other half of the Fuel Approval workflow. A Foreman's
@@ -63,6 +79,7 @@ export default function FuelApprovalsScreen() {
   const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [storeName, setStoreName] = useState('Store');
   const [activeTab, setActiveTab] = useState<'entries' | 'topups'>('entries');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('PENDING');
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editedQuantity, setEditedQuantity] = useState('');
@@ -96,18 +113,17 @@ export default function FuelApprovalsScreen() {
       const [eq, fl, tu] = await Promise.all([
         supabase
           .from('equipment_entries')
-          .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
-          .eq('fuel_approval_status', 'PENDING')
+          .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, fuel_approval_status, fuel_approved_by, fuel_approved_at, fuel_rejection_reason, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
+          .not('fuel_approval_status', 'is', null)
           .order('entry_date', { ascending: false }),
         supabase
           .from('flushing_entries')
-          .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
-          .eq('fuel_approval_status', 'PENDING')
+          .select('id, entry_date, vehicle_number, foreman_name, fuel_quantity, fuel_unit, fuel_approval_status, fuel_approved_by, fuel_approved_at, fuel_rejection_reason, equipment_master:equipment_master_id (equipment_name), jobs:job_id (job_name)')
+          .not('fuel_approval_status', 'is', null)
           .order('entry_date', { ascending: false }),
         supabase
           .from('fuel_topup_requests')
-          .select('id, entry_date, vehicle_number, foreman_name, quantity, unit, remarks, jobs:job_id (job_name)')
-          .eq('status', 'PENDING')
+          .select('id, entry_date, vehicle_number, foreman_name, quantity, unit, remarks, status, approved_by, approved_at, rejection_reason, jobs:job_id (job_name)')
           .order('entry_date', { ascending: false }),
       ]);
 
@@ -121,6 +137,10 @@ export default function FuelApprovalsScreen() {
         fuel_unit: e.fuel_unit || '',
         equipment_name: e.equipment_master?.equipment_name || 'Unknown Equipment',
         job_name: e.jobs?.job_name || 'Unknown Job',
+        status: e.fuel_approval_status || 'PENDING',
+        approved_by: e.fuel_approved_by || null,
+        approved_at: e.fuel_approved_at || null,
+        rejection_reason: e.fuel_rejection_reason || null,
       });
 
       const all = [...(eq.data || []).map(toRow('equipment')), ...(fl.data || []).map(toRow('flushing'))];
@@ -136,6 +156,10 @@ export default function FuelApprovalsScreen() {
         unit: e.unit || '',
         job_name: e.jobs?.job_name || 'Unknown Job',
         remarks: e.remarks || null,
+        status: e.status || 'PENDING',
+        approved_by: e.approved_by || null,
+        approved_at: e.approved_at || null,
+        rejection_reason: e.rejection_reason || null,
       }));
       topups.sort((a, b) => (a.entry_date < b.entry_date ? 1 : -1));
       setTopupRequests(topups);
@@ -182,7 +206,10 @@ export default function FuelApprovalsScreen() {
         })
         .eq('id', req.id);
       if (error) throw error;
-      setRequests(prev => prev.filter(r => r.id !== req.id));
+      const approvedAt = new Date().toISOString();
+      setRequests(prev => prev.map(r => r.id === req.id
+        ? { ...r, fuel_quantity: quantity, status: 'APPROVED', approved_by: storeName, approved_at: approvedAt, rejection_reason: null }
+        : r));
       setExpandedId(null);
     } catch (err: any) {
       console.error('Error approving fuel request', err);
@@ -206,7 +233,11 @@ export default function FuelApprovalsScreen() {
         })
         .eq('id', req.id);
       if (error) throw error;
-      setRequests(prev => prev.filter(r => r.id !== req.id));
+      const approvedAt = new Date().toISOString();
+      const reason = rejectionReason.trim();
+      setRequests(prev => prev.map(r => r.id === req.id
+        ? { ...r, status: 'REJECTED', approved_by: storeName, approved_at: approvedAt, rejection_reason: reason }
+        : r));
       setExpandedId(null);
     } catch (err: any) {
       console.error('Error rejecting fuel request', err);
@@ -240,7 +271,10 @@ export default function FuelApprovalsScreen() {
         })
         .eq('id', req.id);
       if (error) throw error;
-      setTopupRequests(prev => prev.filter(r => r.id !== req.id));
+      const approvedAt = new Date().toISOString();
+      setTopupRequests(prev => prev.map(r => r.id === req.id
+        ? { ...r, quantity, status: 'APPROVED', approved_by: storeName, approved_at: approvedAt, rejection_reason: null }
+        : r));
       setExpandedTopupId(null);
     } catch (err: any) {
       console.error('Error approving fuel top-up request', err);
@@ -263,7 +297,11 @@ export default function FuelApprovalsScreen() {
         })
         .eq('id', req.id);
       if (error) throw error;
-      setTopupRequests(prev => prev.filter(r => r.id !== req.id));
+      const approvedAt = new Date().toISOString();
+      const reason = topupRejectionReason.trim();
+      setTopupRequests(prev => prev.map(r => r.id === req.id
+        ? { ...r, status: 'REJECTED', approved_by: storeName, approved_at: approvedAt, rejection_reason: reason }
+        : r));
       setExpandedTopupId(null);
     } catch (err: any) {
       console.error('Error rejecting fuel top-up request', err);
@@ -271,6 +309,21 @@ export default function FuelApprovalsScreen() {
       setActingTopupId(null);
     }
   };
+
+  // Counts and the filtered list are derived from whichever tab is active, so
+  // the Pending/Approved/Rejected/All row means the same thing on both tabs.
+  const activeList = activeTab === 'entries' ? requests : topupRequests;
+  const filterCounts = {
+    PENDING: activeList.filter(r => r.status === 'PENDING').length,
+    APPROVED: activeList.filter(r => r.status === 'APPROVED').length,
+    REJECTED: activeList.filter(r => r.status === 'REJECTED').length,
+    ALL: activeList.length,
+  };
+  const matchesFilter = (status: string) => statusFilter === 'ALL' || status === statusFilter;
+  const visibleRequests = requests.filter(r => matchesFilter(r.status));
+  const visibleTopups = topupRequests.filter(r => matchesFilter(r.status));
+  const pendingEntriesCount = requests.filter(r => r.status === 'PENDING').length;
+  const pendingTopupsCount = topupRequests.filter(r => r.status === 'PENDING').length;
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
@@ -289,7 +342,7 @@ export default function FuelApprovalsScreen() {
           className={`flex-1 py-2.5 rounded-lg items-center ${activeTab === 'entries' ? 'bg-white shadow-sm' : ''}`}
         >
           <Text className={`font-bold text-sm ${activeTab === 'entries' ? 'text-slate-900' : 'text-slate-500'}`}>
-            Fuel Confirmations {requests.length > 0 ? `(${requests.length})` : ''}
+            Fuel Confirmations {pendingEntriesCount > 0 ? `(${pendingEntriesCount})` : ''}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -297,9 +350,26 @@ export default function FuelApprovalsScreen() {
           className={`flex-1 py-2.5 rounded-lg items-center ${activeTab === 'topups' ? 'bg-white shadow-sm' : ''}`}
         >
           <Text className={`font-bold text-sm ${activeTab === 'topups' ? 'text-slate-900' : 'text-slate-500'}`}>
-            Top-Up Requests {topupRequests.length > 0 ? `(${topupRequests.length})` : ''}
+            Top-Up Requests {pendingTopupsCount > 0 ? `(${pendingTopupsCount})` : ''}
           </Text>
         </TouchableOpacity>
+      </View>
+
+      <View className="flex-row flex-wrap gap-2 mx-4 mt-3">
+        {(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as StatusFilter[]).map(f => (
+          <TouchableOpacity
+            key={f}
+            onPress={() => setStatusFilter(f)}
+            className={`px-3.5 py-2 rounded-full border flex-row items-center ${statusFilter === f ? 'bg-[#1e3a8a] border-[#1e3a8a]' : 'bg-white border-slate-200'}`}
+          >
+            <Text className={`font-bold text-xs ${statusFilter === f ? 'text-white' : 'text-slate-600'}`}>
+              {f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
+            </Text>
+            <View className={`ml-1.5 px-1.5 py-0.5 rounded-full ${statusFilter === f ? 'bg-white/20' : 'bg-slate-100'}`}>
+              <Text className={`text-[10px] font-bold ${statusFilter === f ? 'text-white' : 'text-slate-500'}`}>{filterCounts[f]}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
@@ -309,30 +379,36 @@ export default function FuelApprovalsScreen() {
             <ActivityIndicator size="large" color="#1e3a8a" />
           </View>
         ) : activeTab === 'entries' ? (
-        requests.length === 0 ? (
+        visibleRequests.length === 0 ? (
           <View className="py-20 items-center bg-white rounded-3xl border border-slate-100">
             <View className="bg-green-50 p-4 rounded-full mb-4">
               <CheckCircle2 size={32} color="#16a34a" />
             </View>
             <Text className="text-slate-900 text-lg font-black">All caught up</Text>
-            <Text className="text-slate-500 mt-1 text-center">No fuel requests waiting on confirmation.</Text>
+            <Text className="text-slate-500 mt-1 text-center">
+              {statusFilter === 'PENDING' ? 'No fuel requests waiting on confirmation.' : 'Nothing in this filter yet.'}
+            </Text>
           </View>
         ) : (
           <>
             <Text className="text-slate-500 font-medium mb-4">
               Check each request against your fuel-issue register, correct the liters if needed, then Approve -- or Reject with a reason if no fuel was actually given.
             </Text>
-            {requests.map(req => {
+            {visibleRequests.map(req => {
               const isExpanded = expandedId === req.id;
               const isActing = actingId === req.id;
+              const isPending = req.status === 'PENDING';
               return (
                 <View key={`${req.type}-${req.id}`} className="bg-white rounded-2xl border border-slate-200 mb-3 shadow-sm overflow-hidden">
-                  <TouchableOpacity onPress={() => openRequest(req)} className="p-4 active:bg-slate-50">
+                  <TouchableOpacity onPress={() => isPending && openRequest(req)} activeOpacity={isPending ? 0.7 : 1} className="p-4 active:bg-slate-50">
                     <View className="flex-row justify-between items-start mb-1">
-                      <View className={`px-2.5 py-1 rounded-full ${req.type === 'equipment' ? 'bg-blue-100' : 'bg-cyan-100'}`}>
-                        <Text className={`text-[10px] font-bold uppercase ${req.type === 'equipment' ? 'text-blue-700' : 'text-cyan-700'}`}>
-                          {TABLES[req.type].label}
-                        </Text>
+                      <View className="flex-row items-center" style={{ gap: 6 }}>
+                        <View className={`px-2.5 py-1 rounded-full ${req.type === 'equipment' ? 'bg-blue-100' : 'bg-cyan-100'}`}>
+                          <Text className={`text-[10px] font-bold uppercase ${req.type === 'equipment' ? 'text-blue-700' : 'text-cyan-700'}`}>
+                            {TABLES[req.type].label}
+                          </Text>
+                        </View>
+                        <StatusPill status={req.status} />
                       </View>
                       <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
                         <Fuel size={12} color="#d97706" />
@@ -342,6 +418,13 @@ export default function FuelApprovalsScreen() {
                     <Text className="text-slate-900 font-bold text-base mt-2">{req.equipment_name} · {req.vehicle_number}</Text>
                     <Text className="text-slate-500 text-sm mt-0.5">{req.job_name}</Text>
                     <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
+                    {!isPending && (
+                      <Text className="text-slate-400 text-xs mt-1.5">
+                        {req.status === 'APPROVED' ? 'Approved' : 'Rejected'} by {req.approved_by || 'Store'}
+                        {req.approved_at ? ` on ${new Date(req.approved_at).toLocaleDateString()}` : ''}
+                        {req.rejection_reason ? ` — "${req.rejection_reason}"` : ''}
+                      </Text>
+                    )}
                   </TouchableOpacity>
 
                   {isExpanded && (
@@ -445,28 +528,34 @@ export default function FuelApprovalsScreen() {
           </>
         )
         ) : (
-        topupRequests.length === 0 ? (
+        topupRequests.length === 0 || visibleTopups.length === 0 ? (
           <View className="py-20 items-center bg-white rounded-3xl border border-slate-100">
             <View className="bg-green-50 p-4 rounded-full mb-4">
               <CheckCircle2 size={32} color="#16a34a" />
             </View>
             <Text className="text-slate-900 text-lg font-black">All caught up</Text>
-            <Text className="text-slate-500 mt-1 text-center">No fuel top-up requests waiting on you.</Text>
+            <Text className="text-slate-500 mt-1 text-center">
+              {statusFilter === 'PENDING' ? 'No fuel top-up requests waiting on you.' : 'Nothing in this filter yet.'}
+            </Text>
           </View>
         ) : (
           <>
             <Text className="text-slate-500 font-medium mb-4">
               A Foreman is asking for fuel to be sent out. Confirm the liters you're actually issuing, then Approve -- or Reject with a reason if it's not needed.
             </Text>
-            {topupRequests.map(req => {
+            {visibleTopups.map(req => {
               const isExpanded = expandedTopupId === req.id;
               const isActing = actingTopupId === req.id;
+              const isPending = req.status === 'PENDING';
               return (
                 <View key={req.id} className="bg-white rounded-2xl border border-slate-200 mb-3 shadow-sm overflow-hidden">
-                  <TouchableOpacity onPress={() => openTopupRequest(req)} className="p-4 active:bg-slate-50">
+                  <TouchableOpacity onPress={() => isPending && openTopupRequest(req)} activeOpacity={isPending ? 0.7 : 1} className="p-4 active:bg-slate-50">
                     <View className="flex-row justify-between items-start mb-1">
-                      <View className="px-2.5 py-1 rounded-full bg-indigo-100">
-                        <Text className="text-[10px] font-bold uppercase text-indigo-700">Top-Up Request</Text>
+                      <View className="flex-row items-center" style={{ gap: 6 }}>
+                        <View className="px-2.5 py-1 rounded-full bg-indigo-100">
+                          <Text className="text-[10px] font-bold uppercase text-indigo-700">Top-Up Request</Text>
+                        </View>
+                        <StatusPill status={req.status} />
                       </View>
                       <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full">
                         <Fuel size={12} color="#d97706" />
@@ -478,6 +567,13 @@ export default function FuelApprovalsScreen() {
                     <Text className="text-slate-400 text-xs mt-1">{req.foreman_name} · {req.entry_date}</Text>
                     {!!req.remarks && (
                       <Text className="text-slate-500 text-xs mt-1.5 italic">"{req.remarks}"</Text>
+                    )}
+                    {!isPending && (
+                      <Text className="text-slate-400 text-xs mt-1.5">
+                        {req.status === 'APPROVED' ? 'Approved' : 'Rejected'} by {req.approved_by || 'Store'}
+                        {req.approved_at ? ` on ${new Date(req.approved_at).toLocaleDateString()}` : ''}
+                        {req.rejection_reason ? ` — "${req.rejection_reason}"` : ''}
+                      </Text>
                     )}
                   </TouchableOpacity>
 
