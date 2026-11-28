@@ -65,3 +65,14 @@ export function getEarlySubmissionFlag(entry: {
   }
   return null;
 }
+
+// Decimal hours (e.g. 12.67) -> "12h 40m" for display. The stored value stays
+// decimal so billing (hours x rate) keeps working.
+export function formatHoursMinutes(value: string | number | null | undefined): string {
+  const hrs = typeof value === 'number' ? value : parseFloat(value ?? '');
+  if (!isFinite(hrs) || hrs <= 0) return '0h';
+  let h = Math.floor(hrs);
+  let m = Math.round((hrs - h) * 60);
+  if (m === 60) { h += 1; m = 0; }
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}

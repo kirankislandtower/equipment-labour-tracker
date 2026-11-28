@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, ChevronDown, Check, X, Wrench, Calendar, Clock, WifiOff, Search, Truck, Users } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
-import { getLocalDateString } from '../../../lib/dateUtils';
+import { getLocalDateString, formatHoursMinutes } from '../../../lib/dateUtils';
 import TimePickerModal from '../../../components/TimePickerModal';
 import NetInfo from '@react-native-community/netinfo';
 import { enqueueEntry } from '../../../lib/offlineQueue';
@@ -883,8 +883,7 @@ export default function InternalVehicleEntryScreen() {
           <View className="flex-1 ml-2">
             <Text className="text-sm font-medium text-slate-700 mb-1">Total Working Hours</Text>
             <TextInput
-              value={formData.working_hours}
-              onChangeText={(t) => updateForm('working_hours', t)}
+              value={formatHoursMinutes(formData.working_hours)}
               className="bg-slate-100 border border-slate-200 text-slate-900 font-bold rounded-lg px-4 py-3.5"
               editable={false}
             />

@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ChevronDown, Check, X, Camera, Image as ImageIcon, Truck, Calendar, Clock, Fuel, WifiOff, Search } from 'lucide-react-native';
 import { supabase } from '../../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
-import { getLocalDateString } from '../../../lib/dateUtils';
+import { getLocalDateString, formatHoursMinutes } from '../../../lib/dateUtils';
 import WebCamera from '../../../components/WebCamera';
 import { uploadToCloudinary, getWatermarkedCloudinaryUrl } from '../../../lib/cloudinary';
 import { compressImageToDataUri } from '../../../lib/imageUtils';
@@ -1262,8 +1262,7 @@ export default function EquipmentEntryScreen() {
               <View className="flex-1 ml-2">
                 <Text className="text-sm font-medium text-slate-700 mb-1">Working Hours</Text>
                 <TextInput
-                  value={formData.working_hours}
-                  onChangeText={(t) => updateForm('working_hours', t)}
+                  value={formatHoursMinutes(formData.working_hours)}
                   className="bg-slate-100 border border-slate-200 text-slate-900 font-bold rounded-lg px-4 py-3.5"
                   editable={false}
                 />
